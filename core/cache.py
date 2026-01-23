@@ -15,9 +15,10 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 try:
-    import redis.asyncio as redis
+    import redis.asyncio as aioredis
     REDIS_AVAILABLE = True
 except ImportError:
+    aioredis = None
     REDIS_AVAILABLE = False
 
 
@@ -146,11 +147,11 @@ class RedisCache(CacheBackend):
         self._db = db
         self._password = password
         self._key_prefix = key_prefix
-        self._client: Optional[redis.Redis] = None
+        self._client = None
 
-    async def _get_client(self) -> redis.Redis:
+    async def _get_client(self):
         if self._client is None:
-            self._client = redis.Redis(
+            self._client = aioredis.Redis(
                 host=self._host,
                 port=self._port,
                 db=self._db,
