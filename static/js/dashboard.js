@@ -9,6 +9,8 @@ let netflowChart = null;
 let holdingsChart = null;
 let trendsChart = null;
 let sectorChart = null;
+let historyChart = null;
+let transferChart = null;
 
 // WSJ-inspired chart colors
 const CHART_COLORS = {
@@ -409,6 +411,46 @@ function renderSectorChart(data) {
     });
 }
 
+// === Sparkline Rendering ===
+
+function renderSparkline(data, momentum) {
+    if (!data || data.length < 2) return '';
+
+    // Normalize data to fit in a small SVG
+    const width = 60;
+    const height = 16;
+    const padding = 2;
+
+    const values = data.filter(v => v !== null && v !== undefined);
+    if (values.length < 2) return '';
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    // Generate path points
+    const points = values.map((v, i) => {
+        const x = padding + (i / (values.length - 1)) * (width - padding * 2);
+        const y = height - padding - ((v - min) / range) * (height - padding * 2);
+        return `${x},${y}`;
+    });
+
+    const color = momentum === 'accelerating' ? CHART_COLORS.positive :
+                  momentum === 'decelerating' ? CHART_COLORS.negative :
+                  CHART_COLORS.neutral;
+
+    return `
+        <svg class="sparkline" width="${width}" height="${height}" style="vertical-align: middle; margin-left: 4px;">
+            <polyline
+                fill="none"
+                stroke="${color}"
+                stroke-width="1.5"
+                points="${points.join(' ')}"
+            />
+        </svg>
+    `;
+}
+
 // === Data Loading ===
 
 async function loadData() {
@@ -448,11 +490,13 @@ async function loadPurchases(chains) {
                 <td class="numeric">${fmt.number(token.smart_money_holders)}</td>
                 <td class="numeric ${token.net_flow_24h_usd > 0 ? 'positive' : 'negative'}">
                     ${fmt.usdSigned(token.net_flow_24h_usd)}
+                    ${renderSparkline(token.netflow_trend, token.momentum)}
                 </td>
                 <td class="numeric">${fmt.usd(token.total_value_usd)}</td>
                 <td>
                     <span class="signal signal-${token.signal}">${token.signal}</span>
                     <span class="signal-strength">${token.signal_strength}</span>
+                    ${token.momentum !== 'steady' ? `<span class="momentum momentum-${token.momentum}">${token.momentum === 'accelerating' ? '↑' : '↓'}</span>` : ''}
                 </td>
             </tr>
         `).join('');
@@ -571,7 +615,12 @@ async function loadDrilldown(chain, tokenAddress) {
     $('#holders-body').innerHTML = '<tr><td colspan="3" class="loading">Loading...</td></tr>';
 
     try {
-        const data = await api.get(`/api/v1/token/${chain}/${tokenAddress}`);
+        // Load main drilldown data, historical data, and transfer data in parallel
+        const [data, historyData, transferData] = await Promise.all([
+            api.get(`/api/v1/token/${chain}/${tokenAddress}`),
+            api.get(`/api/v1/history/${chain}/${tokenAddress}?days=30`).catch(() => null),
+            api.get(`/api/v1/transfers/${chain}/${tokenAddress}?days=7`).catch(() => null),
+        ]);
 
         // Update title
         $('#drilldown-title').textContent = `${data.token_symbol} Analysis`;
@@ -582,8 +631,17 @@ async function loadDrilldown(chain, tokenAddress) {
         $('#whale-holders').textContent = fmt.number(data.holder_breakdown?.whale || 0);
         $('#exchange-holders').textContent = fmt.number(data.holder_breakdown?.exchange || 0);
 
-        // Update narrative
-        $('#drilldown-narrative').innerHTML = data.narrative?.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') || 'No analysis available.';
+        // Update narrative with historical context
+        let narrative = data.narrative?.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') || 'No analysis available.';
+        if (historyData?.metrics) {
+            const trend = historyData.metrics.trend;
+            const changePct = historyData.metrics.period_change_pct;
+            narrative += `<br><br><strong>30-Day Trend:</strong> ${trend} (${changePct > 0 ? '+' : ''}${changePct.toFixed(1)}% position change)`;
+        }
+        if (transferData?.summary) {
+            narrative += `<br><strong>CEX Flow Signal:</strong> ${transferData.summary.flow_signal}`;
+        }
+        $('#drilldown-narrative').innerHTML = narrative;
 
         // Render flow intelligence
         const flows = data.flow_intelligence;
@@ -619,6 +677,14 @@ async function loadDrilldown(chain, tokenAddress) {
                         ${fmt.usdSigned(flows.top_pnl?.net_flow_usd)}
                     </span>
                 </div>
+                ${transferData?.summary ? `
+                <div class="flow-segment" style="margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 8px;">
+                    <span class="flow-label">CEX Net Flow (7d)</span>
+                    <span class="flow-value ${transferData.summary.net_cex_flow < 0 ? 'positive' : 'negative'}">
+                        ${fmt.usdSigned(-transferData.summary.net_cex_flow)}
+                    </span>
+                </div>
+                ` : ''}
             `;
         }
 
@@ -637,10 +703,135 @@ async function loadDrilldown(chain, tokenAddress) {
             $('#holders-body').innerHTML = '<tr><td colspan="3">No holder data</td></tr>';
         }
 
+        // Render historical chart if data available
+        if (historyData?.chart_data?.length > 0) {
+            renderHistoricalChart(historyData.chart_data);
+        }
+
+        // Render transfer flow chart if data available
+        if (transferData?.summary) {
+            renderTransferChart(transferData.summary);
+        }
+
     } catch (error) {
         console.error('Error loading drilldown:', error);
         $('#drilldown-narrative').textContent = `Error loading data: ${error.message}`;
     }
+}
+
+// === Historical Charts ===
+
+function renderHistoricalChart(data) {
+    const container = document.getElementById('history-chart');
+    if (!container) return;
+
+    if (historyChart) {
+        historyChart.destroy();
+    }
+
+    const labels = data.map(d => {
+        const date = new Date(d.date);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const values = data.map(d => d.value_usd);
+
+    historyChart = new Chart(container, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Smart Money Position',
+                data: values,
+                borderColor: CHART_COLORS.neutral,
+                backgroundColor: 'rgba(102, 102, 102, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => fmt.usd(context.raw)
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { maxTicksLimit: 6 }
+                },
+                y: {
+                    grid: { color: CHART_COLORS.border },
+                    ticks: {
+                        callback: (value) => fmt.usd(value)
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderTransferChart(summary) {
+    const container = document.getElementById('transfer-chart');
+    if (!container) return;
+
+    if (transferChart) {
+        transferChart.destroy();
+    }
+
+    const labels = ['CEX Deposits', 'CEX Withdrawals', 'DEX Activity'];
+    const values = [
+        summary.cex_deposit_volume || 0,
+        summary.cex_withdrawal_volume || 0,
+        summary.dex_volume || 0,
+    ];
+    const colors = [
+        CHART_COLORS.negative,  // CEX deposits = bearish
+        CHART_COLORS.positive,  // CEX withdrawals = bullish
+        CHART_COLORS.neutral,   // DEX = neutral
+    ];
+
+    transferChart = new Chart(container, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => fmt.usd(context.raw)
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: CHART_COLORS.border },
+                    ticks: {
+                        callback: (value) => fmt.usd(value)
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                }
+            }
+        }
+    });
 }
 
 function updateLastUpdated() {

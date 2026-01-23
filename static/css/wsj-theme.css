@@ -256,6 +256,28 @@ h2 { font-size: 20px; }
   margin-left: 4px;
 }
 
+/* Momentum indicators */
+.momentum {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.momentum-accelerating {
+  color: var(--color-bullish);
+}
+
+.momentum-decelerating {
+  color: var(--color-bearish);
+}
+
+/* Sparkline */
+.sparkline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* Views */
 .view {
   display: none;

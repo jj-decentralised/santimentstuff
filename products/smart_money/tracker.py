@@ -34,6 +34,11 @@ class TokenPurchaseItem:
     signal: str  # "accumulating", "distributing", "neutral"
     signal_strength: str  # "strong", "moderate", "weak"
     sectors: list[str]
+    # Historical netflow data for sparklines
+    net_flow_1h_usd: float = 0
+    net_flow_7d_usd: float = 0
+    net_flow_30d_usd: float = 0
+    momentum: str = "steady"  # "accelerating", "decelerating", "steady"
 
     def to_dict(self) -> dict:
         return {
@@ -47,6 +52,14 @@ class TokenPurchaseItem:
             "signal": self.signal,
             "signal_strength": self.signal_strength,
             "sectors": self.sectors,
+            # Sparkline data
+            "netflow_trend": [
+                self.net_flow_1h_usd,
+                self.net_flow_24h_usd,
+                self.net_flow_7d_usd,
+                self.net_flow_30d_usd,
+            ],
+            "momentum": self.momentum,
         }
 
 
@@ -116,6 +129,7 @@ class SmartMoneyTracker:
         for h in holdings:
             nf = netflow_map.get(h.token_address)
             signal, strength = self._calculate_signal(h, nf)
+            momentum = self._calculate_momentum(nf) if nf else "steady"
 
             tokens.append(TokenPurchaseItem(
                 token_symbol=h.token_symbol,
@@ -128,6 +142,11 @@ class SmartMoneyTracker:
                 signal=signal,
                 signal_strength=strength,
                 sectors=h.token_sectors,
+                # Historical data for sparklines
+                net_flow_1h_usd=nf.net_flow_1h_usd if nf else 0,
+                net_flow_7d_usd=nf.net_flow_7d_usd if nf else 0,
+                net_flow_30d_usd=nf.net_flow_30d_usd if nf else 0,
+                momentum=momentum,
             ))
 
         # Sort
@@ -339,6 +358,64 @@ class SmartMoneyTracker:
 
         return "neutral", "weak"
 
+    def _calculate_momentum(self, netflow: TokenNetflow) -> str:
+        """
+        Calculate momentum based on netflow acceleration.
+
+        Compares rate of change across time periods:
+        - If 1h rate > 24h rate > 7d rate → accelerating
+        - If 1h rate < 24h rate < 7d rate → decelerating
+        - Otherwise → steady
+        """
+        # Normalize to daily rates for comparison
+        rate_1h = netflow.net_flow_1h_usd * 24  # Annualize hourly rate
+        rate_24h = netflow.net_flow_24h_usd
+        rate_7d = netflow.net_flow_7d_usd / 7 if netflow.net_flow_7d_usd else 0
+
+        # Check for acceleration (recent flows stronger than historical)
+        if rate_1h > rate_24h > rate_7d and rate_24h > 0:
+            return "accelerating"
+        elif rate_1h < rate_24h < rate_7d and rate_24h < 0:
+            return "accelerating"  # Accelerating distribution
+        elif rate_1h < rate_24h < rate_7d and rate_24h > 0:
+            return "decelerating"
+        elif rate_1h > rate_24h > rate_7d and rate_24h < 0:
+            return "decelerating"  # Decelerating distribution
+
+        return "steady"
+
+    def _calculate_velocity(
+        self,
+        balance_24h: float,
+        balance_7d: float,
+        balance_30d: float,
+    ) -> dict:
+        """
+        Calculate holder velocity from balance changes.
+
+        Returns velocity indicator and trend data.
+        """
+        # Normalize to daily rates
+        rate_24h = balance_24h
+        rate_7d = balance_7d / 7 if balance_7d else 0
+        rate_30d = balance_30d / 30 if balance_30d else 0
+
+        # Determine velocity
+        if rate_24h > rate_7d > rate_30d:
+            velocity = "accelerating"
+        elif rate_24h < rate_7d < rate_30d:
+            velocity = "decelerating"
+        else:
+            velocity = "steady"
+
+        return {
+            "indicator": velocity,
+            "rate_24h": rate_24h,
+            "rate_7d": rate_7d,
+            "rate_30d": rate_30d,
+            "trend": [balance_24h, balance_7d, balance_30d],
+        }
+
     def _count_holders_by_category(
         self,
         holders: list[TokenHolder],
@@ -510,4 +587,154 @@ class SmartMoneyTracker:
             "short_volume_usd": short_volume,
             "sentiment": "bullish" if long_count > short_count else "bearish" if short_count > long_count else "neutral",
             "trades": formatted,
+        }
+
+    # === Historical Data Methods ===
+
+    async def get_token_history(
+        self,
+        chain: str,
+        token_address: str,
+        days: int = 30,
+    ) -> dict:
+        """
+        Get historical smart money holdings for a token.
+
+        Returns time-series data showing position building over time.
+        """
+        try:
+            history = await self.client.get_historical_holdings(token_address, chain, days)
+        except Exception:
+            history = []
+
+        # Format for chart
+        chart_data = []
+        for h in history:
+            chart_data.append({
+                "date": h.get("date", ""),
+                "value_usd": h.get("value_usd", 0),
+                "balance": h.get("balance", 0),
+                "holder_count": h.get("holder_count", 0),
+            })
+
+        # Calculate key metrics
+        if len(chart_data) >= 2:
+            first_value = chart_data[0].get("value_usd", 0)
+            last_value = chart_data[-1].get("value_usd", 0)
+            change_pct = ((last_value - first_value) / first_value * 100) if first_value else 0
+
+            # Find peak and trough
+            values = [d.get("value_usd", 0) for d in chart_data]
+            peak_value = max(values) if values else 0
+            trough_value = min(values) if values else 0
+            peak_date = chart_data[values.index(peak_value)].get("date") if peak_value else None
+        else:
+            change_pct = 0
+            peak_value = 0
+            trough_value = 0
+            peak_date = None
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "chain": chain,
+            "token_address": token_address,
+            "days": days,
+            "data_points": len(chart_data),
+            "chart_data": chart_data,
+            "metrics": {
+                "period_change_pct": change_pct,
+                "peak_value_usd": peak_value,
+                "peak_date": peak_date,
+                "trough_value_usd": trough_value,
+                "trend": "accumulating" if change_pct > 10 else "distributing" if change_pct < -10 else "stable",
+            },
+        }
+
+    async def get_token_transfers(
+        self,
+        chain: str,
+        token_address: str,
+        days: int = 7,
+    ) -> dict:
+        """
+        Get token transfer activity by smart money.
+
+        Returns flow analysis: CEX deposits (exit signals) vs DEX activity.
+        """
+        try:
+            transfers = await self.client.get_token_transfers(token_address, chain, days)
+        except Exception:
+            transfers = []
+
+        # Categorize transfers
+        cex_deposits = []
+        cex_withdrawals = []
+        dex_swaps = []
+        wallet_transfers = []
+
+        cex_deposit_volume = 0
+        cex_withdrawal_volume = 0
+        dex_volume = 0
+        wallet_volume = 0
+
+        for t in transfers:
+            transfer_type = t.get("transfer_type", "").lower()
+            value = t.get("value_usd", 0) or 0
+
+            transfer_item = {
+                "timestamp": t.get("timestamp", ""),
+                "from_address": t.get("from_address", ""),
+                "from_label": t.get("from_label", ""),
+                "to_address": t.get("to_address", ""),
+                "to_label": t.get("to_label", ""),
+                "value_usd": value,
+                "type": transfer_type,
+            }
+
+            if "cex" in transfer_type and "deposit" in transfer_type:
+                cex_deposits.append(transfer_item)
+                cex_deposit_volume += value
+            elif "cex" in transfer_type and "withdrawal" in transfer_type:
+                cex_withdrawals.append(transfer_item)
+                cex_withdrawal_volume += value
+            elif "dex" in transfer_type or "swap" in transfer_type:
+                dex_swaps.append(transfer_item)
+                dex_volume += value
+            else:
+                wallet_transfers.append(transfer_item)
+                wallet_volume += value
+
+        # Determine flow sentiment
+        net_cex_flow = cex_deposit_volume - cex_withdrawal_volume
+        if net_cex_flow > 100_000:
+            flow_sentiment = "bearish"  # Net deposits to CEX = sell pressure
+            flow_signal = "CEX deposits high - potential sell pressure"
+        elif net_cex_flow < -100_000:
+            flow_sentiment = "bullish"  # Net withdrawals from CEX = accumulation
+            flow_signal = "CEX withdrawals high - accumulation signal"
+        else:
+            flow_sentiment = "neutral"
+            flow_signal = "Balanced CEX flows"
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "chain": chain,
+            "token_address": token_address,
+            "days": days,
+            "total_transfers": len(transfers),
+            "summary": {
+                "cex_deposit_volume": cex_deposit_volume,
+                "cex_withdrawal_volume": cex_withdrawal_volume,
+                "net_cex_flow": net_cex_flow,
+                "dex_volume": dex_volume,
+                "wallet_volume": wallet_volume,
+                "flow_sentiment": flow_sentiment,
+                "flow_signal": flow_signal,
+            },
+            "flow_breakdown": {
+                "cex_deposits": cex_deposits[:10],
+                "cex_withdrawals": cex_withdrawals[:10],
+                "dex_swaps": dex_swaps[:10],
+                "wallet_transfers": wallet_transfers[:10],
+            },
         }
