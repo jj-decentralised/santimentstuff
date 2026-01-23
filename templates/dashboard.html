@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fund Portfolio Tracker</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="header">
+        <h1>Fund Portfolio Tracker</h1>
+        <div class="header-controls">
+            <select id="fundSelector" class="fund-selector">
+                <option value="">Select a fund...</option>
+            </select>
+            <span id="lastUpdated" class="last-updated"></span>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <!-- Summary Cards -->
+        <section class="summary-cards" id="summaryCards">
+            <div class="card">
+                <div class="card-label">Total Value</div>
+                <div class="card-value" id="totalValue">-</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Cost Basis</div>
+                <div class="card-value" id="costBasis">-</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Unrealized P/L</div>
+                <div class="card-value" id="unrealizedPnl">-</div>
+            </div>
+            <div class="card">
+                <div class="card-label">P/L %</div>
+                <div class="card-value" id="pnlPercent">-</div>
+            </div>
+        </section>
+
+        <!-- Charts Row -->
+        <section class="charts-row">
+            <div class="chart-container">
+                <h3>Portfolio Allocation</h3>
+                <canvas id="allocationChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Cumulative Flows</h3>
+                <canvas id="flowChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Holdings Table -->
+        <section class="holdings-section">
+            <h3>Holdings</h3>
+            <div class="table-container">
+                <table class="holdings-table" id="holdingsTable">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>Chain</th>
+                            <th>Balance</th>
+                            <th>Price</th>
+                            <th>Value</th>
+                            <th>Cost Basis</th>
+                            <th>P/L</th>
+                            <th>P/L %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="holdingsBody">
+                        <tr><td colspan="8" class="no-data">Select a fund to view holdings</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Recent Activity -->
+        <section class="activity-section">
+            <h3>Recent Activity</h3>
+            <div class="table-container">
+                <table class="activity-table" id="activityTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Token</th>
+                            <th>Amount</th>
+                            <th>Value (USD)</th>
+                            <th>Counterparty</th>
+                            <th>Chain</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activityBody">
+                        <tr><td colspan="7" class="no-data">Select a fund to view activity</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Fund Comparison -->
+        <section class="comparison-section">
+            <h3>Fund Comparison</h3>
+            <div class="comparison-controls">
+                <button id="compareBtn" class="btn">Compare All Funds</button>
+            </div>
+            <div class="comparison-grid" id="comparisonGrid">
+                <p class="no-data">Click "Compare All Funds" to see comparison</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>Data powered by <a href="https://arkm.com" target="_blank">Arkham Intelligence</a></p>
+    </footer>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
