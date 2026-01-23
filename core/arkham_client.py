@@ -131,7 +131,11 @@ class ArkhamClient:
                 cache_ttl=CacheManager.LONG,
             )
             return Fund.from_api(data)
-        except httpx.HTTPStatusError:
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP error fetching entity {entity_id}: {e.response.status_code}")
+            return None
+        except Exception as e:
+            print(f"Error fetching entity {entity_id}: {e}")
             return None
 
     async def get_available_funds(self) -> list[Fund]:
@@ -140,9 +144,17 @@ class ArkhamClient:
         tasks = [self.get_entity(fund_id) for fund_id in self.KNOWN_FUNDS]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for result in results:
-            if isinstance(result, Fund) and result.type == "fund":
-                funds.append(result)
+        for i, result in enumerate(results):
+            fund_id = self.KNOWN_FUNDS[i]
+            if isinstance(result, Exception):
+                print(f"Error fetching {fund_id}: {result}")
+            elif isinstance(result, Fund):
+                # Accept fund type or any entity we successfully fetched
+                if result.type in ("fund", "exchange", "individual", "unknown"):
+                    funds.append(result)
+                    print(f"Loaded fund: {result.name} ({result.id})")
+            else:
+                print(f"No data for {fund_id}")
 
         return funds
 

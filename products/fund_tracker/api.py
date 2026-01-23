@@ -251,9 +251,13 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         """Health check endpoint."""
+        api_key = os.environ.get("ARKHAM_API_KEY", "")
         return {
             "status": "healthy",
+            "api_key_set": bool(api_key),
+            "api_key_preview": api_key[:8] + "..." if api_key else "NOT SET",
             "cache_stats": _cache.stats() if _cache else {},
+            "tracker_ready": _tracker is not None,
         }
 
     return app
