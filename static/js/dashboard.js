@@ -640,6 +640,28 @@ async function loadDrilldown(chain, tokenAddress) {
     state.currentToken = { chain, address: tokenAddress };
     showView('drilldown');
 
+    // Restore chart canvases (in case they were replaced with no-data message)
+    const drilldownView = document.getElementById('drilldown-view');
+    const chartContainers = drilldownView?.querySelectorAll('.chart-container');
+    if (chartContainers) {
+        chartContainers.forEach((container, idx) => {
+            const canvasId = idx === 0 ? 'history-chart' : 'transfer-chart';
+            if (!container.querySelector('canvas')) {
+                container.innerHTML = `<canvas id="${canvasId}"></canvas>`;
+            }
+        });
+    }
+
+    // Destroy existing charts
+    if (historyChart) {
+        historyChart.destroy();
+        historyChart = null;
+    }
+    if (transferChart) {
+        transferChart.destroy();
+        transferChart = null;
+    }
+
     // Show loading state
     $('#drilldown-title').textContent = 'Loading...';
     $('#drilldown-narrative').textContent = 'Loading analysis...';
@@ -726,12 +748,26 @@ async function loadDrilldown(chain, tokenAddress) {
 
         // Render historical chart using netflow trend
         if (data.netflow_trend?.values) {
-            renderHistoricalChart(data.netflow_trend);
+            const hasData = data.netflow_trend.values.some(v => v !== 0);
+            if (hasData) {
+                renderHistoricalChart(data.netflow_trend);
+            } else {
+                renderNoDataChart('history-chart', 'No netflow data available for this token');
+            }
+        } else {
+            renderNoDataChart('history-chart', 'No netflow data available');
         }
 
         // Render buyer/seller activity chart
         if (data.buyer_seller_summary) {
-            renderTransferChart(data.buyer_seller_summary);
+            const hasActivity = data.buyer_seller_summary.buyer_volume > 0 || data.buyer_seller_summary.seller_volume > 0;
+            if (hasActivity) {
+                renderTransferChart(data.buyer_seller_summary);
+            } else {
+                renderNoDataChart('transfer-chart', 'No recent buyer/seller activity');
+            }
+        } else {
+            renderNoDataChart('transfer-chart', 'No activity data available');
         }
 
     } catch (error) {
@@ -741,6 +777,21 @@ async function loadDrilldown(chain, tokenAddress) {
 }
 
 // === Historical Charts ===
+
+function renderNoDataChart(canvasId, message) {
+    const container = document.getElementById(canvasId);
+    if (!container) return;
+
+    // Get the parent container and replace canvas with message
+    const parent = container.parentElement;
+    if (parent) {
+        parent.innerHTML = `
+            <div class="no-data-message">
+                <span>${message}</span>
+            </div>
+        `;
+    }
+}
 
 function renderHistoricalChart(netflowTrend) {
     const container = document.getElementById('history-chart');

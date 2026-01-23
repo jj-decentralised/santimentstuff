@@ -224,6 +224,18 @@ h2 { font-size: 20px; }
   position: relative;
 }
 
+.no-data-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-style: italic;
+  background: var(--color-bg-subtle);
+  border: 1px dashed var(--color-border);
+}
+
 /* Cards */
 .card {
   background: var(--color-bg);
