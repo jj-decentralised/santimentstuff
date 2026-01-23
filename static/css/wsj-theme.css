@@ -105,7 +105,7 @@ h2 { font-size: 20px; }
 /* Stats Grid */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--spacing-md);
   margin-bottom: var(--spacing-lg);
 }
@@ -133,6 +133,67 @@ h2 { font-size: 20px; }
 
 .stat-card .stat-value.positive { color: var(--color-bullish); }
 .stat-card .stat-value.negative { color: var(--color-bearish); }
+
+.stat-card-expanded {
+  grid-column: span 2;
+}
+
+.stat-details {
+  margin-top: var(--spacing-sm);
+  font-size: 12px;
+}
+
+.flow-breakdown {
+  margin-bottom: var(--spacing-xs);
+}
+
+.flow-sentiment {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: var(--spacing-xs);
+}
+
+.flow-sentiment.bullish {
+  background: var(--color-bullish-bg);
+  color: var(--color-bullish);
+}
+
+.flow-sentiment.bearish {
+  background: var(--color-bearish-bg);
+  color: var(--color-bearish);
+}
+
+.flow-sentiment.neutral {
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral);
+}
+
+.top-movers {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.movers-label {
+  margin-right: 4px;
+}
+
+.mover {
+  display: inline-block;
+  margin-right: 4px;
+  font-weight: 500;
+}
+
+.mover.positive {
+  color: var(--color-bullish);
+}
+
+.mover.negative {
+  color: var(--color-bearish);
+}
 
 /* Charts */
 .charts-row {
@@ -461,7 +522,11 @@ h2 { font-size: 20px; }
 /* Responsive */
 @media (max-width: 1200px) {
   .stats-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .stat-card-expanded {
+    grid-column: span 1;
   }
 }
 

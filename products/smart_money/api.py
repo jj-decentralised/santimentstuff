@@ -219,48 +219,6 @@ def create_app() -> FastAPI:
 
         return await _tracker.get_perp_trades(limit)
 
-    # === Historical Data Endpoints ===
-
-    @app.get("/api/v1/history/{chain}/{token_address}")
-    async def get_token_history(
-        chain: str,
-        token_address: str,
-        days: int = Query(default=30, ge=1, le=365),
-    ):
-        """
-        Get historical smart money holdings for a token.
-
-        Returns time-series data showing position building over time.
-        Up to 365 days of historical data (4 years max available via API).
-        """
-        if not _tracker:
-            raise HTTPException(500, "Tracker not initialized")
-
-        if chain not in VALID_CHAINS:
-            raise HTTPException(400, f"Invalid chain: {chain}. Valid: {VALID_CHAINS}")
-
-        return await _tracker.get_token_history(chain, token_address, days)
-
-    @app.get("/api/v1/transfers/{chain}/{token_address}")
-    async def get_token_transfers(
-        chain: str,
-        token_address: str,
-        days: int = Query(default=7, ge=1, le=30),
-    ):
-        """
-        Get token transfer activity by smart money.
-
-        Returns flow analysis including CEX deposits (exit signals) vs DEX activity.
-        Useful for identifying accumulation/distribution patterns.
-        """
-        if not _tracker:
-            raise HTTPException(500, "Tracker not initialized")
-
-        if chain not in VALID_CHAINS:
-            raise HTTPException(400, f"Invalid chain: {chain}. Valid: {VALID_CHAINS}")
-
-        return await _tracker.get_token_transfers(chain, token_address, days)
-
     # === Reference Endpoints ===
 
     @app.get("/api/v1/chains")

@@ -32,9 +32,10 @@
                     <div class="stat-label">Total Smart Money Value</div>
                     <div class="stat-value" id="total-value">--</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-expanded">
                     <div class="stat-label">24h Net Flow</div>
                     <div class="stat-value" id="net-flow">--</div>
+                    <div class="stat-details" id="net-flow-details"></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">Tokens Accumulating</div>
@@ -223,16 +224,16 @@
 
             <div class="narrative" id="drilldown-narrative">Loading analysis...</div>
 
-            <!-- Historical Charts Row -->
+            <!-- Flow Trend Charts Row -->
             <div class="charts-row">
                 <div class="chart-card">
-                    <div class="chart-header">Smart Money Position (30d)</div>
+                    <div class="chart-header">Net Flow Trend (1h → 30d)</div>
                     <div class="chart-container">
                         <canvas id="history-chart"></canvas>
                     </div>
                 </div>
                 <div class="chart-card">
-                    <div class="chart-header">Transfer Flow (7d)</div>
+                    <div class="chart-header">Buyer vs Seller Activity</div>
                     <div class="chart-container">
                         <canvas id="transfer-chart"></canvas>
                     </div>

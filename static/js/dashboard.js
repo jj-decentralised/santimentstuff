@@ -191,12 +191,44 @@ async function loadOverview() {
 
         // Update stat cards
         $('#total-value').textContent = fmt.usd(data.summary?.total_value_usd);
-        $('#net-flow').textContent = fmt.usdSigned(data.summary?.net_flow_24h);
-        $('#net-flow').className = `stat-value ${data.summary?.net_flow_24h > 0 ? 'positive' : 'negative'}`;
         $('#accumulating').textContent = fmt.number(data.summary?.tokens_accumulating);
         $('#distributing').textContent = fmt.number(data.summary?.tokens_distributing);
         $('#buy-vol').textContent = fmt.usd(data.trade_summary?.buy_volume_usd);
         $('#sell-vol').textContent = fmt.usd(data.trade_summary?.sell_volume_usd);
+
+        // Enhanced Net Flow card with breakdown
+        const breakdown = data.net_flow_breakdown;
+        if (breakdown) {
+            const netFlowEl = $('#net-flow');
+            netFlowEl.textContent = fmt.usdSigned(breakdown.net);
+            netFlowEl.className = `stat-value ${breakdown.net > 0 ? 'positive' : 'negative'}`;
+
+            // Update net flow details if element exists
+            const detailsEl = $('#net-flow-details');
+            if (detailsEl) {
+                const topInflows = breakdown.top_inflows?.slice(0, 3) || [];
+                const topOutflows = breakdown.top_outflows?.slice(0, 3) || [];
+
+                detailsEl.innerHTML = `
+                    <div class="flow-breakdown">
+                        <span class="positive">+${fmt.usd(breakdown.inflow)}</span>
+                        <span class="neutral"> / </span>
+                        <span class="negative">-${fmt.usd(breakdown.outflow)}</span>
+                    </div>
+                    <div class="flow-sentiment ${breakdown.sentiment}">${breakdown.sentiment.toUpperCase()}</div>
+                    ${topInflows.length > 0 ? `
+                    <div class="top-movers">
+                        <span class="movers-label">Top inflows:</span>
+                        ${topInflows.map(t => `<span class="mover positive">${t.token}</span>`).join(' ')}
+                    </div>
+                    ` : ''}
+                `;
+            }
+        } else {
+            // Fallback to old format
+            $('#net-flow').textContent = fmt.usdSigned(data.summary?.net_flow_24h);
+            $('#net-flow').className = `stat-value ${data.summary?.net_flow_24h > 0 ? 'positive' : 'negative'}`;
+        }
 
         // Render charts
         renderNetflowChart(data.charts?.top_by_inflow || []);
@@ -615,12 +647,8 @@ async function loadDrilldown(chain, tokenAddress) {
     $('#holders-body').innerHTML = '<tr><td colspan="3" class="loading">Loading...</td></tr>';
 
     try {
-        // Load main drilldown data, historical data, and transfer data in parallel
-        const [data, historyData, transferData] = await Promise.all([
-            api.get(`/api/v1/token/${chain}/${tokenAddress}`),
-            api.get(`/api/v1/history/${chain}/${tokenAddress}?days=30`).catch(() => null),
-            api.get(`/api/v1/transfers/${chain}/${tokenAddress}?days=7`).catch(() => null),
-        ]);
+        // Load drilldown data (now includes netflow_trend and buyer_seller_summary)
+        const data = await api.get(`/api/v1/token/${chain}/${tokenAddress}`);
 
         // Update title
         $('#drilldown-title').textContent = `${data.token_symbol} Analysis`;
@@ -631,15 +659,16 @@ async function loadDrilldown(chain, tokenAddress) {
         $('#whale-holders').textContent = fmt.number(data.holder_breakdown?.whale || 0);
         $('#exchange-holders').textContent = fmt.number(data.holder_breakdown?.exchange || 0);
 
-        // Update narrative with historical context
+        // Update narrative with flow context
         let narrative = data.narrative?.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') || 'No analysis available.';
-        if (historyData?.metrics) {
-            const trend = historyData.metrics.trend;
-            const changePct = historyData.metrics.period_change_pct;
-            narrative += `<br><br><strong>30-Day Trend:</strong> ${trend} (${changePct > 0 ? '+' : ''}${changePct.toFixed(1)}% position change)`;
+        if (data.netflow_trend) {
+            const momentum = data.netflow_trend.momentum;
+            const flow30d = data.netflow_trend.values[3];
+            narrative += `<br><br><strong>30-Day Flow:</strong> ${fmt.usdSigned(flow30d)} (${momentum})`;
         }
-        if (transferData?.summary) {
-            narrative += `<br><strong>CEX Flow Signal:</strong> ${transferData.summary.flow_signal}`;
+        if (data.buyer_seller_summary) {
+            const sentiment = data.buyer_seller_summary.sentiment;
+            narrative += `<br><strong>Recent Activity:</strong> ${sentiment} (${data.buyer_seller_summary.buyer_count} buyers, ${data.buyer_seller_summary.seller_count} sellers)`;
         }
         $('#drilldown-narrative').innerHTML = narrative;
 
@@ -677,14 +706,6 @@ async function loadDrilldown(chain, tokenAddress) {
                         ${fmt.usdSigned(flows.top_pnl?.net_flow_usd)}
                     </span>
                 </div>
-                ${transferData?.summary ? `
-                <div class="flow-segment" style="margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 8px;">
-                    <span class="flow-label">CEX Net Flow (7d)</span>
-                    <span class="flow-value ${transferData.summary.net_cex_flow < 0 ? 'positive' : 'negative'}">
-                        ${fmt.usdSigned(-transferData.summary.net_cex_flow)}
-                    </span>
-                </div>
-                ` : ''}
             `;
         }
 
@@ -703,14 +724,14 @@ async function loadDrilldown(chain, tokenAddress) {
             $('#holders-body').innerHTML = '<tr><td colspan="3">No holder data</td></tr>';
         }
 
-        // Render historical chart if data available
-        if (historyData?.chart_data?.length > 0) {
-            renderHistoricalChart(historyData.chart_data);
+        // Render historical chart using netflow trend
+        if (data.netflow_trend?.values) {
+            renderHistoricalChart(data.netflow_trend);
         }
 
-        // Render transfer flow chart if data available
-        if (transferData?.summary) {
-            renderTransferChart(transferData.summary);
+        // Render buyer/seller activity chart
+        if (data.buyer_seller_summary) {
+            renderTransferChart(data.buyer_seller_summary);
         }
 
     } catch (error) {
@@ -721,7 +742,7 @@ async function loadDrilldown(chain, tokenAddress) {
 
 // === Historical Charts ===
 
-function renderHistoricalChart(data) {
+function renderHistoricalChart(netflowTrend) {
     const container = document.getElementById('history-chart');
     if (!container) return;
 
@@ -729,25 +750,30 @@ function renderHistoricalChart(data) {
         historyChart.destroy();
     }
 
-    const labels = data.map(d => {
-        const date = new Date(d.date);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    });
-    const values = data.map(d => d.value_usd);
+    // Use netflow trend data: [1h, 24h, 7d, 30d]
+    const labels = netflowTrend.periods || ['1h', '24h', '7d', '30d'];
+    const values = netflowTrend.values || [0, 0, 0, 0];
+    const momentum = netflowTrend.momentum || 'steady';
+
+    // Color based on momentum
+    const lineColor = momentum === 'accelerating' ? CHART_COLORS.positive :
+                      momentum === 'decelerating' ? CHART_COLORS.negative :
+                      CHART_COLORS.neutral;
 
     historyChart = new Chart(container, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [{
-                label: 'Smart Money Position',
+                label: 'Net Flow',
                 data: values,
-                borderColor: CHART_COLORS.neutral,
-                backgroundColor: 'rgba(102, 102, 102, 0.1)',
+                borderColor: lineColor,
+                backgroundColor: lineColor + '20',
                 fill: true,
                 tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: lineColor,
             }]
         },
         options: {
@@ -757,14 +783,13 @@ function renderHistoricalChart(data) {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (context) => fmt.usd(context.raw)
+                        label: (context) => fmt.usdSigned(context.raw)
                     }
                 }
             },
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { maxTicksLimit: 6 }
                 },
                 y: {
                     grid: { color: CHART_COLORS.border },
@@ -777,7 +802,7 @@ function renderHistoricalChart(data) {
     });
 }
 
-function renderTransferChart(summary) {
+function renderTransferChart(buyerSellerSummary) {
     const container = document.getElementById('transfer-chart');
     if (!container) return;
 
@@ -785,16 +810,15 @@ function renderTransferChart(summary) {
         transferChart.destroy();
     }
 
-    const labels = ['CEX Deposits', 'CEX Withdrawals', 'DEX Activity'];
+    // Use buyer/seller data from drilldown
+    const labels = ['Buyers', 'Sellers'];
     const values = [
-        summary.cex_deposit_volume || 0,
-        summary.cex_withdrawal_volume || 0,
-        summary.dex_volume || 0,
+        buyerSellerSummary.buyer_volume || 0,
+        buyerSellerSummary.seller_volume || 0,
     ];
     const colors = [
-        CHART_COLORS.negative,  // CEX deposits = bearish
-        CHART_COLORS.positive,  // CEX withdrawals = bullish
-        CHART_COLORS.neutral,   // DEX = neutral
+        CHART_COLORS.positive,  // Buyers = bullish
+        CHART_COLORS.negative,  // Sellers = bearish
     ];
 
     transferChart = new Chart(container, {
@@ -815,7 +839,7 @@ function renderTransferChart(summary) {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (context) => fmt.usd(context.raw)
+                        label: (context) => `${fmt.usd(context.raw)} (${context.label === 'Buyers' ? buyerSellerSummary.buyer_count : buyerSellerSummary.seller_count} wallets)`
                     }
                 }
             },

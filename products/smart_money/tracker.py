@@ -238,14 +238,15 @@ class SmartMoneyTracker:
         Returns:
             Token drilldown response dict
         """
-        # Fetch all TGM data in parallel with error handling
+        # Fetch all TGM data + netflow in parallel with error handling
         holders_task = self.client.get_token_holders(token_address, chain)
         flows_task = self.client.get_flow_intelligence(token_address, chain)
         buyers_task = self.client.get_who_bought_sold(token_address, chain, "buy")
         sellers_task = self.client.get_who_bought_sold(token_address, chain, "sell")
+        netflow_task = self.client.get_smart_money_netflow([chain], 100)
 
         results = await asyncio.gather(
-            holders_task, flows_task, buyers_task, sellers_task,
+            holders_task, flows_task, buyers_task, sellers_task, netflow_task,
             return_exceptions=True
         )
 
@@ -254,15 +255,20 @@ class SmartMoneyTracker:
         flows = results[1] if not isinstance(results[1], Exception) else None
         buyers = results[2] if not isinstance(results[2], Exception) else []
         sellers = results[3] if not isinstance(results[3], Exception) else []
+        netflows = results[4] if not isinstance(results[4], Exception) else []
+
+        # Find this token's netflow data
+        token_netflow = None
+        for nf in netflows:
+            if nf.token_address.lower() == token_address.lower():
+                token_netflow = nf
+                break
 
         # Count holders by category
         holder_counts = self._count_holders_by_category(holders)
 
-        # Get token symbol from first holder if available
-        token_symbol = "UNKNOWN"
-        if holders:
-            # Try to infer from label or use address
-            token_symbol = token_address[:8] + "..."
+        # Get token symbol from netflow or use address
+        token_symbol = token_netflow.token_symbol if token_netflow else token_address[:8] + "..."
 
         # Generate narrative (handle missing flows)
         narrative = self.narrative_gen.generate_token_narrative(
@@ -302,6 +308,36 @@ class SmartMoneyTracker:
                 },
             }
 
+        # Build netflow trend for historical chart (1h, 24h, 7d, 30d)
+        netflow_trend = {
+            "periods": ["1h", "24h", "7d", "30d"],
+            "values": [0, 0, 0, 0],
+            "momentum": "steady",
+        }
+        if token_netflow:
+            netflow_trend = {
+                "periods": ["1h", "24h", "7d", "30d"],
+                "values": [
+                    token_netflow.net_flow_1h_usd,
+                    token_netflow.net_flow_24h_usd,
+                    token_netflow.net_flow_7d_usd,
+                    token_netflow.net_flow_30d_usd,
+                ],
+                "momentum": self._calculate_momentum(token_netflow),
+            }
+
+        # Build buyer/seller summary for transfer chart
+        buyer_volume = sum(b.get("value_usd", 0) or 0 for b in buyers[:10])
+        seller_volume = sum(s.get("value_usd", 0) or 0 for s in sellers[:10])
+        buyer_seller_summary = {
+            "buyer_count": len(buyers),
+            "seller_count": len(sellers),
+            "buyer_volume": buyer_volume,
+            "seller_volume": seller_volume,
+            "net_activity": buyer_volume - seller_volume,
+            "sentiment": "bullish" if buyer_volume > seller_volume else "bearish" if seller_volume > buyer_volume else "neutral",
+        }
+
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "chain": chain,
@@ -315,6 +351,8 @@ class SmartMoneyTracker:
                 "other": holder_counts.get("other", 0),
             },
             "flow_intelligence": flow_data,
+            "netflow_trend": netflow_trend,
+            "buyer_seller_summary": buyer_seller_summary,
             "recent_buyers": buyers[:10] if buyers else [],
             "recent_sellers": sellers[:10] if sellers else [],
             "top_holders": [
@@ -502,6 +540,23 @@ class SmartMoneyTracker:
 
         top_sectors = sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:8]
 
+        # Top movers (for enhanced net flow display)
+        top_inflows = sorted(netflows, key=lambda x: x.net_flow_24h_usd, reverse=True)[:3]
+        top_outflows = sorted(netflows, key=lambda x: x.net_flow_24h_usd)[:3]
+
+        # Calculate 7d average for comparison
+        total_7d_flow = sum(n.net_flow_7d_usd for n in netflows)
+        avg_daily_7d = total_7d_flow / 7 if total_7d_flow else 0
+
+        # Net flow sentiment
+        net_flow = total_inflow + total_outflow
+        if net_flow > avg_daily_7d * 1.5:
+            flow_sentiment = "bullish"
+        elif net_flow < avg_daily_7d * 0.5:
+            flow_sentiment = "bearish"
+        else:
+            flow_sentiment = "neutral"
+
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "chains": chains,
@@ -511,9 +566,24 @@ class SmartMoneyTracker:
                 "unique_tokens": unique_tokens,
                 "tokens_accumulating": accumulating,
                 "tokens_distributing": distributing,
-                "net_flow_24h": total_inflow + total_outflow,
+                "net_flow_24h": net_flow,
                 "total_inflow_24h": total_inflow,
                 "total_outflow_24h": total_outflow,
+            },
+            "net_flow_breakdown": {
+                "inflow": total_inflow,
+                "outflow": abs(total_outflow),
+                "net": net_flow,
+                "sentiment": flow_sentiment,
+                "vs_7d_avg": net_flow - avg_daily_7d,
+                "top_inflows": [
+                    {"token": n.token_symbol, "flow": n.net_flow_24h_usd}
+                    for n in top_inflows
+                ],
+                "top_outflows": [
+                    {"token": n.token_symbol, "flow": n.net_flow_24h_usd}
+                    for n in top_outflows
+                ],
             },
             "trade_summary": {
                 "total_trades": len(trades),
@@ -589,152 +659,3 @@ class SmartMoneyTracker:
             "trades": formatted,
         }
 
-    # === Historical Data Methods ===
-
-    async def get_token_history(
-        self,
-        chain: str,
-        token_address: str,
-        days: int = 30,
-    ) -> dict:
-        """
-        Get historical smart money holdings for a token.
-
-        Returns time-series data showing position building over time.
-        """
-        try:
-            history = await self.client.get_historical_holdings(token_address, chain, days)
-        except Exception:
-            history = []
-
-        # Format for chart
-        chart_data = []
-        for h in history:
-            chart_data.append({
-                "date": h.get("date", ""),
-                "value_usd": h.get("value_usd", 0),
-                "balance": h.get("balance", 0),
-                "holder_count": h.get("holder_count", 0),
-            })
-
-        # Calculate key metrics
-        if len(chart_data) >= 2:
-            first_value = chart_data[0].get("value_usd", 0)
-            last_value = chart_data[-1].get("value_usd", 0)
-            change_pct = ((last_value - first_value) / first_value * 100) if first_value else 0
-
-            # Find peak and trough
-            values = [d.get("value_usd", 0) for d in chart_data]
-            peak_value = max(values) if values else 0
-            trough_value = min(values) if values else 0
-            peak_date = chart_data[values.index(peak_value)].get("date") if peak_value else None
-        else:
-            change_pct = 0
-            peak_value = 0
-            trough_value = 0
-            peak_date = None
-
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
-            "chain": chain,
-            "token_address": token_address,
-            "days": days,
-            "data_points": len(chart_data),
-            "chart_data": chart_data,
-            "metrics": {
-                "period_change_pct": change_pct,
-                "peak_value_usd": peak_value,
-                "peak_date": peak_date,
-                "trough_value_usd": trough_value,
-                "trend": "accumulating" if change_pct > 10 else "distributing" if change_pct < -10 else "stable",
-            },
-        }
-
-    async def get_token_transfers(
-        self,
-        chain: str,
-        token_address: str,
-        days: int = 7,
-    ) -> dict:
-        """
-        Get token transfer activity by smart money.
-
-        Returns flow analysis: CEX deposits (exit signals) vs DEX activity.
-        """
-        try:
-            transfers = await self.client.get_token_transfers(token_address, chain, days)
-        except Exception:
-            transfers = []
-
-        # Categorize transfers
-        cex_deposits = []
-        cex_withdrawals = []
-        dex_swaps = []
-        wallet_transfers = []
-
-        cex_deposit_volume = 0
-        cex_withdrawal_volume = 0
-        dex_volume = 0
-        wallet_volume = 0
-
-        for t in transfers:
-            transfer_type = t.get("transfer_type", "").lower()
-            value = t.get("value_usd", 0) or 0
-
-            transfer_item = {
-                "timestamp": t.get("timestamp", ""),
-                "from_address": t.get("from_address", ""),
-                "from_label": t.get("from_label", ""),
-                "to_address": t.get("to_address", ""),
-                "to_label": t.get("to_label", ""),
-                "value_usd": value,
-                "type": transfer_type,
-            }
-
-            if "cex" in transfer_type and "deposit" in transfer_type:
-                cex_deposits.append(transfer_item)
-                cex_deposit_volume += value
-            elif "cex" in transfer_type and "withdrawal" in transfer_type:
-                cex_withdrawals.append(transfer_item)
-                cex_withdrawal_volume += value
-            elif "dex" in transfer_type or "swap" in transfer_type:
-                dex_swaps.append(transfer_item)
-                dex_volume += value
-            else:
-                wallet_transfers.append(transfer_item)
-                wallet_volume += value
-
-        # Determine flow sentiment
-        net_cex_flow = cex_deposit_volume - cex_withdrawal_volume
-        if net_cex_flow > 100_000:
-            flow_sentiment = "bearish"  # Net deposits to CEX = sell pressure
-            flow_signal = "CEX deposits high - potential sell pressure"
-        elif net_cex_flow < -100_000:
-            flow_sentiment = "bullish"  # Net withdrawals from CEX = accumulation
-            flow_signal = "CEX withdrawals high - accumulation signal"
-        else:
-            flow_sentiment = "neutral"
-            flow_signal = "Balanced CEX flows"
-
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
-            "chain": chain,
-            "token_address": token_address,
-            "days": days,
-            "total_transfers": len(transfers),
-            "summary": {
-                "cex_deposit_volume": cex_deposit_volume,
-                "cex_withdrawal_volume": cex_withdrawal_volume,
-                "net_cex_flow": net_cex_flow,
-                "dex_volume": dex_volume,
-                "wallet_volume": wallet_volume,
-                "flow_sentiment": flow_sentiment,
-                "flow_signal": flow_signal,
-            },
-            "flow_breakdown": {
-                "cex_deposits": cex_deposits[:10],
-                "cex_withdrawals": cex_withdrawals[:10],
-                "dex_swaps": dex_swaps[:10],
-                "wallet_transfers": wallet_transfers[:10],
-            },
-        }
