@@ -338,6 +338,58 @@ class SmartMoneyTracker:
             "sentiment": "bullish" if buyer_volume > seller_volume else "bearish" if seller_volume > buyer_volume else "neutral",
         }
 
+        # Build fund holdings list (institutional holders)
+        fund_holdings = []
+        for h in holders:
+            if h.holder_type == "fund":
+                fund_holdings.append({
+                    "address": h.address,
+                    "label": h.address_label,
+                    "type": h.holder_type,
+                    "value_usd": h.value_usd,
+                    "token_amount": h.token_amount,
+                    "ownership_pct": h.ownership_percentage,
+                    "total_inflow": h.total_inflow,
+                    "total_outflow": h.total_outflow,
+                    "net_tokens": h.net_tokens,
+                    "balance_change_24h": h.balance_change_24h,
+                    "balance_change_7d": h.balance_change_7d,
+                    "balance_change_30d": h.balance_change_30d,
+                })
+
+        # Build holder summary stats
+        holder_summary = {
+            "total_funds": len([h for h in holders if h.holder_type == "fund"]),
+            "fund_value_usd": sum(h.value_usd for h in holders if h.holder_type == "fund"),
+            "fund_ownership_pct": sum(h.ownership_percentage for h in holders if h.holder_type == "fund"),
+            "total_exchanges": len([h for h in holders if h.holder_type == "exchange"]),
+            "exchange_value_usd": sum(h.value_usd for h in holders if h.holder_type == "exchange"),
+            "total_whales": len([h for h in holders if h.holder_type == "whale"]),
+            "whale_value_usd": sum(h.value_usd for h in holders if h.holder_type == "whale"),
+            "total_smart_money": len([h for h in holders if h.holder_type == "smart_money"]),
+            "smart_money_value_usd": sum(h.value_usd for h in holders if h.holder_type == "smart_money"),
+        }
+
+        # Build most active holders list (sorted by absolute 30d balance change)
+        most_active = []
+        sorted_by_activity = sorted(
+            holders,
+            key=lambda h: abs(h.balance_change_30d) if h.balance_change_30d else 0,
+            reverse=True
+        )
+        for h in sorted_by_activity[:10]:
+            most_active.append({
+                "address": h.address,
+                "label": h.address_label,
+                "type": h.holder_type,
+                "value_usd": h.value_usd,
+                "balance_change_24h": h.balance_change_24h,
+                "balance_change_7d": h.balance_change_7d,
+                "balance_change_30d": h.balance_change_30d,
+                "total_inflow": h.total_inflow,
+                "total_outflow": h.total_outflow,
+            })
+
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "chain": chain,
@@ -359,12 +411,21 @@ class SmartMoneyTracker:
                 {
                     "address": h.address,
                     "label": h.address_label,
+                    "type": h.holder_type,
                     "value_usd": h.value_usd,
+                    "token_amount": h.token_amount,
                     "ownership_pct": h.ownership_percentage,
                     "balance_change_24h": h.balance_change_24h,
+                    "balance_change_7d": h.balance_change_7d,
+                    "balance_change_30d": h.balance_change_30d,
+                    "total_inflow": h.total_inflow,
+                    "total_outflow": h.total_outflow,
                 }
                 for h in holders[:10]
             ],
+            "fund_holdings": fund_holdings,
+            "holder_summary": holder_summary,
+            "most_active": most_active,
             "narrative": narrative,
         }
 

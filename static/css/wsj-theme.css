@@ -531,6 +531,67 @@ h2 { font-size: 20px; }
   color: var(--color-text-muted);
 }
 
+/* Holder Type Badges */
+.holder-type-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.holder-type-fund {
+  background: #E6F0FF;
+  color: #2563EB;
+}
+
+.holder-type-exchange {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.holder-type-whale {
+  background: #E0E7FF;
+  color: #4F46E5;
+}
+
+.holder-type-smart_money {
+  background: var(--color-bullish-bg);
+  color: var(--color-bullish);
+}
+
+.holder-type-other {
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral);
+}
+
+/* No Data Message */
+.no-data {
+  text-align: center;
+  padding: var(--spacing-md);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Fund Holdings Card */
+#fund-holdings-card {
+  margin-bottom: var(--spacing-lg);
+}
+
+#fund-holdings-table th,
+#fund-holdings-table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 12px;
+}
+
+#most-active-table th,
+#most-active-table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 12px;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .stats-grid {

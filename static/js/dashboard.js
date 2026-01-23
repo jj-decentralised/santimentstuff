@@ -666,10 +666,12 @@ async function loadDrilldown(chain, tokenAddress) {
     $('#drilldown-title').textContent = 'Loading...';
     $('#drilldown-narrative').textContent = 'Loading analysis...';
     $('#flow-intelligence').innerHTML = '<div class="loading">Loading...</div>';
-    $('#holders-body').innerHTML = '<tr><td colspan="3" class="loading">Loading...</td></tr>';
+    $('#holders-body').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+    $('#fund-holdings-body').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
+    $('#most-active-body').innerHTML = '<tr><td colspan="4" class="loading">Loading...</td></tr>';
 
     try {
-        // Load drilldown data (now includes netflow_trend and buyer_seller_summary)
+        // Load drilldown data (now includes netflow_trend, buyer_seller_summary, fund_holdings, most_active)
         const data = await api.get(`/api/v1/token/${chain}/${tokenAddress}`);
 
         // Update title
@@ -677,6 +679,10 @@ async function loadDrilldown(chain, tokenAddress) {
 
         // Update stats
         $('#total-holders').textContent = fmt.number(data.holder_breakdown?.total || 0);
+        const fundHoldersEl = $('#fund-holders');
+        if (fundHoldersEl) {
+            fundHoldersEl.textContent = fmt.number(data.holder_summary?.total_funds || 0);
+        }
         $('#sm-holders').textContent = fmt.number(data.holder_breakdown?.smart_money || 0);
         $('#whale-holders').textContent = fmt.number(data.holder_breakdown?.whale || 0);
         $('#exchange-holders').textContent = fmt.number(data.holder_breakdown?.exchange || 0);
@@ -731,19 +737,29 @@ async function loadDrilldown(chain, tokenAddress) {
             `;
         }
 
+        // Render fund holdings table
+        renderFundHoldingsTable(data.fund_holdings || []);
+
+        // Render most active holders table
+        renderActivityTable(data.most_active || []);
+
         // Render top holders
         if (data.top_holders && data.top_holders.length > 0) {
             $('#holders-body').innerHTML = data.top_holders.map(h => `
                 <tr>
                     <td title="${h.label || h.address}">${h.label || fmt.address(h.address)}</td>
+                    <td><span class="holder-type-badge holder-type-${h.type || 'other'}">${h.type || 'other'}</span></td>
                     <td class="numeric">${fmt.usd(h.value_usd)}</td>
                     <td class="numeric ${h.balance_change_24h > 0 ? 'positive' : h.balance_change_24h < 0 ? 'negative' : ''}">
                         ${fmt.percent(h.balance_change_24h)}
                     </td>
+                    <td class="numeric ${h.balance_change_7d > 0 ? 'positive' : h.balance_change_7d < 0 ? 'negative' : ''}">
+                        ${fmt.percent(h.balance_change_7d)}
+                    </td>
                 </tr>
             `).join('');
         } else {
-            $('#holders-body').innerHTML = '<tr><td colspan="3">No holder data</td></tr>';
+            $('#holders-body').innerHTML = '<tr><td colspan="5">No holder data</td></tr>';
         }
 
         // Render historical chart using netflow trend
@@ -774,6 +790,66 @@ async function loadDrilldown(chain, tokenAddress) {
         console.error('Error loading drilldown:', error);
         $('#drilldown-narrative').textContent = `Error loading data: ${error.message}`;
     }
+}
+
+// === Fund Holdings & Activity Tables ===
+
+function renderFundHoldingsTable(fundHoldings) {
+    const body = $('#fund-holdings-body');
+    if (!body) return;
+
+    if (!fundHoldings || fundHoldings.length === 0) {
+        body.innerHTML = '<tr><td colspan="9" class="no-data">No institutional/fund holdings detected</td></tr>';
+        // Hide the card if no data
+        const card = document.getElementById('fund-holdings-card');
+        if (card) card.style.display = 'none';
+        return;
+    }
+
+    // Show the card
+    const card = document.getElementById('fund-holdings-card');
+    if (card) card.style.display = 'block';
+
+    body.innerHTML = fundHoldings.map(h => `
+        <tr>
+            <td title="${h.label || h.address}">${h.label || fmt.address(h.address)}</td>
+            <td><span class="holder-type-badge holder-type-${h.type || 'fund'}">${h.type || 'fund'}</span></td>
+            <td class="numeric">${fmt.usd(h.value_usd)}</td>
+            <td class="numeric">${fmt.number(Math.round(h.token_amount || 0))}</td>
+            <td class="numeric ${h.balance_change_24h > 0 ? 'positive' : h.balance_change_24h < 0 ? 'negative' : ''}">
+                ${fmt.percent(h.balance_change_24h)}
+            </td>
+            <td class="numeric ${h.balance_change_7d > 0 ? 'positive' : h.balance_change_7d < 0 ? 'negative' : ''}">
+                ${fmt.percent(h.balance_change_7d)}
+            </td>
+            <td class="numeric ${h.balance_change_30d > 0 ? 'positive' : h.balance_change_30d < 0 ? 'negative' : ''}">
+                ${fmt.percent(h.balance_change_30d)}
+            </td>
+            <td class="numeric">${fmt.number(Math.round(h.total_inflow || 0))}</td>
+            <td class="numeric">${fmt.number(Math.round(h.total_outflow || 0))}</td>
+        </tr>
+    `).join('');
+}
+
+function renderActivityTable(mostActive) {
+    const body = $('#most-active-body');
+    if (!body) return;
+
+    if (!mostActive || mostActive.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" class="no-data">No activity data available</td></tr>';
+        return;
+    }
+
+    body.innerHTML = mostActive.map(h => `
+        <tr>
+            <td title="${h.label || h.address}">${h.label || fmt.address(h.address)}</td>
+            <td><span class="holder-type-badge holder-type-${h.type || 'other'}">${h.type || 'other'}</span></td>
+            <td class="numeric">${fmt.usd(h.value_usd)}</td>
+            <td class="numeric ${h.balance_change_30d > 0 ? 'positive' : h.balance_change_30d < 0 ? 'negative' : ''}">
+                ${fmt.percent(h.balance_change_30d)}
+            </td>
+        </tr>
+    `).join('');
 }
 
 // === Historical Charts ===

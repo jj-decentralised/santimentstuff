@@ -209,6 +209,10 @@
                     <span class="stat-value" id="total-holders">--</span>
                 </div>
                 <div class="stat">
+                    <span class="stat-label">Funds</span>
+                    <span class="stat-value" id="fund-holders">--</span>
+                </div>
+                <div class="stat">
                     <span class="stat-label">Smart Money</span>
                     <span class="stat-value" id="sm-holders">--</span>
                 </div>
@@ -224,7 +228,32 @@
 
             <div class="narrative" id="drilldown-narrative">Loading analysis...</div>
 
-            <!-- Flow Trend Charts Row -->
+            <!-- Fund Holdings Table (Full Width) -->
+            <div class="card" id="fund-holdings-card">
+                <div class="card-header">Fund & Institutional Holdings</div>
+                <div class="card-body">
+                    <table class="data-table" id="fund-holdings-table">
+                        <thead>
+                            <tr>
+                                <th>Holder</th>
+                                <th>Type</th>
+                                <th class="numeric">Value</th>
+                                <th class="numeric">Tokens</th>
+                                <th class="numeric">24h</th>
+                                <th class="numeric">7d</th>
+                                <th class="numeric">30d</th>
+                                <th class="numeric">Inflow</th>
+                                <th class="numeric">Outflow</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fund-holdings-body">
+                            <tr><td colspan="9" class="loading">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Flow Trend Chart + Most Active Holders -->
             <div class="charts-row">
                 <div class="chart-card">
                     <div class="chart-header">Net Flow Trend (1h → 30d)</div>
@@ -232,10 +261,22 @@
                         <canvas id="history-chart"></canvas>
                     </div>
                 </div>
-                <div class="chart-card">
-                    <div class="chart-header">Buyer vs Seller Activity</div>
-                    <div class="chart-container">
-                        <canvas id="transfer-chart"></canvas>
+                <div class="card">
+                    <div class="card-header">Most Active Holders (30d)</div>
+                    <div class="card-body">
+                        <table class="data-table" id="most-active-table">
+                            <thead>
+                                <tr>
+                                    <th>Holder</th>
+                                    <th>Type</th>
+                                    <th class="numeric">Value</th>
+                                    <th class="numeric">30d Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="most-active-body">
+                                <tr><td colspan="4" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -254,12 +295,14 @@
                             <thead>
                                 <tr>
                                     <th>Address</th>
+                                    <th>Type</th>
                                     <th class="numeric">Value</th>
                                     <th class="numeric">24h</th>
+                                    <th class="numeric">7d</th>
                                 </tr>
                             </thead>
                             <tbody id="holders-body">
-                                <tr><td colspan="3" class="loading">Loading...</td></tr>
+                                <tr><td colspan="5" class="loading">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>

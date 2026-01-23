@@ -11,6 +11,20 @@ from enum import Enum
 from typing import Optional
 
 
+# Keywords for holder categorization
+FUND_KEYWORDS = [
+    "fund", "capital", "ventures", "venture", "investment", "partners",
+    "dao", "treasury", "foundation", "paradigm", "a16z", "polychain",
+    "pantera", "multicoin", "dragonfly", "sequoia", "framework", "coinbase ventures",
+    "binance labs", "jump", "wintermute", "alameda", "three arrows",
+]
+
+EXCHANGE_KEYWORDS = [
+    "binance", "coinbase", "kraken", "okx", "huobi", "kucoin", "exchange",
+    "deposit", "hot wallet", "ftx", "bybit", "bitfinex", "gemini", "bitstamp",
+]
+
+
 class SmartMoneyCategory(Enum):
     """Categories of smart money traders from Nansen."""
     ALL = "all"
@@ -183,18 +197,49 @@ class TokenHolder:
 
     @property
     def category(self) -> str:
-        """Infer holder category from label."""
+        """Infer holder category from label (legacy - use holder_type instead)."""
+        return self.holder_type
+
+    @property
+    def holder_type(self) -> str:
+        """
+        Categorize holder: fund, exchange, whale, smart_money, other.
+
+        Uses keyword matching against address labels to identify
+        institutional holders like venture funds and exchanges.
+        """
         label_lower = self.address_label.lower()
-        if "fund" in label_lower or "capital" in label_lower:
-            return "smart_money"
-        elif "exchange" in label_lower or "binance" in label_lower or "coinbase" in label_lower:
+
+        # Check for fund/VC keywords
+        if any(kw in label_lower for kw in FUND_KEYWORDS):
+            return "fund"
+
+        # Check for exchange keywords
+        if any(kw in label_lower for kw in EXCHANGE_KEYWORDS):
             return "exchange"
-        elif "whale" in label_lower:
+
+        # Size-based categorization
+        if self.value_usd > 5_000_000:
             return "whale"
-        elif self.value_usd > 1_000_000:
-            return "whale"
-        else:
-            return "other"
+        elif self.value_usd > 500_000:
+            return "smart_money"
+
+        return "other"
+
+    @property
+    def net_tokens(self) -> float:
+        """Net token position (inflow - outflow)."""
+        return self.total_inflow - self.total_outflow
+
+    @property
+    def is_accumulating(self) -> bool:
+        """Check if holder is accumulating based on recent balance changes."""
+        return self.balance_change_24h > 0 or self.balance_change_7d > 0
+
+    @property
+    def is_distributing(self) -> bool:
+        """Check if holder is distributing based on recent balance changes."""
+        return self.balance_change_24h < 0 or self.balance_change_7d < 0
 
     @classmethod
     def from_api_response(cls, data: dict) -> "TokenHolder":
