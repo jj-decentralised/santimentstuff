@@ -3,6 +3,7 @@
 import os
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +14,11 @@ from fastapi.templating import Jinja2Templates
 from core.arkham_client import ArkhamClient
 from core.cache import CacheManager
 from .tracker import FundTracker
+
+# Get project root directory
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+STATIC_DIR = BASE_DIR / "static"
+TEMPLATES_DIR = BASE_DIR / "templates"
 
 
 # Global instances
@@ -28,10 +34,18 @@ async def lifespan(app: FastAPI):
 
     # Startup
     api_key = os.environ.get("ARKHAM_API_KEY", "")
+    if not api_key:
+        print("WARNING: ARKHAM_API_KEY not set. API calls will fail.")
+
     _cache = CacheManager()
     _client = ArkhamClient(api_key=api_key, cache=_cache)
-    await _client.connect()
-    _tracker = FundTracker(_client)
+
+    try:
+        await _client.connect()
+        _tracker = FundTracker(_client)
+        print(f"Fund Tracker started. Static dir: {STATIC_DIR}, Templates dir: {TEMPLATES_DIR}")
+    except Exception as e:
+        print(f"Error during startup: {e}")
 
     yield
 
@@ -58,9 +72,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Static files and templates
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-    templates = Jinja2Templates(directory="templates")
+    # Static files and templates (use absolute paths for Railway)
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
     # === Page Routes ===
 
