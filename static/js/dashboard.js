@@ -73,15 +73,29 @@ let currentFund = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    // Check API health first
+    try {
+        const health = await fetch('/health').then(r => r.json());
+        console.log('API Health:', health);
+    } catch (e) {
+        console.error('Health check failed:', e);
+    }
+
     await loadFunds();
     setupEventListeners();
 });
 
 async function loadFunds() {
+    const selector = document.getElementById('fundSelector');
     try {
         const data = await API.get('/funds');
-        const selector = document.getElementById('fundSelector');
 
+        if (!data.funds || data.funds.length === 0) {
+            selector.innerHTML = '<option value="">No funds available - check API key</option>';
+            return;
+        }
+
+        selector.innerHTML = '<option value="">Select a fund...</option>';
         data.funds.forEach(fund => {
             const option = document.createElement('option');
             option.value = fund.id;
@@ -90,6 +104,10 @@ async function loadFunds() {
         });
     } catch (error) {
         console.error('Failed to load funds:', error);
+        selector.innerHTML = '<option value="">Error loading funds - check console</option>';
+        // Show error in UI
+        document.getElementById('totalValue').textContent = 'API Error';
+        document.getElementById('costBasis').textContent = error.message;
     }
 }
 
