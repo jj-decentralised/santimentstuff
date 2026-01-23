@@ -359,3 +359,155 @@ class SmartMoneyTracker:
                 counts["other"] += 1
 
         return counts
+
+    async def get_market_overview(
+        self,
+        chains: list[str],
+    ) -> dict:
+        """
+        Get comprehensive market overview with aggregated stats.
+
+        Returns data for charts and summary statistics.
+        """
+        # Fetch all data in parallel
+        holdings_task = self.client.get_smart_money_holdings(chains, 100)
+        netflow_task = self.client.get_smart_money_netflow(chains, 100)
+        trades_task = self.client.get_dex_trades(chains, 100)
+
+        results = await asyncio.gather(
+            holdings_task, netflow_task, trades_task,
+            return_exceptions=True
+        )
+
+        holdings = results[0] if not isinstance(results[0], Exception) else []
+        netflows = results[1] if not isinstance(results[1], Exception) else []
+        trades = results[2] if not isinstance(results[2], Exception) else []
+
+        # Aggregate holdings stats
+        total_value = sum(h.value_usd for h in holdings)
+        total_holders = sum(h.holders_count for h in holdings)
+        unique_tokens = len(set(h.token_address for h in holdings))
+
+        # Aggregate netflow stats
+        total_inflow = sum(n.net_flow_24h_usd for n in netflows if n.net_flow_24h_usd > 0)
+        total_outflow = sum(n.net_flow_24h_usd for n in netflows if n.net_flow_24h_usd < 0)
+        accumulating = sum(1 for n in netflows if n.is_accumulating)
+        distributing = sum(1 for n in netflows if n.is_distributing)
+
+        # Netflow time series data for charts
+        netflow_chart_data = []
+        for n in sorted(netflows, key=lambda x: x.net_flow_24h_usd, reverse=True)[:20]:
+            netflow_chart_data.append({
+                "token": n.token_symbol,
+                "1h": n.net_flow_1h_usd,
+                "24h": n.net_flow_24h_usd,
+                "7d": n.net_flow_7d_usd,
+                "30d": n.net_flow_30d_usd,
+            })
+
+        # Trade stats
+        buy_count = sum(1 for t in trades if t.is_buy)
+        sell_count = len(trades) - buy_count
+        buy_volume = sum(t.trade_value_usd for t in trades if t.is_buy)
+        sell_volume = sum(t.trade_value_usd for t in trades if not t.is_buy)
+
+        # Top tokens by value
+        top_by_value = sorted(holdings, key=lambda x: x.value_usd, reverse=True)[:10]
+
+        # Top by inflow
+        top_by_inflow = sorted(netflows, key=lambda x: x.net_flow_24h_usd, reverse=True)[:10]
+
+        # Sector breakdown
+        sector_counts = {}
+        for h in holdings:
+            for sector in h.token_sectors:
+                sector_counts[sector] = sector_counts.get(sector, 0) + 1
+
+        top_sectors = sorted(sector_counts.items(), key=lambda x: x[1], reverse=True)[:8]
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "chains": chains,
+            "summary": {
+                "total_value_usd": total_value,
+                "total_smart_money_holders": total_holders,
+                "unique_tokens": unique_tokens,
+                "tokens_accumulating": accumulating,
+                "tokens_distributing": distributing,
+                "net_flow_24h": total_inflow + total_outflow,
+                "total_inflow_24h": total_inflow,
+                "total_outflow_24h": total_outflow,
+            },
+            "trade_summary": {
+                "total_trades": len(trades),
+                "buy_count": buy_count,
+                "sell_count": sell_count,
+                "buy_volume_usd": buy_volume,
+                "sell_volume_usd": sell_volume,
+                "buy_sell_ratio": buy_count / sell_count if sell_count > 0 else 0,
+            },
+            "charts": {
+                "netflow_by_token": netflow_chart_data,
+                "top_by_value": [
+                    {"token": h.token_symbol, "value": h.value_usd, "holders": h.holders_count}
+                    for h in top_by_value
+                ],
+                "top_by_inflow": [
+                    {"token": n.token_symbol, "inflow": n.net_flow_24h_usd}
+                    for n in top_by_inflow
+                ],
+                "sectors": [{"name": s[0], "count": s[1]} for s in top_sectors],
+            },
+        }
+
+    async def get_perp_trades(
+        self,
+        limit: int = 50,
+    ) -> dict:
+        """
+        Get perpetual trades from Hyperliquid.
+
+        Returns formatted perp trade data.
+        """
+        try:
+            trades = await self.client.get_perp_trades(limit)
+        except Exception:
+            trades = []
+
+        formatted = []
+        long_count = 0
+        short_count = 0
+        long_volume = 0
+        short_volume = 0
+
+        for t in trades:
+            side = t.get("position_side", "").lower()
+            value = t.get("value_usd", 0) or 0
+
+            if side == "long":
+                long_count += 1
+                long_volume += value
+            elif side == "short":
+                short_count += 1
+                short_volume += value
+
+            formatted.append({
+                "timestamp": t.get("block_timestamp", ""),
+                "trader": t.get("trader_address_label", t.get("trader_address", "")[:10] + "..."),
+                "token": t.get("token_symbol", ""),
+                "side": side.upper() if side else "UNKNOWN",
+                "action": t.get("action", ""),
+                "value_usd": value,
+                "price": t.get("price", 0),
+            })
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "total_trades": len(formatted),
+            "long_count": long_count,
+            "short_count": short_count,
+            "long_volume_usd": long_volume,
+            "short_volume_usd": short_volume,
+            "sentiment": "bullish" if long_count > short_count else "bearish" if short_count > long_count else "neutral",
+            "trades": formatted,
+        }

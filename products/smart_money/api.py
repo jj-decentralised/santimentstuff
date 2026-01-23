@@ -178,6 +178,47 @@ def create_app() -> FastAPI:
 
         return await _tracker.get_token_drilldown(chain, token_address)
 
+    # === Market Overview ===
+
+    @app.get("/api/v1/overview")
+    async def get_market_overview(
+        chains: str = Query(
+            default="ethereum",
+            description="Comma-separated blockchain networks"
+        ),
+    ):
+        """
+        Get comprehensive market overview with charts data.
+
+        Returns aggregated stats, netflow charts, top tokens, and sector breakdown.
+        """
+        if not _tracker:
+            raise HTTPException(500, "Tracker not initialized")
+
+        chain_list = [c.strip() for c in chains.split(",")]
+
+        invalid_chains = [c for c in chain_list if c not in VALID_CHAINS]
+        if invalid_chains:
+            raise HTTPException(400, f"Invalid chains: {invalid_chains}")
+
+        return await _tracker.get_market_overview(chain_list)
+
+    # === Perp Trades ===
+
+    @app.get("/api/v1/perps")
+    async def get_perp_trades(
+        limit: int = Query(default=50, ge=1, le=200),
+    ):
+        """
+        Get perpetual trades from Hyperliquid by smart money.
+
+        Returns long/short sentiment and recent trades.
+        """
+        if not _tracker:
+            raise HTTPException(500, "Tracker not initialized")
+
+        return await _tracker.get_perp_trades(limit)
+
     # === Reference Endpoints ===
 
     @app.get("/api/v1/chains")

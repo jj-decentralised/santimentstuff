@@ -5,49 +5,104 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Money Tracker</title>
     <link rel="stylesheet" href="/static/css/wsj-theme.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header class="header">
-        <h1>Smart Money Tracker</h1>
+        <div class="header-left">
+            <h1>Smart Money Tracker</h1>
+            <span class="subtitle">Real-time institutional activity across crypto markets</span>
+        </div>
         <div class="controls">
-            <div class="chain-selector" id="chain-selector">
-                <!-- Populated via JS -->
-            </div>
+            <div class="chain-selector" id="chain-selector"></div>
             <span class="last-updated" id="last-updated">Updated: --</span>
         </div>
     </header>
 
     <main class="container">
+        <!-- Market Overview Section -->
+        <section id="overview-section" class="section">
+            <div class="section-header">
+                <h2>Market Overview</h2>
+            </div>
+
+            <!-- Key Stats Cards -->
+            <div class="stats-grid" id="key-stats">
+                <div class="stat-card">
+                    <div class="stat-label">Total Smart Money Value</div>
+                    <div class="stat-value" id="total-value">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">24h Net Flow</div>
+                    <div class="stat-value" id="net-flow">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Tokens Accumulating</div>
+                    <div class="stat-value positive" id="accumulating">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Tokens Distributing</div>
+                    <div class="stat-value negative" id="distributing">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">24h Buy Volume</div>
+                    <div class="stat-value positive" id="buy-vol">--</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">24h Sell Volume</div>
+                    <div class="stat-value negative" id="sell-vol">--</div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-header">Net Flow by Token (24h)</div>
+                    <div class="chart-container">
+                        <canvas id="netflow-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">Top Holdings by Value</div>
+                    <div class="chart-container">
+                        <canvas id="holdings-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Second Charts Row -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-header">Accumulation Trends (1h vs 24h vs 7d)</div>
+                    <div class="chart-container">
+                        <canvas id="trends-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">Sector Breakdown</div>
+                    <div class="chart-container">
+                        <canvas id="sector-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Navigation Tabs -->
         <div class="tabs" id="main-tabs">
             <div class="tab active" data-view="purchases">Token Purchases</div>
             <div class="tab" data-view="trades">Recent Trades</div>
+            <div class="tab" data-view="perps">Perp Positions</div>
         </div>
 
         <!-- View 1: Token Purchases -->
         <section id="purchases-view" class="view active">
-            <div class="stats-row" id="purchases-stats">
-                <div class="stat">
-                    <span class="stat-label">Tokens Tracked</span>
-                    <span class="stat-value" id="total-tokens">--</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-label">Accumulating</span>
-                    <span class="stat-value positive" id="accumulating-count">--</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-label">Distributing</span>
-                    <span class="stat-value negative" id="distributing-count">--</span>
-                </div>
-            </div>
-
             <div class="card">
                 <table class="data-table" id="purchases-table">
                     <thead>
                         <tr>
                             <th>Token</th>
                             <th>Chain</th>
-                            <th class="numeric">Smart Money Holders</th>
+                            <th class="numeric">Holders</th>
                             <th class="numeric">Net Flow (24h)</th>
                             <th class="numeric">Total Value</th>
                             <th>Signal</th>
@@ -75,19 +130,9 @@
                     <span class="stat-label">Sells</span>
                     <span class="stat-value negative" id="sell-count">--</span>
                 </div>
-                <div class="stat">
-                    <span class="stat-label">Buy Volume</span>
-                    <span class="stat-value positive" id="buy-volume">--</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-label">Sell Volume</span>
-                    <span class="stat-value negative" id="sell-volume">--</span>
-                </div>
             </div>
 
-            <div class="narrative" id="trades-narrative">
-                Loading narrative...
-            </div>
+            <div class="narrative" id="trades-narrative">Loading...</div>
 
             <div class="card">
                 <table class="data-table" id="trades-table">
@@ -109,7 +154,48 @@
             </div>
         </section>
 
-        <!-- View 3: Token Drilldown -->
+        <!-- View 3: Perp Positions -->
+        <section id="perps-view" class="view">
+            <div class="stats-row" id="perps-stats">
+                <div class="stat">
+                    <span class="stat-label">Total Trades</span>
+                    <span class="stat-value" id="perp-total">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Longs</span>
+                    <span class="stat-value positive" id="long-count">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Shorts</span>
+                    <span class="stat-value negative" id="short-count">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Sentiment</span>
+                    <span class="stat-value" id="perp-sentiment">--</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <table class="data-table" id="perps-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Trader</th>
+                            <th>Token</th>
+                            <th>Side</th>
+                            <th>Action</th>
+                            <th class="numeric">Value</th>
+                            <th class="numeric">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="perps-body">
+                        <tr><td colspan="7" class="loading">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Token Drilldown View -->
         <section id="drilldown-view" class="view">
             <div class="drilldown-header">
                 <h2 id="drilldown-title">Token Analysis</h2>
@@ -135,9 +221,7 @@
                 </div>
             </div>
 
-            <div class="narrative" id="drilldown-narrative">
-                Loading analysis...
-            </div>
+            <div class="narrative" id="drilldown-narrative">Loading analysis...</div>
 
             <div class="two-column">
                 <div class="card">
@@ -146,7 +230,6 @@
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
-
                 <div class="card">
                     <div class="card-header">Top Holders</div>
                     <div class="card-body">
@@ -155,29 +238,13 @@
                                 <tr>
                                     <th>Address</th>
                                     <th class="numeric">Value</th>
-                                    <th class="numeric">24h Change</th>
+                                    <th class="numeric">24h</th>
                                 </tr>
                             </thead>
                             <tbody id="holders-body">
                                 <tr><td colspan="3" class="loading">Loading...</td></tr>
                             </tbody>
                         </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="two-column">
-                <div class="card">
-                    <div class="card-header">Recent Buyers</div>
-                    <div class="card-body" id="buyers-list">
-                        <div class="loading">Loading...</div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">Recent Sellers</div>
-                    <div class="card-body" id="sellers-list">
-                        <div class="loading">Loading...</div>
                     </div>
                 </div>
             </div>

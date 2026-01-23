@@ -4,6 +4,28 @@
  * WSJ-inspired dashboard for tracking smart money activity.
  */
 
+// Chart instances
+let netflowChart = null;
+let holdingsChart = null;
+let trendsChart = null;
+let sectorChart = null;
+
+// WSJ-inspired chart colors
+const CHART_COLORS = {
+    positive: '#00A86B',
+    negative: '#C41E3A',
+    neutral: '#666666',
+    text: '#1A1A1A',
+    textMuted: '#999999',
+    border: '#E5E5E5',
+    sectors: ['#1A1A1A', '#333333', '#4D4D4D', '#666666', '#808080', '#999999', '#B3B3B3', '#CCCCCC'],
+};
+
+// Chart.js defaults
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = CHART_COLORS.textMuted;
+
 // State
 const state = {
     selectedChains: ['ethereum'],
@@ -76,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initChainSelector();
     initTabs();
     initBackButton();
+    loadOverview();
     loadData();
 });
 
@@ -115,6 +138,7 @@ function initChainSelector() {
             b.classList.toggle('active', state.selectedChains.includes(b.dataset.chain));
         });
 
+        loadOverview();
         loadData();
     });
 }
@@ -155,6 +179,238 @@ function showView(viewId) {
     $(`#${viewId}-view`).classList.add('active');
 }
 
+// === Market Overview ===
+
+async function loadOverview() {
+    const chains = state.selectedChains.join(',');
+
+    try {
+        const data = await api.get(`/api/v1/overview?chains=${chains}`);
+
+        // Update stat cards
+        $('#total-value').textContent = fmt.usd(data.summary?.total_value_usd);
+        $('#net-flow').textContent = fmt.usdSigned(data.summary?.net_flow_24h);
+        $('#net-flow').className = `stat-value ${data.summary?.net_flow_24h > 0 ? 'positive' : 'negative'}`;
+        $('#accumulating').textContent = fmt.number(data.summary?.tokens_accumulating);
+        $('#distributing').textContent = fmt.number(data.summary?.tokens_distributing);
+        $('#buy-vol').textContent = fmt.usd(data.trade_summary?.buy_volume_usd);
+        $('#sell-vol').textContent = fmt.usd(data.trade_summary?.sell_volume_usd);
+
+        // Render charts
+        renderNetflowChart(data.charts?.top_by_inflow || []);
+        renderHoldingsChart(data.charts?.top_by_value || []);
+        renderTrendsChart(data.charts?.netflow_by_token || []);
+        renderSectorChart(data.charts?.sectors || []);
+
+    } catch (error) {
+        console.error('Error loading overview:', error);
+    }
+}
+
+function renderNetflowChart(data) {
+    const ctx = document.getElementById('netflow-chart');
+    if (!ctx) return;
+
+    // Destroy existing chart
+    if (netflowChart) {
+        netflowChart.destroy();
+    }
+
+    const labels = data.slice(0, 10).map(d => d.token);
+    const values = data.slice(0, 10).map(d => d.inflow);
+    const colors = values.map(v => v >= 0 ? CHART_COLORS.positive : CHART_COLORS.negative);
+
+    netflowChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => fmt.usdSigned(context.raw)
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: CHART_COLORS.border },
+                    ticks: {
+                        callback: (value) => fmt.usd(value)
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                }
+            }
+        }
+    });
+}
+
+function renderHoldingsChart(data) {
+    const ctx = document.getElementById('holdings-chart');
+    if (!ctx) return;
+
+    if (holdingsChart) {
+        holdingsChart.destroy();
+    }
+
+    const labels = data.slice(0, 10).map(d => d.token);
+    const values = data.slice(0, 10).map(d => d.value);
+
+    holdingsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: CHART_COLORS.neutral,
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => fmt.usd(context.raw)
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: CHART_COLORS.border },
+                    ticks: {
+                        callback: (value) => fmt.usd(value)
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                }
+            }
+        }
+    });
+}
+
+function renderTrendsChart(data) {
+    const ctx = document.getElementById('trends-chart');
+    if (!ctx) return;
+
+    if (trendsChart) {
+        trendsChart.destroy();
+    }
+
+    // Take top 8 tokens for readability
+    const topData = data.slice(0, 8);
+    const labels = topData.map(d => d.token);
+
+    trendsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '1h',
+                    data: topData.map(d => d['1h'] || 0),
+                    backgroundColor: '#B3B3B3',
+                },
+                {
+                    label: '24h',
+                    data: topData.map(d => d['24h'] || 0),
+                    backgroundColor: '#666666',
+                },
+                {
+                    label: '7d',
+                    data: topData.map(d => d['7d'] || 0),
+                    backgroundColor: '#1A1A1A',
+                },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 8,
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => `${context.dataset.label}: ${fmt.usdSigned(context.raw)}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                },
+                y: {
+                    grid: { color: CHART_COLORS.border },
+                    ticks: {
+                        callback: (value) => fmt.usd(value)
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderSectorChart(data) {
+    const ctx = document.getElementById('sector-chart');
+    if (!ctx) return;
+
+    if (sectorChart) {
+        sectorChart.destroy();
+    }
+
+    const labels = data.map(d => d.name);
+    const values = data.map(d => d.count);
+
+    sectorChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: CHART_COLORS.sectors.slice(0, labels.length),
+                borderWidth: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 6,
+                        font: { size: 10 }
+                    }
+                },
+            },
+        }
+    });
+}
+
+// === Data Loading ===
+
 async function loadData() {
     const chains = state.selectedChains.join(',');
 
@@ -162,6 +418,8 @@ async function loadData() {
         await loadPurchases(chains);
     } else if (state.currentView === 'trades') {
         await loadTrades(chains);
+    } else if (state.currentView === 'perps') {
+        await loadPerps();
     }
 
     updateLastUpdated();
@@ -173,11 +431,6 @@ async function loadPurchases(chains) {
 
     try {
         const data = await api.get(`/api/v1/purchases?chains=${chains}&limit=50`);
-
-        // Update stats
-        $('#total-tokens').textContent = fmt.number(data.total_tokens);
-        $('#accumulating-count').textContent = fmt.number(data.accumulating_count);
-        $('#distributing-count').textContent = fmt.number(data.distributing_count);
 
         // Render table
         if (!data.tokens || data.tokens.length === 0) {
@@ -230,8 +483,6 @@ async function loadTrades(chains) {
         $('#total-trades').textContent = fmt.number(data.total_trades);
         $('#buy-count').textContent = fmt.number(data.buy_count);
         $('#sell-count').textContent = fmt.number(data.sell_count);
-        $('#buy-volume').textContent = fmt.usd(data.buy_volume_usd);
-        $('#sell-volume').textContent = fmt.usd(data.sell_volume_usd);
 
         // Update narrative
         $('#trades-narrative').textContent = data.narrative || 'No narrative available.';
@@ -264,6 +515,51 @@ async function loadTrades(chains) {
     }
 }
 
+async function loadPerps() {
+    const body = $('#perps-body');
+    body.innerHTML = '<tr><td colspan="7" class="loading">Loading data...</td></tr>';
+
+    try {
+        const data = await api.get('/api/v1/perps?limit=50');
+
+        // Update stats
+        $('#perp-total').textContent = fmt.number(data.total_trades);
+        $('#long-count').textContent = fmt.number(data.long_count);
+        $('#short-count').textContent = fmt.number(data.short_count);
+
+        const sentiment = data.sentiment || 'neutral';
+        const sentimentEl = $('#perp-sentiment');
+        sentimentEl.textContent = sentiment.toUpperCase();
+        sentimentEl.className = `stat-value ${sentiment === 'bullish' ? 'positive' : sentiment === 'bearish' ? 'negative' : ''}`;
+
+        // Render table
+        if (!data.trades || data.trades.length === 0) {
+            body.innerHTML = '<tr><td colspan="7">No perp trades available</td></tr>';
+            return;
+        }
+
+        body.innerHTML = data.trades.map(trade => `
+            <tr>
+                <td>${fmt.time(trade.timestamp)}</td>
+                <td title="${trade.trader}">${trade.trader}</td>
+                <td>${trade.token}</td>
+                <td>
+                    <span class="signal signal-${trade.side === 'LONG' ? 'accumulating' : 'distributing'}">
+                        ${trade.side}
+                    </span>
+                </td>
+                <td>${trade.action}</td>
+                <td class="numeric">${fmt.usd(trade.value_usd)}</td>
+                <td class="numeric">${trade.price ? '$' + trade.price.toLocaleString() : '--'}</td>
+            </tr>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading perps:', error);
+        body.innerHTML = `<tr><td colspan="7">Error loading data: ${error.message}</td></tr>`;
+    }
+}
+
 async function loadDrilldown(chain, tokenAddress) {
     state.currentToken = { chain, address: tokenAddress };
     showView('drilldown');
@@ -273,8 +569,6 @@ async function loadDrilldown(chain, tokenAddress) {
     $('#drilldown-narrative').textContent = 'Loading analysis...';
     $('#flow-intelligence').innerHTML = '<div class="loading">Loading...</div>';
     $('#holders-body').innerHTML = '<tr><td colspan="3" class="loading">Loading...</td></tr>';
-    $('#buyers-list').innerHTML = '<div class="loading">Loading...</div>';
-    $('#sellers-list').innerHTML = '<div class="loading">Loading...</div>';
 
     try {
         const data = await api.get(`/api/v1/token/${chain}/${tokenAddress}`);
@@ -343,36 +637,9 @@ async function loadDrilldown(chain, tokenAddress) {
             $('#holders-body').innerHTML = '<tr><td colspan="3">No holder data</td></tr>';
         }
 
-        // Render buyers/sellers
-        renderBuyersSellers(data.recent_buyers, data.recent_sellers);
-
     } catch (error) {
         console.error('Error loading drilldown:', error);
         $('#drilldown-narrative').textContent = `Error loading data: ${error.message}`;
-    }
-}
-
-function renderBuyersSellers(buyers, sellers) {
-    if (buyers && buyers.length > 0) {
-        $('#buyers-list').innerHTML = buyers.slice(0, 5).map(b => `
-            <div class="flow-segment">
-                <span class="flow-label">${b.trader_label || fmt.address(b.trader_address)}</span>
-                <span class="flow-value positive">${fmt.usd(b.volume_usd)}</span>
-            </div>
-        `).join('');
-    } else {
-        $('#buyers-list').innerHTML = '<p>No recent buyers</p>';
-    }
-
-    if (sellers && sellers.length > 0) {
-        $('#sellers-list').innerHTML = sellers.slice(0, 5).map(s => `
-            <div class="flow-segment">
-                <span class="flow-label">${s.trader_label || fmt.address(s.trader_address)}</span>
-                <span class="flow-value negative">${fmt.usd(s.volume_usd)}</span>
-            </div>
-        `).join('');
-    } else {
-        $('#sellers-list').innerHTML = '<p>No recent sellers</p>';
     }
 }
 
@@ -386,5 +653,6 @@ function updateLastUpdated() {
 
 // Auto-refresh every 5 minutes
 setInterval(() => {
+    loadOverview();
     loadData();
 }, 5 * 60 * 1000);

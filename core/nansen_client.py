@@ -333,3 +333,27 @@ class NansenClient:
         )
 
         return data.get("data", [])
+
+    async def get_perp_trades(
+        self,
+        limit: int = 50,
+    ) -> list[dict]:
+        """
+        Get perpetual trades from Hyperliquid by smart money.
+
+        Returns:
+            List of perp trade records
+        """
+        body = {
+            "pagination": {"page": 1, "per_page": limit},
+        }
+
+        cache_key = self._cache.make_key("nansen:perp:trades")
+        data = await self._post(
+            "/smart-money/perp-trades",
+            body,
+            cache_key=cache_key,
+            cache_ttl=CacheManager.TTL_SHORT,
+        )
+
+        return data.get("data", [])
