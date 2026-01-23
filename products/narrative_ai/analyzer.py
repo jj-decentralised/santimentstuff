@@ -1,20 +1,17 @@
 """
 Narrative Analyzer
 
-Combines Santiment data with LLM capabilities to generate
-human-readable market narratives and insights.
+Generates human-readable market narratives using Santiment data
+with intelligent template-based generation.
 """
 
 import asyncio
-import os
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
 
 from core.client import SantimentClient
 from core.models import NarrativeInsight, TrendingWord
-from .prompts import NarrativePrompts
 
 
 @dataclass
@@ -80,142 +77,177 @@ class MarketContext:
         }
 
 
-class LLMProvider(ABC):
-    """Abstract base class for LLM providers."""
+class NarrativeGenerator:
+    """Generates data-driven narratives from market context."""
 
-    @abstractmethod
-    async def generate(self, prompt: str, max_tokens: int = 1000) -> str:
-        """Generate text from prompt."""
-        pass
+    def generate_market_narrative(self, ctx: MarketContext) -> str:
+        """Generate a market narrative based on actual data."""
+        asset = ctx.asset_slug.upper() if ctx.asset_slug else "The asset"
 
-
-class OpenAIProvider(LLMProvider):
-    """OpenAI API provider."""
-
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4"):
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        self.model = model
-
-    async def generate(self, prompt: str, max_tokens: int = 1000) -> str:
-        try:
-            import openai
-            client = openai.AsyncOpenAI(api_key=self.api_key)
-            response = await client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-                temperature=0.7,
-            )
-            return response.choices[0].message.content
-        except ImportError:
-            raise RuntimeError("openai package not installed")
-        except Exception as e:
-            raise RuntimeError(f"OpenAI API error: {e}")
-
-
-class AnthropicProvider(LLMProvider):
-    """Anthropic API provider."""
-
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-sonnet-20240229"):
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model
-
-    async def generate(self, prompt: str, max_tokens: int = 1000) -> str:
-        try:
-            import anthropic
-            client = anthropic.AsyncAnthropic(api_key=self.api_key)
-            response = await client.messages.create(
-                model=self.model,
-                max_tokens=max_tokens,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return response.content[0].text
-        except ImportError:
-            raise RuntimeError("anthropic package not installed")
-        except Exception as e:
-            raise RuntimeError(f"Anthropic API error: {e}")
-
-
-class MockProvider(LLMProvider):
-    """Mock provider for testing without API calls."""
-
-    async def generate(self, prompt: str, max_tokens: int = 1000) -> str:
-        # Generate a simple template response based on prompt content
-        if "market narrative" in prompt.lower():
-            return self._mock_market_narrative(prompt)
-        elif "divergence" in prompt.lower():
-            return self._mock_divergence()
-        elif "trending" in prompt.lower():
-            return self._mock_trending()
-        elif "whale" in prompt.lower():
-            return self._mock_whale()
+        # Price section
+        if ctx.price_change_7d > 15:
+            price_text = f"{asset} has seen a strong rally of {ctx.price_change_7d:.1f}% over the past week, currently trading at ${ctx.current_price:,.2f}."
+        elif ctx.price_change_7d > 5:
+            price_text = f"{asset} is up {ctx.price_change_7d:.1f}% this week, trading at ${ctx.current_price:,.2f}."
+        elif ctx.price_change_7d < -15:
+            price_text = f"{asset} has dropped {abs(ctx.price_change_7d):.1f}% over the past week to ${ctx.current_price:,.2f}."
+        elif ctx.price_change_7d < -5:
+            price_text = f"{asset} is down {abs(ctx.price_change_7d):.1f}% this week at ${ctx.current_price:,.2f}."
         else:
-            return self._mock_generic()
+            price_text = f"{asset} is consolidating around ${ctx.current_price:,.2f} with minimal movement ({ctx.price_change_7d:+.1f}% this week)."
 
-    def _mock_market_narrative(self, prompt: str) -> str:
-        return """**Market Overview**
+        # Sentiment section
+        if ctx.sentiment > 0.3:
+            sentiment_text = "Social sentiment is strongly positive, indicating bullish crowd psychology."
+        elif ctx.sentiment > 0.1:
+            sentiment_text = "Social sentiment leans positive with moderate optimism in the community."
+        elif ctx.sentiment < -0.3:
+            sentiment_text = "Social sentiment is notably negative, reflecting fear or pessimism."
+        elif ctx.sentiment < -0.1:
+            sentiment_text = "Social sentiment leans negative with some caution in discussions."
+        else:
+            sentiment_text = "Social sentiment is neutral with no strong directional bias."
 
-The asset is currently experiencing moderate trading activity with mixed signals across different metrics. Price action over the past week shows a consolidation pattern, suggesting the market is in a decision phase.
+        # Volume context
+        if ctx.social_volume_change > 50:
+            volume_text = f" Social volume has spiked {ctx.social_volume_change:.0f}%, suggesting heightened interest."
+        elif ctx.social_volume_change < -30:
+            volume_text = f" Social volume has declined {abs(ctx.social_volume_change):.0f}%, indicating reduced attention."
+        else:
+            volume_text = ""
 
-**Key Drivers**
+        # Whale section
+        if ctx.whale_flow_signal == "bullish":
+            whale_text = f"Whale activity is bullish with net outflows of ${abs(ctx.whale_net_flow):,.0f} from exchanges, suggesting accumulation."
+        elif ctx.whale_flow_signal == "bearish":
+            whale_text = f"Whale activity shows warning signs with ${ctx.whale_net_flow:,.0f} net inflows to exchanges, potentially signaling distribution."
+        else:
+            whale_text = "Exchange flows are balanced with no strong directional whale activity."
 
-Social sentiment has remained relatively stable, with no extreme readings that would typically precede major moves. Whale activity shows balanced exchange flows, indicating large holders are neither aggressively accumulating nor distributing.
+        # Holder behavior
+        if ctx.holder_behavior == "accumulating":
+            holder_text = " Top holders have been increasing their positions."
+        elif ctx.holder_behavior == "distributing":
+            holder_text = " Top holders appear to be reducing exposure."
+        else:
+            holder_text = ""
 
-**Outlook**
+        # MVRV context
+        if ctx.mvrv < 0.8:
+            valuation_text = f"The MVRV ratio at {ctx.mvrv:.2f} suggests the asset may be undervalued historically."
+        elif ctx.mvrv > 3.0:
+            valuation_text = f"The MVRV ratio at {ctx.mvrv:.2f} indicates potential overvaluation - caution advised."
+        elif ctx.mvrv > 2.0:
+            valuation_text = f"The MVRV ratio at {ctx.mvrv:.2f} shows healthy profit levels in the market."
+        else:
+            valuation_text = f"Valuation metrics (MVRV: {ctx.mvrv:.2f}) are within normal ranges."
 
-The current setup suggests a neutral bias with potential for increased volatility as the market awaits catalysts. Key levels to watch include recent support and resistance zones, while monitoring social sentiment for any sudden shifts that could precede directional moves."""
+        # Combine sections
+        narrative = f"""**Market Overview**
 
-    def _mock_divergence(self) -> str:
-        return """Based on the data provided, there appears to be a mild divergence between price action and sentiment. While prices have shown weakness, social sentiment has started improving - a pattern historically associated with potential trend reversals.
+{price_text} {sentiment_text}{volume_text}
 
-However, divergences alone are not reliable signals and should be confirmed with other indicators. The current divergence is moderate in strength, suggesting caution rather than immediate action."""
+**On-Chain Analysis**
 
-    def _mock_trending(self) -> str:
-        return """The crypto community is currently focused on several key narratives: institutional adoption discussions, regulatory developments, and layer-2 scaling solutions. These topics are generating significant engagement across social platforms.
+{whale_text}{holder_text} {valuation_text}
 
-The trending discussions suggest market participants are weighing both bullish catalysts (ETF developments, enterprise adoption) and bearish concerns (regulatory scrutiny). This balanced narrative may explain current market consolidation."""
+**Development & Activity**
 
-    def _mock_whale(self) -> str:
-        return """Whale activity analysis shows a relatively balanced picture. Exchange inflows and outflows are roughly equal, suggesting large holders are not making aggressive directional bets at current prices.
+Development activity is {ctx.dev_activity_trend} with {ctx.contributors} active contributors. {"This signals ongoing project commitment." if ctx.dev_activity_trend == "increasing" else "Activity levels are being maintained." if ctx.dev_activity_trend == "stable" else "Reduced development activity warrants monitoring."}"""
 
-Top holder positions have remained stable over the past week, which is typically a sign of confidence in current valuations. This stability in whale behavior often precedes periods of accumulation when prices dip."""
+        return narrative
 
-    def _mock_generic(self) -> str:
-        return """Based on the available data, the market shows typical characteristics of a consolidation phase. Key metrics are within normal ranges, and no extreme readings suggest imminent major moves.
+    def generate_divergence_narrative(self, ctx: MarketContext) -> str:
+        """Generate divergence analysis narrative."""
+        has_divergence = False
+        divergence_type = None
 
-Continue monitoring key indicators for any significant deviations that could signal changing conditions."""
+        if ctx.price_change_7d > 10 and ctx.sentiment < -0.1:
+            has_divergence = True
+            divergence_type = "bearish"
+        elif ctx.price_change_7d < -10 and ctx.sentiment > 0.1:
+            has_divergence = True
+            divergence_type = "bullish"
+
+        if has_divergence:
+            if divergence_type == "bullish":
+                return f"""A bullish divergence is detected: price has declined {abs(ctx.price_change_7d):.1f}% but sentiment remains positive ({ctx.sentiment:.2f}).
+
+Historically, this pattern can precede price recoveries as the crowd sentiment leads price action. The negative price movement may present accumulation opportunities if sentiment continues to improve."""
+            else:
+                return f"""A bearish divergence is detected: price has risen {ctx.price_change_7d:.1f}% but sentiment is negative ({ctx.sentiment:.2f}).
+
+This disconnect between price and sentiment can signal unsustainable rallies. When the crowd is pessimistic despite rising prices, it may indicate distribution by informed participants."""
+        else:
+            return f"""No significant divergence detected. Price ({ctx.price_change_7d:+.1f}% 7d) and sentiment ({ctx.sentiment:.2f}) are relatively aligned.
+
+The market appears to be pricing in the current sentiment accurately, suggesting continuation of the prevailing trend unless external catalysts emerge."""
+
+    def generate_whale_narrative(self, ctx: MarketContext) -> str:
+        """Generate whale activity narrative."""
+        net_flow_str = f"${abs(ctx.whale_net_flow):,.0f}"
+
+        if ctx.whale_flow_signal == "bullish":
+            flow_text = f"Exchange outflows dominate with {net_flow_str} net withdrawals. Large holders are moving assets to cold storage, a classic accumulation signal."
+        elif ctx.whale_flow_signal == "bearish":
+            flow_text = f"Exchange inflows are elevated with {net_flow_str} net deposits. This increases available supply for selling and often precedes downward pressure."
+        else:
+            flow_text = f"Exchange flows are balanced (net: {net_flow_str}). Whales appear to be in a wait-and-see mode."
+
+        if ctx.holder_behavior == "accumulating":
+            holder_text = "Top 10 holders have increased positions over the past week, confirming accumulation patterns."
+        elif ctx.holder_behavior == "distributing":
+            holder_text = "Top 10 holders have reduced positions, suggesting some profit-taking or rebalancing."
+        else:
+            holder_text = "Top holder positions remain stable with no significant changes."
+
+        return f"""**Exchange Flow Analysis**
+
+{flow_text}
+
+**Top Holder Behavior**
+
+{holder_text}
+
+**Summary**
+
+{"Whale behavior is supportive of higher prices." if ctx.whale_flow_signal == "bullish" else "Whale positioning suggests caution." if ctx.whale_flow_signal == "bearish" else "No strong directional signal from whale activity."}"""
+
+    def generate_trending_narrative(self, trending_words: list, associated_assets: list) -> str:
+        """Generate trending topics narrative."""
+        if not trending_words:
+            return "No significant trending topics detected in crypto social media at this time."
+
+        top_words = [w.get("word", "") for w in trending_words[:5]]
+        words_str = ", ".join(top_words)
+
+        return f"""**Trending Topics**
+
+The crypto community is currently discussing: {words_str}
+
+{"These topics are associated with: " + ", ".join(associated_assets) if associated_assets else "These topics span multiple assets and general market themes."}
+
+**Market Implications**
+
+Trending discussions often reflect near-term catalysts and sentiment drivers. Elevated social volume around specific topics can precede volatility as narratives spread through the market."""
 
 
 class NarrativeAnalyzer:
     """
-    Main analyzer that combines Santiment data with LLM capabilities
-    to generate market narratives.
+    Main analyzer that combines Santiment data to generate
+    market narratives using intelligent templates.
     """
 
-    def __init__(
-        self,
-        client: SantimentClient,
-        llm_provider: Optional[LLMProvider] = None,
-    ):
+    def __init__(self, client: SantimentClient):
         self.client = client
-        self.llm = llm_provider or MockProvider()
-        self.prompts = NarrativePrompts()
+        self.generator = NarrativeGenerator()
 
     async def gather_context(
         self,
         asset_slug: str,
         include_trending: bool = True,
     ) -> MarketContext:
-        """
-        Gather all context needed for narrative generation.
-
-        Args:
-            asset_slug: Asset to analyze
-            include_trending: Whether to include trending words
-
-        Returns:
-            MarketContext with all relevant data
-        """
+        """Gather all context needed for narrative generation."""
         now = datetime.utcnow()
         from_30d = now - timedelta(days=30)
         from_7d = now - timedelta(days=7)
@@ -330,32 +362,12 @@ class NarrativeAnalyzer:
 
         return context
 
-    async def generate_narrative(
-        self,
-        asset_slug: str,
-    ) -> NarrativeInsight:
-        """
-        Generate a full market narrative for an asset.
-
-        Args:
-            asset_slug: Asset to analyze
-
-        Returns:
-            NarrativeInsight with the generated narrative
-        """
+    async def generate_narrative(self, asset_slug: str) -> NarrativeInsight:
+        """Generate a full market narrative for an asset."""
         context = await self.gather_context(asset_slug)
 
-        # Generate prompt
-        prompt = self.prompts.market_narrative(
-            asset=asset_slug,
-            price_data=context.to_price_dict(),
-            sentiment_data=context.to_sentiment_dict(),
-            trending_words=[w.word for w in context.trending_words],
-            whale_data=context.to_whale_dict(),
-        )
-
-        # Generate narrative
-        narrative_text = await self.llm.generate(prompt)
+        # Generate narrative using templates
+        narrative_text = self.generator.generate_market_narrative(context)
 
         # Extract key drivers from context
         key_drivers = []
@@ -388,10 +400,7 @@ class NarrativeAnalyzer:
             whale_activity_summary=f"{context.whale_flow_signal} - Net flow: ${context.whale_net_flow:,.0f}",
         )
 
-    async def generate_divergence_analysis(
-        self,
-        asset_slug: str,
-    ) -> dict:
+    async def generate_divergence_analysis(self, asset_slug: str) -> dict:
         """Generate focused divergence analysis."""
         context = await self.gather_context(asset_slug, include_trending=False)
 
@@ -406,14 +415,7 @@ class NarrativeAnalyzer:
             has_divergence = True
             divergence_type = "bullish"
 
-        prompt = self.prompts.divergence_analysis(
-            asset=asset_slug,
-            price_change=context.price_change_7d,
-            sentiment=context.sentiment,
-            sentiment_change=context.social_volume_change / 100,  # Approximate
-        )
-
-        analysis = await self.llm.generate(prompt)
+        analysis = self.generator.generate_divergence_narrative(context)
 
         return {
             "asset": asset_slug,
@@ -439,38 +441,22 @@ class NarrativeAnalyzer:
                 associated_assets.append("ethereum")
             elif word_lower in ["solana", "sol"]:
                 associated_assets.append("solana")
-            # Add more mappings as needed
 
-        prompt = self.prompts.trending_topics_summary(
-            trending_words=[{"word": w.word, "hype_score": w.hype_score} for w in trending],
-            associated_assets=list(set(associated_assets)),
-        )
-
-        summary = await self.llm.generate(prompt)
+        trending_dicts = [{"word": w.word, "hype_score": w.hype_score} for w in trending]
+        summary = self.generator.generate_trending_narrative(trending_dicts, list(set(associated_assets)))
 
         return {
-            "trending_words": [
-                {"word": w.word, "hype_score": w.hype_score}
-                for w in trending
-            ],
+            "trending_words": trending_dicts,
             "associated_assets": list(set(associated_assets)),
             "summary": summary,
             "generated_at": datetime.utcnow().isoformat(),
         }
 
-    async def generate_whale_summary(
-        self,
-        asset_slug: str,
-    ) -> dict:
+    async def generate_whale_summary(self, asset_slug: str) -> dict:
         """Generate whale activity summary."""
         context = await self.gather_context(asset_slug, include_trending=False)
 
-        prompt = self.prompts.whale_activity_summary(
-            whale_data=context.to_whale_dict(),
-            recent_large_transactions=[],  # Would need actual transaction data
-        )
-
-        summary = await self.llm.generate(prompt)
+        summary = self.generator.generate_whale_narrative(context)
 
         return {
             "asset": asset_slug,
@@ -482,15 +468,7 @@ class NarrativeAnalyzer:
         }
 
     def _calculate_confidence(self, context: MarketContext) -> float:
-        """
-        Calculate confidence score for the narrative.
-
-        Higher confidence when:
-        - Strong price movement
-        - Clear sentiment signal
-        - Whale activity aligns with sentiment
-        - High social volume
-        """
+        """Calculate confidence score for the narrative."""
         confidence = 0.5  # Base confidence
 
         # Price clarity
@@ -522,7 +500,3 @@ class NarrativeAnalyzer:
             confidence += 0.05
 
         return min(0.95, confidence)
-
-    def set_llm_provider(self, provider: LLMProvider) -> None:
-        """Change the LLM provider."""
-        self.llm = provider

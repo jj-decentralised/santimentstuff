@@ -16,7 +16,7 @@ from products.health_score.calculator import HealthScoreCalculator
 from products.whale_watch.tracker import WhaleTracker
 from products.sentiment_bot.signals import SignalGenerator
 from products.sentiment_bot.strategy import StrategyConfig
-from products.narrative_ai.analyzer import NarrativeAnalyzer, MockProvider
+from products.narrative_ai.analyzer import NarrativeAnalyzer
 from .screener import AssetScreener
 
 
@@ -173,7 +173,7 @@ class ResearchTerminal:
         self._health_calculator = HealthScoreCalculator(self._client)
         self._whale_tracker = WhaleTracker(self._client)
         self._signal_generator = SignalGenerator(self._client)
-        self._narrative_analyzer = NarrativeAnalyzer(self._client, MockProvider())
+        self._narrative_analyzer = NarrativeAnalyzer(self._client)
         self._screener = AssetScreener(self._client)
 
         return self

@@ -1,24 +1,19 @@
 """
 Narrative AI REST API
 
-FastAPI-based REST API for AI-powered market narrative generation.
+FastAPI-based REST API for market narrative generation using Santiment data.
 """
 
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from core.client import SantimentClient
 from core.cache import CacheManager
-from .analyzer import (
-    NarrativeAnalyzer,
-    OpenAIProvider,
-    AnthropicProvider,
-    MockProvider,
-)
+from .analyzer import NarrativeAnalyzer
 
 
 # ==================== Pydantic Models ====================
@@ -63,13 +58,6 @@ class WhaleSummaryResponse(BaseModel):
     generated_at: datetime
 
 
-class LLMConfigRequest(BaseModel):
-    """Request model for LLM configuration."""
-    provider: str = Field(..., description="LLM provider: 'openai', 'anthropic', or 'mock'")
-    api_key: Optional[str] = Field(None, description="API key (uses env var if not provided)")
-    model: Optional[str] = Field(None, description="Model name (uses default if not provided)")
-
-
 # ==================== Dependencies ====================
 
 _client: Optional[SantimentClient] = None
@@ -83,7 +71,7 @@ async def get_analyzer() -> NarrativeAnalyzer:
         cache = CacheManager.create(use_redis=False)
         _client = SantimentClient(cache=cache)
         await _client.__aenter__()
-        _analyzer = NarrativeAnalyzer(_client, MockProvider())
+        _analyzer = NarrativeAnalyzer(_client)
     return _analyzer
 
 
@@ -93,24 +81,18 @@ def create_narrative_app() -> FastAPI:
     """Create the FastAPI application for Narrative AI."""
 
     app = FastAPI(
-        title="AI Market Narrative Analyzer",
+        title="Market Narrative Analyzer",
         description="""
-        LLM-powered market analysis that combines multiple data sources
-        to generate human-readable market narratives.
+        Market narrative generation using Santiment on-chain and social data.
 
         ## Features
-        - **Market Narratives**: Full analysis explaining price movements
+        - **Market Narratives**: Analysis explaining price movements
         - **Divergence Analysis**: Detect price-sentiment divergences
         - **Trending Summary**: What the crypto community is discussing
-        - **Whale Analysis**: AI interpretation of whale activity
+        - **Whale Analysis**: Interpretation of whale activity
 
-        ## LLM Providers
-        Supports multiple LLM providers:
-        - **OpenAI**: GPT-4 and GPT-3.5
-        - **Anthropic**: Claude models
-        - **Mock**: For testing without API costs
-
-        Configure the provider using the `/config/llm` endpoint.
+        All narratives are generated using intelligent templates
+        powered by real-time Santiment data.
         """,
         version="1.0.0",
         docs_url="/docs",
@@ -132,14 +114,13 @@ def create_narrative_app() -> FastAPI:
     async def root():
         """API root with service information."""
         return {
-            "service": "AI Market Narrative Analyzer",
+            "service": "Market Narrative Analyzer",
             "version": "1.0.0",
             "endpoints": {
                 "narrative": "/narrative/{slug}",
                 "divergence": "/divergence/{slug}",
                 "trending": "/trending",
                 "whale_analysis": "/whale/{slug}",
-                "config": "/config/llm",
             }
         }
 
@@ -149,7 +130,7 @@ def create_narrative_app() -> FastAPI:
         analyzer: NarrativeAnalyzer = Depends(get_analyzer),
     ):
         """
-        Generate a full market narrative for an asset.
+        Generate a market narrative for an asset.
 
         Combines price action, sentiment, whale activity, and trending topics
         into a coherent narrative explaining current market conditions.
@@ -206,7 +187,7 @@ def create_narrative_app() -> FastAPI:
         analyzer: NarrativeAnalyzer = Depends(get_analyzer),
     ):
         """
-        Get AI-generated summary of trending topics in crypto social media.
+        Get summary of trending topics in crypto social media.
 
         Analyzes what the community is discussing and potential market impact.
         """
@@ -228,7 +209,7 @@ def create_narrative_app() -> FastAPI:
         analyzer: NarrativeAnalyzer = Depends(get_analyzer),
     ):
         """
-        Get AI-generated analysis of whale activity.
+        Get analysis of whale activity.
 
         Interprets exchange flows and top holder behavior.
         """
@@ -256,12 +237,12 @@ def create_narrative_app() -> FastAPI:
         """
         Generate narratives for multiple assets.
 
-        Maximum 5 assets per request (LLM cost consideration).
+        Maximum 10 assets per request.
         """
-        if len(slugs) > 5:
+        if len(slugs) > 10:
             raise HTTPException(
                 status_code=400,
-                detail="Maximum 5 assets per batch request"
+                detail="Maximum 10 assets per batch request"
             )
 
         import asyncio
@@ -333,71 +314,13 @@ def create_narrative_app() -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    # ==================== Configuration Endpoints ====================
-
-    @app.post("/config/llm")
-    async def configure_llm(
-        config: LLMConfigRequest,
-        analyzer: NarrativeAnalyzer = Depends(get_analyzer),
-    ):
-        """
-        Configure the LLM provider.
-
-        Supported providers:
-        - `openai`: Uses GPT-4 or specified model
-        - `anthropic`: Uses Claude or specified model
-        - `mock`: For testing (no API calls)
-        """
-        try:
-            if config.provider == "openai":
-                provider = OpenAIProvider(
-                    api_key=config.api_key,
-                    model=config.model or "gpt-4",
-                )
-            elif config.provider == "anthropic":
-                provider = AnthropicProvider(
-                    api_key=config.api_key,
-                    model=config.model or "claude-3-sonnet-20240229",
-                )
-            elif config.provider == "mock":
-                provider = MockProvider()
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unknown provider: {config.provider}"
-                )
-
-            analyzer.set_llm_provider(provider)
-
-            return {
-                "status": "configured",
-                "provider": config.provider,
-                "model": config.model,
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    @app.get("/config/llm")
-    async def get_llm_config(
-        analyzer: NarrativeAnalyzer = Depends(get_analyzer),
-    ):
-        """Get current LLM configuration."""
-        provider_name = type(analyzer.llm).__name__
-        return {
-            "provider": provider_name.replace("Provider", "").lower(),
-            "note": "Use POST /config/llm to change provider",
-        }
-
     # ==================== Health Check ====================
 
     @app.get("/health")
-    async def health_check(
-        analyzer: NarrativeAnalyzer = Depends(get_analyzer),
-    ):
+    async def health_check():
         """Health check endpoint."""
         return {
             "status": "healthy",
-            "llm_provider": type(analyzer.llm).__name__,
             "timestamp": datetime.utcnow().isoformat(),
         }
 
