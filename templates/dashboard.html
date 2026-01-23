@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Money Tracker</title>
+    <link rel="stylesheet" href="/static/css/wsj-theme.css">
+</head>
+<body>
+    <header class="header">
+        <h1>Smart Money Tracker</h1>
+        <div class="controls">
+            <div class="chain-selector" id="chain-selector">
+                <!-- Populated via JS -->
+            </div>
+            <span class="last-updated" id="last-updated">Updated: --</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Navigation Tabs -->
+        <div class="tabs" id="main-tabs">
+            <div class="tab active" data-view="purchases">Token Purchases</div>
+            <div class="tab" data-view="trades">Recent Trades</div>
+        </div>
+
+        <!-- View 1: Token Purchases -->
+        <section id="purchases-view" class="view active">
+            <div class="stats-row" id="purchases-stats">
+                <div class="stat">
+                    <span class="stat-label">Tokens Tracked</span>
+                    <span class="stat-value" id="total-tokens">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Accumulating</span>
+                    <span class="stat-value positive" id="accumulating-count">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Distributing</span>
+                    <span class="stat-value negative" id="distributing-count">--</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <table class="data-table" id="purchases-table">
+                    <thead>
+                        <tr>
+                            <th>Token</th>
+                            <th>Chain</th>
+                            <th class="numeric">Smart Money Holders</th>
+                            <th class="numeric">Net Flow (24h)</th>
+                            <th class="numeric">Total Value</th>
+                            <th>Signal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="purchases-body">
+                        <tr><td colspan="6" class="loading">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- View 2: Recent Trades -->
+        <section id="trades-view" class="view">
+            <div class="stats-row" id="trades-stats">
+                <div class="stat">
+                    <span class="stat-label">Total Trades</span>
+                    <span class="stat-value" id="total-trades">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Buys</span>
+                    <span class="stat-value positive" id="buy-count">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Sells</span>
+                    <span class="stat-value negative" id="sell-count">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Buy Volume</span>
+                    <span class="stat-value positive" id="buy-volume">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Sell Volume</span>
+                    <span class="stat-value negative" id="sell-volume">--</span>
+                </div>
+            </div>
+
+            <div class="narrative" id="trades-narrative">
+                Loading narrative...
+            </div>
+
+            <div class="card">
+                <table class="data-table" id="trades-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Wallet</th>
+                            <th>Action</th>
+                            <th>Bought</th>
+                            <th>Sold</th>
+                            <th class="numeric">Value</th>
+                            <th>Chain</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trades-body">
+                        <tr><td colspan="7" class="loading">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- View 3: Token Drilldown -->
+        <section id="drilldown-view" class="view">
+            <div class="drilldown-header">
+                <h2 id="drilldown-title">Token Analysis</h2>
+                <button class="back-btn" id="back-btn">Back to Overview</button>
+            </div>
+
+            <div class="stats-row" id="drilldown-stats">
+                <div class="stat">
+                    <span class="stat-label">Total Holders</span>
+                    <span class="stat-value" id="total-holders">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Smart Money</span>
+                    <span class="stat-value" id="sm-holders">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Whales</span>
+                    <span class="stat-value" id="whale-holders">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Exchanges</span>
+                    <span class="stat-value" id="exchange-holders">--</span>
+                </div>
+            </div>
+
+            <div class="narrative" id="drilldown-narrative">
+                Loading analysis...
+            </div>
+
+            <div class="two-column">
+                <div class="card">
+                    <div class="card-header">Flow Intelligence</div>
+                    <div class="card-body" id="flow-intelligence">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Top Holders</div>
+                    <div class="card-body">
+                        <table class="data-table" id="holders-table">
+                            <thead>
+                                <tr>
+                                    <th>Address</th>
+                                    <th class="numeric">Value</th>
+                                    <th class="numeric">24h Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holders-body">
+                                <tr><td colspan="3" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="two-column">
+                <div class="card">
+                    <div class="card-header">Recent Buyers</div>
+                    <div class="card-body" id="buyers-list">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Recent Sellers</div>
+                    <div class="card-body" id="sellers-list">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
