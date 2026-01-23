@@ -219,15 +219,22 @@ class SmartMoneyTracker:
         Returns:
             Token drilldown response dict
         """
-        # Fetch all TGM data in parallel
+        # Fetch all TGM data in parallel with error handling
         holders_task = self.client.get_token_holders(token_address, chain)
         flows_task = self.client.get_flow_intelligence(token_address, chain)
         buyers_task = self.client.get_who_bought_sold(token_address, chain, "buy")
         sellers_task = self.client.get_who_bought_sold(token_address, chain, "sell")
 
-        holders, flows, buyers, sellers = await asyncio.gather(
-            holders_task, flows_task, buyers_task, sellers_task
+        results = await asyncio.gather(
+            holders_task, flows_task, buyers_task, sellers_task,
+            return_exceptions=True
         )
+
+        # Handle potential errors gracefully
+        holders = results[0] if not isinstance(results[0], Exception) else []
+        flows = results[1] if not isinstance(results[1], Exception) else None
+        buyers = results[2] if not isinstance(results[2], Exception) else []
+        sellers = results[3] if not isinstance(results[3], Exception) else []
 
         # Count holders by category
         holder_counts = self._count_holders_by_category(holders)
@@ -238,24 +245,22 @@ class SmartMoneyTracker:
             # Try to infer from label or use address
             token_symbol = token_address[:8] + "..."
 
-        # Generate narrative
+        # Generate narrative (handle missing flows)
         narrative = self.narrative_gen.generate_token_narrative(
             token_symbol, holders, flows, buyers, sellers
         )
 
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
-            "chain": chain,
-            "token_address": token_address,
-            "token_symbol": token_symbol,
-            "holder_breakdown": {
-                "total": len(holders),
-                "smart_money": holder_counts.get("smart_money", 0),
-                "whale": holder_counts.get("whale", 0),
-                "exchange": holder_counts.get("exchange", 0),
-                "other": holder_counts.get("other", 0),
-            },
-            "flow_intelligence": {
+        # Build flow intelligence response (handle None flows)
+        flow_data = {
+            "smart_money": {"net_flow_usd": 0, "wallet_count": 0},
+            "whale": {"net_flow_usd": 0, "wallet_count": 0},
+            "exchange": {"net_flow_usd": 0, "wallet_count": 0},
+            "fresh_wallets": {"net_flow_usd": 0, "wallet_count": 0},
+            "top_pnl": {"net_flow_usd": 0, "wallet_count": 0},
+        }
+
+        if flows:
+            flow_data = {
                 "smart_money": {
                     "net_flow_usd": flows.smart_trader_net_flow_usd,
                     "wallet_count": flows.smart_trader_wallet_count,
@@ -276,9 +281,23 @@ class SmartMoneyTracker:
                     "net_flow_usd": flows.top_pnl_net_flow_usd,
                     "wallet_count": flows.top_pnl_wallet_count,
                 },
+            }
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "chain": chain,
+            "token_address": token_address,
+            "token_symbol": token_symbol,
+            "holder_breakdown": {
+                "total": len(holders),
+                "smart_money": holder_counts.get("smart_money", 0),
+                "whale": holder_counts.get("whale", 0),
+                "exchange": holder_counts.get("exchange", 0),
+                "other": holder_counts.get("other", 0),
             },
-            "recent_buyers": buyers[:10],
-            "recent_sellers": sellers[:10],
+            "flow_intelligence": flow_data,
+            "recent_buyers": buyers[:10] if buyers else [],
+            "recent_sellers": sellers[:10] if sellers else [],
             "top_holders": [
                 {
                     "address": h.address,

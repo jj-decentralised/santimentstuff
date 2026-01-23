@@ -94,7 +94,7 @@ class SmartMoneyNarrativeGenerator:
         self,
         token_symbol: str,
         holders: list[TokenHolder],
-        flows: FlowIntelligence,
+        flows: Optional[FlowIntelligence],
         buyers: list[dict],
         sellers: list[dict],
     ) -> str:
@@ -106,12 +106,15 @@ class SmartMoneyNarrativeGenerator:
         holder_text = self._holder_breakdown_narrative(holders)
         sections.append(f"**Holder Analysis:** {holder_text}")
 
-        # Flow intelligence
-        flow_text = self._flow_intelligence_narrative(flows)
-        sections.append(f"**Flow Intelligence:** {flow_text}")
+        # Flow intelligence (handle None)
+        if flows:
+            flow_text = self._flow_intelligence_narrative(flows)
+            sections.append(f"**Flow Intelligence:** {flow_text}")
+        else:
+            sections.append("**Flow Intelligence:** Flow data temporarily unavailable.")
 
         # Recent activity
-        activity_text = self._buyer_seller_narrative(len(buyers), len(sellers))
+        activity_text = self._buyer_seller_narrative(len(buyers) if buyers else 0, len(sellers) if sellers else 0)
         sections.append(f"**Recent Activity:** {activity_text}")
 
         return "\n\n".join(sections)
