@@ -219,6 +219,31 @@ def create_app() -> FastAPI:
 
         return await _tracker.get_perp_trades(limit)
 
+    # === Funds Overview ===
+
+    @app.get("/api/v1/funds")
+    async def get_funds_overview(
+        chains: str = Query(
+            default="ethereum",
+            description="Comma-separated blockchain networks"
+        ),
+    ):
+        """
+        Get aggregated view of fund/institutional holdings.
+
+        Shows combined positions, trades, and P/L for venture funds and hedge funds.
+        """
+        if not _tracker:
+            raise HTTPException(500, "Tracker not initialized")
+
+        chain_list = [c.strip() for c in chains.split(",")]
+
+        invalid_chains = [c for c in chain_list if c not in VALID_CHAINS]
+        if invalid_chains:
+            raise HTTPException(400, f"Invalid chains: {invalid_chains}")
+
+        return await _tracker.get_funds_overview(chain_list)
+
     # === Reference Endpoints ===
 
     @app.get("/api/v1/chains")

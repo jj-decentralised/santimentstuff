@@ -79,6 +79,23 @@ const fmt = {
         return `${prefix}${value.toFixed(2)}%`;
     },
 
+    // Format balance change as token amount (not percentage)
+    balanceChange(value) {
+        if (value === null || value === undefined) return '--';
+        const abs = Math.abs(value);
+        const sign = value > 0 ? '+' : value < 0 ? '' : '';
+        if (abs >= 1_000_000_000) {
+            return `${sign}${(value / 1_000_000_000).toFixed(1)}B`;
+        } else if (abs >= 1_000_000) {
+            return `${sign}${(value / 1_000_000).toFixed(1)}M`;
+        } else if (abs >= 1_000) {
+            return `${sign}${(value / 1_000).toFixed(1)}K`;
+        } else if (abs >= 1) {
+            return `${sign}${value.toFixed(0)}`;
+        }
+        return `${sign}${value.toFixed(2)}`;
+    },
+
     time(isoString) {
         if (!isoString) return '--';
         const date = new Date(isoString);
@@ -490,6 +507,8 @@ async function loadData() {
 
     if (state.currentView === 'purchases') {
         await loadPurchases(chains);
+    } else if (state.currentView === 'funds') {
+        await loadFunds(chains);
     } else if (state.currentView === 'trades') {
         await loadTrades(chains);
     } else if (state.currentView === 'perps') {
@@ -636,6 +655,122 @@ async function loadPerps() {
     }
 }
 
+// Store funds data for detail view
+let currentFundsData = null;
+
+async function loadFunds(chains) {
+    const body = $('#funds-body');
+    const tradesBody = $('#fund-trades-body');
+    body.innerHTML = '<tr><td colspan="3" class="loading">Loading data...</td></tr>';
+    tradesBody.innerHTML = '<tr><td colspan="7" class="loading">Loading data...</td></tr>';
+
+    // Hide detail view
+    const detailCard = document.getElementById('fund-detail-card');
+    if (detailCard) detailCard.style.display = 'none';
+
+    try {
+        const data = await api.get(`/api/v1/funds?chains=${chains}`);
+        currentFundsData = data;
+
+        // Update stats
+        $('#total-funds').textContent = fmt.number(data.summary?.total_funds || 0);
+        $('#funds-total-value').textContent = fmt.usd(data.summary?.total_fund_value_usd);
+        $('#funds-positions').textContent = fmt.number(data.summary?.total_positions || 0);
+        $('#funds-buy-count').textContent = fmt.number(data.summary?.recent_buy_count || 0);
+        $('#funds-sell-count').textContent = fmt.number(data.summary?.recent_sell_count || 0);
+
+        // Render funds table
+        if (!data.funds || data.funds.length === 0) {
+            body.innerHTML = '<tr><td colspan="3">No fund holdings detected</td></tr>';
+        } else {
+            body.innerHTML = data.funds.map((fund, idx) => `
+                <tr class="fund-row" data-fund-index="${idx}" style="cursor: pointer;">
+                    <td><strong>${fund.name}</strong></td>
+                    <td class="numeric">${fmt.usd(fund.total_value_usd)}</td>
+                    <td class="numeric">${fund.total_tokens_held}</td>
+                </tr>
+            `).join('');
+
+            // Add click handlers for fund detail
+            body.querySelectorAll('.fund-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const idx = parseInt(row.dataset.fundIndex);
+                    showFundDetail(data.funds[idx]);
+                });
+            });
+        }
+
+        // Render fund trades table
+        if (!data.recent_trades || data.recent_trades.length === 0) {
+            tradesBody.innerHTML = '<tr><td colspan="7">No recent fund trades</td></tr>';
+        } else {
+            tradesBody.innerHTML = data.recent_trades.map(trade => `
+                <tr>
+                    <td>${fmt.time(trade.timestamp)}</td>
+                    <td title="${trade.fund}">${trade.fund}</td>
+                    <td>
+                        <span class="signal signal-${trade.action === 'BUY' ? 'accumulating' : 'distributing'}">
+                            ${trade.action}
+                        </span>
+                    </td>
+                    <td>${trade.token_bought}</td>
+                    <td>${trade.token_sold}</td>
+                    <td class="numeric">${fmt.usd(trade.value_usd)}</td>
+                    <td>${trade.chain}</td>
+                </tr>
+            `).join('');
+        }
+
+    } catch (error) {
+        console.error('Error loading funds:', error);
+        body.innerHTML = `<tr><td colspan="3">Error loading data: ${error.message}</td></tr>`;
+    }
+}
+
+function showFundDetail(fund) {
+    const detailCard = document.getElementById('fund-detail-card');
+    const fundsCard = document.querySelector('#funds-view .card:first-of-type');
+
+    if (!detailCard || !fund) return;
+
+    // Update header
+    document.getElementById('fund-detail-name').textContent = `${fund.name} Positions`;
+
+    // Render positions table
+    const positionsBody = document.getElementById('fund-positions-body');
+    if (fund.positions && fund.positions.length > 0) {
+        positionsBody.innerHTML = fund.positions.map(pos => `
+            <tr>
+                <td><strong>${pos.token_symbol}</strong></td>
+                <td>${pos.chain}</td>
+                <td class="numeric">${fmt.usd(pos.value_usd)}</td>
+                <td class="numeric">${fmt.number(Math.round(pos.token_amount || 0))}</td>
+                <td class="numeric ${pos.balance_change_24h > 0 ? 'positive' : pos.balance_change_24h < 0 ? 'negative' : ''}">
+                    ${fmt.balanceChange(pos.balance_change_24h)}
+                </td>
+                <td class="numeric ${pos.balance_change_30d > 0 ? 'positive' : pos.balance_change_30d < 0 ? 'negative' : ''}">
+                    ${fmt.balanceChange(pos.balance_change_30d)}
+                </td>
+                <td class="numeric">${fmt.number(Math.round(pos.total_inflow || 0))}</td>
+                <td class="numeric">${fmt.number(Math.round(pos.total_outflow || 0))}</td>
+            </tr>
+        `).join('');
+    } else {
+        positionsBody.innerHTML = '<tr><td colspan="8">No positions found</td></tr>';
+    }
+
+    // Show detail card
+    detailCard.style.display = 'block';
+
+    // Add back button handler
+    document.getElementById('fund-back-btn').onclick = () => {
+        detailCard.style.display = 'none';
+    };
+
+    // Scroll to detail
+    detailCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function loadDrilldown(chain, tokenAddress) {
     state.currentToken = { chain, address: tokenAddress };
     showView('drilldown');
@@ -751,10 +886,10 @@ async function loadDrilldown(chain, tokenAddress) {
                     <td><span class="holder-type-badge holder-type-${h.type || 'other'}">${h.type || 'other'}</span></td>
                     <td class="numeric">${fmt.usd(h.value_usd)}</td>
                     <td class="numeric ${h.balance_change_24h > 0 ? 'positive' : h.balance_change_24h < 0 ? 'negative' : ''}">
-                        ${fmt.percent(h.balance_change_24h)}
+                        ${fmt.balanceChange(h.balance_change_24h)}
                     </td>
                     <td class="numeric ${h.balance_change_7d > 0 ? 'positive' : h.balance_change_7d < 0 ? 'negative' : ''}">
-                        ${fmt.percent(h.balance_change_7d)}
+                        ${fmt.balanceChange(h.balance_change_7d)}
                     </td>
                 </tr>
             `).join('');
@@ -817,13 +952,13 @@ function renderFundHoldingsTable(fundHoldings) {
             <td class="numeric">${fmt.usd(h.value_usd)}</td>
             <td class="numeric">${fmt.number(Math.round(h.token_amount || 0))}</td>
             <td class="numeric ${h.balance_change_24h > 0 ? 'positive' : h.balance_change_24h < 0 ? 'negative' : ''}">
-                ${fmt.percent(h.balance_change_24h)}
+                ${fmt.balanceChange(h.balance_change_24h)}
             </td>
             <td class="numeric ${h.balance_change_7d > 0 ? 'positive' : h.balance_change_7d < 0 ? 'negative' : ''}">
-                ${fmt.percent(h.balance_change_7d)}
+                ${fmt.balanceChange(h.balance_change_7d)}
             </td>
             <td class="numeric ${h.balance_change_30d > 0 ? 'positive' : h.balance_change_30d < 0 ? 'negative' : ''}">
-                ${fmt.percent(h.balance_change_30d)}
+                ${fmt.balanceChange(h.balance_change_30d)}
             </td>
             <td class="numeric">${fmt.number(Math.round(h.total_inflow || 0))}</td>
             <td class="numeric">${fmt.number(Math.round(h.total_outflow || 0))}</td>
@@ -846,7 +981,7 @@ function renderActivityTable(mostActive) {
             <td><span class="holder-type-badge holder-type-${h.type || 'other'}">${h.type || 'other'}</span></td>
             <td class="numeric">${fmt.usd(h.value_usd)}</td>
             <td class="numeric ${h.balance_change_30d > 0 ? 'positive' : h.balance_change_30d < 0 ? 'negative' : ''}">
-                ${fmt.percent(h.balance_change_30d)}
+                ${fmt.balanceChange(h.balance_change_30d)}
             </td>
         </tr>
     `).join('');

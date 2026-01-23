@@ -720,3 +720,121 @@ class SmartMoneyTracker:
             "trades": formatted,
         }
 
+    async def get_funds_overview(
+        self,
+        chains: list[str],
+        limit: int = 100,
+    ) -> dict:
+        """
+        Get aggregated view of fund/institutional holdings across all tokens.
+
+        Aggregates holdings by fund name and shows their positions, trades, and P/L.
+        """
+        # Fetch holdings and trades in parallel
+        holdings_task = self.client.get_smart_money_holdings(chains, limit)
+        trades_task = self.client.get_dex_trades(chains, limit)
+
+        results = await asyncio.gather(
+            holdings_task, trades_task,
+            return_exceptions=True
+        )
+
+        holdings = results[0] if not isinstance(results[0], Exception) else []
+        trades = results[1] if not isinstance(results[1], Exception) else []
+
+        # Get top token addresses to fetch holder data
+        top_tokens = sorted(holdings, key=lambda h: h.value_usd, reverse=True)[:20]
+
+        # Fetch holder data for top tokens in parallel
+        holder_tasks = []
+        for token in top_tokens:
+            holder_tasks.append(
+                self.client.get_token_holders(token.token_address, token.chain, 50)
+            )
+
+        holder_results = await asyncio.gather(*holder_tasks, return_exceptions=True)
+
+        # Aggregate fund holdings across all tokens
+        fund_positions = {}  # fund_name -> {positions: [], total_value, etc.}
+
+        for idx, holders in enumerate(holder_results):
+            if isinstance(holders, Exception) or not holders:
+                continue
+
+            token = top_tokens[idx]
+
+            for holder in holders:
+                if holder.holder_type != "fund":
+                    continue
+
+                fund_name = holder.address_label or holder.address[:10]
+
+                if fund_name not in fund_positions:
+                    fund_positions[fund_name] = {
+                        "name": fund_name,
+                        "address": holder.address,
+                        "positions": [],
+                        "total_value_usd": 0,
+                        "total_tokens_held": 0,
+                    }
+
+                fund_positions[fund_name]["positions"].append({
+                    "token_symbol": token.token_symbol,
+                    "token_address": token.token_address,
+                    "chain": token.chain,
+                    "value_usd": holder.value_usd,
+                    "token_amount": holder.token_amount,
+                    "ownership_pct": holder.ownership_percentage,
+                    "balance_change_24h": holder.balance_change_24h,
+                    "balance_change_7d": holder.balance_change_7d,
+                    "balance_change_30d": holder.balance_change_30d,
+                    "total_inflow": holder.total_inflow,
+                    "total_outflow": holder.total_outflow,
+                })
+                fund_positions[fund_name]["total_value_usd"] += holder.value_usd
+                fund_positions[fund_name]["total_tokens_held"] += 1
+
+        # Convert to list and sort by total value
+        funds_list = list(fund_positions.values())
+        funds_list.sort(key=lambda f: f["total_value_usd"], reverse=True)
+
+        # Filter fund trades from all trades
+        fund_trades = []
+        fund_labels = {f["name"].lower() for f in funds_list}
+
+        for trade in trades:
+            trader_label = (trade.trader_label or "").lower()
+            if any(label in trader_label for label in fund_labels) or \
+               any(kw in trader_label for kw in ["fund", "capital", "ventures", "investment"]):
+                fund_trades.append({
+                    "timestamp": trade.block_timestamp.isoformat(),
+                    "fund": trade.trader_label or trade.trader_address[:10],
+                    "action": "BUY" if trade.is_buy else "SELL",
+                    "token_bought": trade.token_bought_symbol,
+                    "token_sold": trade.token_sold_symbol,
+                    "value_usd": trade.trade_value_usd,
+                    "chain": trade.chain,
+                })
+
+        # Calculate summary stats
+        total_fund_value = sum(f["total_value_usd"] for f in funds_list)
+        total_positions = sum(f["total_tokens_held"] for f in funds_list)
+        buy_trades = [t for t in fund_trades if t["action"] == "BUY"]
+        sell_trades = [t for t in fund_trades if t["action"] == "SELL"]
+
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "chains": chains,
+            "summary": {
+                "total_funds": len(funds_list),
+                "total_fund_value_usd": total_fund_value,
+                "total_positions": total_positions,
+                "recent_buy_count": len(buy_trades),
+                "recent_sell_count": len(sell_trades),
+                "recent_buy_volume": sum(t["value_usd"] for t in buy_trades),
+                "recent_sell_volume": sum(t["value_usd"] for t in sell_trades),
+            },
+            "funds": funds_list[:30],  # Top 30 funds
+            "recent_trades": fund_trades[:50],  # Last 50 fund trades
+        }
+

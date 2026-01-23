@@ -91,6 +91,7 @@
         <!-- Navigation Tabs -->
         <div class="tabs" id="main-tabs">
             <div class="tab active" data-view="purchases">Token Purchases</div>
+            <div class="tab" data-view="funds">Fund Holdings</div>
             <div class="tab" data-view="trades">Recent Trades</div>
             <div class="tab" data-view="perps">Perp Positions</div>
         </div>
@@ -116,7 +117,99 @@
             </div>
         </section>
 
-        <!-- View 2: Recent Trades -->
+        <!-- View 2: Fund Holdings -->
+        <section id="funds-view" class="view">
+            <div class="stats-row" id="funds-stats">
+                <div class="stat">
+                    <span class="stat-label">Total Funds</span>
+                    <span class="stat-value" id="total-funds">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Combined Value</span>
+                    <span class="stat-value" id="funds-total-value">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Total Positions</span>
+                    <span class="stat-value" id="funds-positions">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Recent Buys</span>
+                    <span class="stat-value positive" id="funds-buy-count">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Recent Sells</span>
+                    <span class="stat-value negative" id="funds-sell-count">--</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Fund Holdings by Institution</div>
+                <div class="card-body">
+                    <table class="data-table" id="funds-table">
+                        <thead>
+                            <tr>
+                                <th>Fund Name</th>
+                                <th class="numeric">Total Value</th>
+                                <th class="numeric">Positions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="funds-body">
+                            <tr><td colspan="3" class="loading">Loading data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Fund Detail View (shown when clicking a fund) -->
+            <div class="card" id="fund-detail-card" style="display: none;">
+                <div class="card-header">
+                    <span id="fund-detail-name">Fund Positions</span>
+                    <button class="back-btn" id="fund-back-btn" style="float: right;">Back to Funds</button>
+                </div>
+                <div class="card-body">
+                    <table class="data-table" id="fund-positions-table">
+                        <thead>
+                            <tr>
+                                <th>Token</th>
+                                <th>Chain</th>
+                                <th class="numeric">Value</th>
+                                <th class="numeric">Tokens</th>
+                                <th class="numeric">24h Δ</th>
+                                <th class="numeric">30d Δ</th>
+                                <th class="numeric">Inflow</th>
+                                <th class="numeric">Outflow</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fund-positions-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Recent Fund Trades</div>
+                <div class="card-body">
+                    <table class="data-table" id="fund-trades-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Fund</th>
+                                <th>Action</th>
+                                <th>Bought</th>
+                                <th>Sold</th>
+                                <th class="numeric">Value</th>
+                                <th>Chain</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fund-trades-body">
+                            <tr><td colspan="7" class="loading">Loading data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- View 3: Recent Trades -->
         <section id="trades-view" class="view">
             <div class="stats-row" id="trades-stats">
                 <div class="stat">
@@ -239,9 +332,9 @@
                                 <th>Type</th>
                                 <th class="numeric">Value</th>
                                 <th class="numeric">Tokens</th>
-                                <th class="numeric">24h</th>
-                                <th class="numeric">7d</th>
-                                <th class="numeric">30d</th>
+                                <th class="numeric">24h Δ</th>
+                                <th class="numeric">7d Δ</th>
+                                <th class="numeric">30d Δ</th>
                                 <th class="numeric">Inflow</th>
                                 <th class="numeric">Outflow</th>
                             </tr>
@@ -270,7 +363,7 @@
                                     <th>Holder</th>
                                     <th>Type</th>
                                     <th class="numeric">Value</th>
-                                    <th class="numeric">30d Change</th>
+                                    <th class="numeric">30d Δ Tokens</th>
                                 </tr>
                             </thead>
                             <tbody id="most-active-body">
@@ -297,8 +390,8 @@
                                     <th>Address</th>
                                     <th>Type</th>
                                     <th class="numeric">Value</th>
-                                    <th class="numeric">24h</th>
-                                    <th class="numeric">7d</th>
+                                    <th class="numeric">24h Δ</th>
+                                    <th class="numeric">7d Δ</th>
                                 </tr>
                             </thead>
                             <tbody id="holders-body">
