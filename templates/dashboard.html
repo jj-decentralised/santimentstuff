@@ -8,142 +8,180 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-            background: #f8f9fa;
-            color: #1a1a1a;
-            line-height: 1.5;
+            background: #f5f5f7;
+            color: #1d1d1f;
+            line-height: 1.4;
+            font-size: 13px;
         }
 
         .header {
             background: #fff;
-            border-bottom: 1px solid #e5e5e5;
-            padding: 1rem 2rem;
+            border-bottom: 1px solid #d2d2d7;
+            padding: 0.75rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .header h1 { font-size: 1.125rem; font-weight: 600; }
-        .header-right { display: flex; gap: 1rem; align-items: center; }
-
-        .filter {
-            background: #fff;
-            border: 1px solid #ddd;
+        .header h1 { font-size: 1rem; font-weight: 600; }
+        .header-right { display: flex; gap: 0.75rem; align-items: center; }
+        .header-right select, .header-right button {
+            padding: 0.4rem 0.75rem;
             border-radius: 6px;
-            padding: 0.5rem 1rem;
-            color: #1a1a1a;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
         }
+        .header-right select { border: 1px solid #d2d2d7; background: #fff; }
+        .header-right button { background: #0071e3; color: #fff; border: none; cursor: pointer; }
+        .header-right button:hover { background: #0077ed; }
+        .cache-info { font-size: 0.7rem; color: #86868b; }
 
-        .btn {
-            background: #2563eb;
-            border: none;
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            color: white;
-            font-size: 0.875rem;
-            cursor: pointer;
-        }
-        .btn:hover { background: #1d4ed8; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .container { max-width: 1800px; margin: 0 auto; padding: 1rem; }
 
-        .container { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
-
+        /* Stats row */
         .stats {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
         }
         .stat {
             background: #fff;
-            border: 1px solid #e5e5e5;
-            border-radius: 8px;
-            padding: 1rem;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
-        .stat-label { font-size: 0.75rem; color: #666; text-transform: uppercase; margin-bottom: 0.25rem; }
-        .stat-value { font-size: 1.5rem; font-weight: 600; font-family: 'SF Mono', monospace; }
-        .stat-value.green { color: #16a34a; }
-        .stat-value.red { color: #dc2626; }
+        .stat-label { font-size: 0.65rem; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 1.25rem; font-weight: 600; font-family: 'SF Mono', monospace; }
+        .stat-value.green { color: #34c759; }
+        .stat-value.red { color: #ff3b30; }
 
-        .grid { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
+        /* Main grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 1rem;
+        }
 
         .card {
             background: #fff;
-            border: 1px solid #e5e5e5;
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .card-header {
-            padding: 1rem;
-            border-bottom: 1px solid #e5e5e5;
+            padding: 0.75rem 1rem;
             font-weight: 600;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             background: #fafafa;
-        }
-
-        .activity-list { max-height: 75vh; overflow-y: auto; }
-        .activity-item {
-            display: grid;
-            grid-template-columns: 70px 110px 70px 90px 90px 100px 1fr 70px;
-            gap: 0.5rem;
-            padding: 0.625rem 1rem;
             border-bottom: 1px solid #f0f0f0;
-            font-size: 0.8125rem;
-            align-items: center;
-        }
-        .activity-item:hover { background: #f8f9fa; }
-
-        .time { color: #888; font-family: 'SF Mono', monospace; font-size: 0.75rem; }
-        .entity { color: #6366f1; font-weight: 500; }
-        .action { font-weight: 500; }
-        .action.received { color: #16a34a; }
-        .action.sent { color: #dc2626; }
-        .token {
-            color: #ca8a04;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: underline;
-            text-decoration-style: dotted;
-        }
-        .token:hover { color: #a16207; }
-        .amount { font-family: 'SF Mono', monospace; color: #666; font-size: 0.75rem; }
-        .usd { font-family: 'SF Mono', monospace; font-weight: 500; }
-        .counterparty { color: #888; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; }
-        .chain {
-            font-size: 0.625rem;
-            background: #f0f0f0;
-            padding: 0.125rem 0.375rem;
-            border-radius: 3px;
-            text-transform: uppercase;
-            color: #666;
-        }
-
-        .token-list { padding: 0.5rem 0; max-height: 75vh; overflow-y: auto; }
-        .token-item {
             display: flex;
             justify-content: space-between;
-            padding: 0.625rem 1rem;
-            font-size: 0.8125rem;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
+            align-items: center;
         }
-        .token-item:hover { background: #f8f9fa; }
-        .token-name { color: #ca8a04; font-weight: 600; }
-        .token-flow { font-family: 'SF Mono', monospace; }
-        .token-flow.positive { color: #16a34a; }
-        .token-flow.negative { color: #dc2626; }
+        .card-header .badge {
+            background: #e8e8ed;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 500;
+        }
 
-        .loading { text-align: center; padding: 3rem; color: #888; }
-        .error { color: #dc2626; padding: 1rem; background: #fef2f2; margin: 1rem; border-radius: 6px; }
+        /* Consensus section */
+        .consensus-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+            padding: 0.75rem;
+        }
+        .consensus-card {
+            border: 1px solid #e8e8ed;
+            border-radius: 8px;
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .consensus-card:hover { border-color: #0071e3; background: #f5f5f7; }
+        .consensus-card.bullish { border-left: 3px solid #34c759; }
+        .consensus-card.bearish { border-left: 3px solid #ff3b30; }
+        .consensus-card.mixed { border-left: 3px solid #ff9500; }
+        .consensus-token { font-weight: 600; color: #1d1d1f; font-size: 0.9rem; }
+        .consensus-signal { font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 3px; }
+        .consensus-signal.bullish { background: #d1f2d9; color: #1d7a3a; }
+        .consensus-signal.bearish { background: #ffd9d6; color: #c41e3a; }
+        .consensus-signal.mixed { background: #fff0d6; color: #996300; }
+        .consensus-meta { font-size: 0.7rem; color: #86868b; margin-top: 0.4rem; }
+        .consensus-flow { font-family: 'SF Mono', monospace; font-size: 0.75rem; margin-top: 0.25rem; }
+
+        /* Activity list */
+        .activity-scroll { max-height: 500px; overflow-y: auto; }
+        .activity-item {
+            display: grid;
+            grid-template-columns: 55px 95px 55px 70px 75px 80px 1fr 55px;
+            gap: 0.4rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #f5f5f5;
+            align-items: center;
+            font-size: 0.75rem;
+        }
+        .activity-item:hover { background: #fafafa; }
+        .activity-item.whale { background: #fffbeb; }
+
+        .time { color: #86868b; font-family: 'SF Mono', monospace; font-size: 0.7rem; }
+        .fund { color: #5856d6; font-weight: 500; cursor: pointer; }
+        .fund:hover { text-decoration: underline; }
+        .action { font-weight: 600; font-size: 0.7rem; }
+        .action.received { color: #34c759; }
+        .action.sent { color: #ff3b30; }
+        .token { color: #af7e00; font-weight: 600; cursor: pointer; }
+        .token:hover { text-decoration: underline; }
+        .amount { font-family: 'SF Mono', monospace; color: #86868b; font-size: 0.7rem; }
+        .usd { font-family: 'SF Mono', monospace; font-weight: 500; }
+        .usd.whale { color: #ff9500; font-weight: 700; }
+        .counterparty { color: #86868b; font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chain { font-size: 0.6rem; background: #e8e8ed; padding: 0.1rem 0.3rem; border-radius: 3px; text-transform: uppercase; }
+
+        /* Right sidebar */
+        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
+
+        .fund-list, .whale-list { max-height: 280px; overflow-y: auto; }
+        .fund-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #f5f5f5;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .fund-item:hover { background: #fafafa; }
+        .fund-name { font-weight: 500; color: #5856d6; }
+        .fund-volume { font-family: 'SF Mono', monospace; color: #86868b; }
+        .fund-net { font-family: 'SF Mono', monospace; font-weight: 500; }
+        .fund-net.positive { color: #34c759; }
+        .fund-net.negative { color: #ff3b30; }
+
+        .whale-item {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 0.75rem;
+        }
+        .whale-item:hover { background: #fafafa; }
+        .whale-header { display: flex; justify-content: space-between; align-items: center; }
+        .whale-amount { font-family: 'SF Mono', monospace; font-weight: 600; color: #ff9500; }
+        .whale-detail { color: #86868b; font-size: 0.7rem; margin-top: 0.2rem; }
+
+        .loading { text-align: center; padding: 2rem; color: #86868b; }
+        .error { color: #ff3b30; padding: 1rem; background: #fff5f5; margin: 0.5rem; border-radius: 6px; }
 
         /* Modal */
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4);
             z-index: 1000;
             align-items: center;
             justify-content: center;
@@ -158,75 +196,81 @@
             overflow-y: auto;
         }
         .modal-header {
-            padding: 1.25rem;
-            border-bottom: 1px solid #e5e5e5;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #e8e8ed;
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: #fafafa;
             border-radius: 12px 12px 0 0;
+            position: sticky;
+            top: 0;
         }
-        .modal-header h2 { font-size: 1.125rem; font-weight: 600; }
+        .modal-header h2 { font-size: 1rem; }
         .modal-close {
             background: none;
             border: none;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             cursor: pointer;
-            color: #888;
+            color: #86868b;
+            padding: 0.25rem;
         }
-        .modal-close:hover { color: #333; }
         .modal-body { padding: 1.25rem; }
 
-        .summary-row {
+        .summary-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
         }
         .summary-item {
-            background: #f8f9fa;
-            padding: 1rem;
+            background: #f5f5f7;
+            padding: 0.75rem;
             border-radius: 8px;
             text-align: center;
         }
-        .summary-label { font-size: 0.75rem; color: #666; margin-bottom: 0.25rem; }
-        .summary-value { font-size: 1.25rem; font-weight: 600; font-family: 'SF Mono', monospace; }
+        .summary-label { font-size: 0.65rem; color: #86868b; text-transform: uppercase; }
+        .summary-value { font-size: 1.1rem; font-weight: 600; font-family: 'SF Mono', monospace; }
 
         .section-title {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            margin: 1.5rem 0 0.75rem 0;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #e5e5e5;
+            margin: 1.25rem 0 0.5rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid #e8e8ed;
         }
-        .section-title.green { color: #16a34a; }
-        .section-title.red { color: #dc2626; }
+        .section-title.green { color: #34c759; }
+        .section-title.red { color: #ff3b30; }
 
-        .entity-table { width: 100%; font-size: 0.8125rem; }
-        .entity-table th {
+        .data-table { width: 100%; font-size: 0.75rem; border-collapse: collapse; }
+        .data-table th {
             text-align: left;
-            padding: 0.5rem;
-            color: #888;
+            padding: 0.4rem 0.5rem;
+            color: #86868b;
             font-weight: 500;
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             text-transform: uppercase;
-            border-bottom: 1px solid #e5e5e5;
+            border-bottom: 1px solid #e8e8ed;
         }
-        .entity-table td {
-            padding: 0.5rem;
-            border-bottom: 1px solid #f0f0f0;
+        .data-table td {
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid #f5f5f5;
             font-family: 'SF Mono', monospace;
         }
-        .entity-table td:first-child { font-family: inherit; font-weight: 500; color: #6366f1; }
-        .entity-table .positive { color: #16a34a; }
-        .entity-table .negative { color: #dc2626; }
+        .data-table td:first-child { font-family: inherit; font-weight: 500; color: #5856d6; }
+        .data-table .positive { color: #34c759; }
+        .data-table .negative { color: #ff3b30; }
 
-        @media (max-width: 1024px) {
-            .grid { grid-template-columns: 1fr; }
-            .activity-item { grid-template-columns: 60px 90px 60px 70px 80px 1fr; }
-            .activity-item .counterparty, .activity-item .chain { display: none; }
+        @media (max-width: 1200px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(3, 1fr); }
+            .consensus-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
             .stats { grid-template-columns: repeat(2, 1fr); }
-            .summary-row { grid-template-columns: repeat(2, 1fr); }
+            .activity-item { grid-template-columns: 50px 80px 50px 60px 70px 1fr; }
+            .activity-item .counterparty, .activity-item .chain { display: none; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
@@ -234,25 +278,27 @@
     <header class="header">
         <h1>Fund Activity Tracker</h1>
         <div class="header-right">
-            <select class="filter" id="minUsd">
+            <span class="cache-info" id="cacheInfo"></span>
+            <select id="minUsd">
                 <option value="10000">Min $10K</option>
                 <option value="50000">Min $50K</option>
                 <option value="100000" selected>Min $100K</option>
                 <option value="500000">Min $500K</option>
                 <option value="1000000">Min $1M</option>
             </select>
-            <button class="btn" id="refreshBtn" onclick="loadActivity()">Refresh</button>
+            <button id="refreshBtn" onclick="loadActivity()">Refresh</button>
         </div>
     </header>
 
     <main class="container">
+        <!-- Stats -->
         <section class="stats">
             <div class="stat">
-                <div class="stat-label">Total Received</div>
+                <div class="stat-label">Total Inflows</div>
                 <div class="stat-value green" id="totalReceived">-</div>
             </div>
             <div class="stat">
-                <div class="stat-label">Total Sent</div>
+                <div class="stat-label">Total Outflows</div>
                 <div class="stat-value red" id="totalSent">-</div>
             </div>
             <div class="stat">
@@ -263,26 +309,61 @@
                 <div class="stat-label">Transactions</div>
                 <div class="stat-value" id="txCount">-</div>
             </div>
+            <div class="stat">
+                <div class="stat-label">Active Funds</div>
+                <div class="stat-value" id="activeFunds">-</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Tokens Moved</div>
+                <div class="stat-value" id="tokensMoved">-</div>
+            </div>
         </section>
 
-        <section class="grid">
+        <!-- Smart Money Consensus -->
+        <section class="card" style="margin-bottom: 1rem;">
+            <div class="card-header">
+                Smart Money Consensus
+                <span class="badge">Multiple funds same direction = stronger signal</span>
+            </div>
+            <div class="consensus-grid" id="consensusGrid">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Main content -->
+        <section class="main-grid">
             <div class="card">
-                <div class="card-header">Recent Activity (click token for details)</div>
-                <div class="activity-list" id="activityList">
+                <div class="card-header">
+                    Recent Activity
+                    <span class="badge" id="activityCount">0 transactions</span>
+                </div>
+                <div class="activity-scroll" id="activityList">
                     <div class="loading">Loading activity...</div>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">Top Tokens by Flow</div>
-                <div class="token-list" id="tokenList">
-                    <div class="loading">Loading...</div>
+            <div class="sidebar">
+                <div class="card">
+                    <div class="card-header">Most Active Funds</div>
+                    <div class="fund-list" id="fundList">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        Whale Transactions
+                        <span class="badge">$500K+</span>
+                    </div>
+                    <div class="whale-list" id="whaleList">
+                        <div class="loading">Loading...</div>
+                    </div>
                 </div>
             </div>
         </section>
     </main>
 
-    <!-- Token Detail Modal -->
+    <!-- Token Modal -->
     <div class="modal" id="tokenModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -290,12 +371,27 @@
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body" id="modalBody">
-                <div class="loading">Loading token data...</div>
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fund Modal -->
+    <div class="modal" id="fundModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="fundModalTitle">Fund Activity</h2>
+                <button class="modal-close" onclick="closeFundModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="fundModalBody">
+                <div class="loading">Loading...</div>
             </div>
         </div>
     </div>
 
     <script>
+        let cachedData = null;
+
         const fmt = {
             usd: (v) => {
                 if (v === null || v === undefined) return '-';
@@ -305,7 +401,7 @@
                 if (abs >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
                 return '$' + v.toFixed(0);
             },
-            signedUsd: (v) => {
+            signed: (v) => {
                 if (v === null || v === undefined) return '-';
                 const sign = v >= 0 ? '+' : '';
                 return sign + fmt.usd(v);
@@ -314,7 +410,7 @@
                 if (!v) return '0';
                 if (Math.abs(v) >= 1e9) return (v/1e9).toFixed(2) + 'B';
                 if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(2) + 'M';
-                if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(2) + 'K';
+                if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1) + 'K';
                 return v.toFixed(2);
             }
         };
@@ -324,83 +420,146 @@
             btn.disabled = true;
             btn.textContent = 'Loading...';
 
-            const minUsd = document.getElementById('minUsd').value;
-
             try {
-                const res = await fetch(`/api/activity?min_usd=${minUsd}`);
+                const res = await fetch(`/api/activity?min_usd=${document.getElementById('minUsd').value}`);
                 const data = await res.json();
+                cachedData = data;
 
-                // Update stats
-                document.getElementById('totalReceived').textContent = fmt.usd(data.stats.total_received);
-                document.getElementById('totalSent').textContent = fmt.usd(data.stats.total_sent);
-
-                const netEl = document.getElementById('netFlow');
-                netEl.textContent = fmt.signedUsd(data.stats.net_flow);
-                netEl.className = 'stat-value ' + (data.stats.net_flow >= 0 ? 'green' : 'red');
-
-                document.getElementById('txCount').textContent = data.stats.transaction_count;
-
-                // Handle loading state (cache still building)
+                // Handle loading state
                 if (data.loading) {
-                    document.getElementById('activityList').innerHTML =
-                        '<div class="loading">' + (data.message || 'Loading...') + '</div>';
-                    document.getElementById('tokenList').innerHTML =
-                        '<div class="loading">Waiting for cache...</div>';
-                    // Auto-refresh in 10 seconds
+                    document.getElementById('activityList').innerHTML = `<div class="loading">${data.message || 'Loading...'}</div>`;
+                    document.getElementById('consensusGrid').innerHTML = '<div class="loading">Building cache...</div>';
+                    document.getElementById('fundList').innerHTML = '<div class="loading">...</div>';
+                    document.getElementById('whaleList').innerHTML = '<div class="loading">...</div>';
                     setTimeout(loadActivity, 10000);
                     return;
                 }
 
-                // Update activity list
-                const list = document.getElementById('activityList');
-                if (!data.activity || data.activity.length === 0) {
-                    list.innerHTML = '<div class="loading">No activity found</div>';
-                } else {
-                    list.innerHTML = data.activity.map(a => `
-                        <div class="activity-item">
-                            <span class="time">${a.time_ago}</span>
-                            <span class="entity">${a.fund}</span>
-                            <span class="action ${a.action.toLowerCase()}">${a.action}</span>
-                            <span class="token" onclick="showTokenDetail('${a.token}')">${a.token}</span>
-                            <span class="amount">${fmt.num(a.amount)}</span>
-                            <span class="usd">${fmt.usd(a.usd)}</span>
-                            <span class="counterparty">${a.counterparty}</span>
-                            <span class="chain">${a.chain}</span>
-                        </div>
-                    `).join('');
+                // Cache info
+                if (data.cache_age_seconds) {
+                    const mins = Math.floor(data.cache_age_seconds / 60);
+                    document.getElementById('cacheInfo').textContent = `Updated ${mins}m ago`;
                 }
 
-                // Update token list
-                const tokenList = document.getElementById('tokenList');
-                if (!data.top_tokens || data.top_tokens.length === 0) {
-                    tokenList.innerHTML = '<div class="loading">No token data</div>';
-                } else {
-                    tokenList.innerHTML = data.top_tokens.map(t => `
-                        <div class="token-item" onclick="showTokenDetail('${t.token}')">
-                            <span class="token-name">${t.token}</span>
-                            <span class="token-flow ${t.net >= 0 ? 'positive' : 'negative'}">
-                                ${fmt.signedUsd(t.net)}
-                            </span>
-                        </div>
-                    `).join('');
-                }
+                // Stats
+                document.getElementById('totalReceived').textContent = fmt.usd(data.stats.total_received);
+                document.getElementById('totalSent').textContent = fmt.usd(data.stats.total_sent);
+                const netEl = document.getElementById('netFlow');
+                netEl.textContent = fmt.signed(data.stats.net_flow);
+                netEl.className = 'stat-value ' + (data.stats.net_flow >= 0 ? 'green' : 'red');
+                document.getElementById('txCount').textContent = data.stats.transaction_count;
+                document.getElementById('activeFunds').textContent = data.stats.active_funds || '-';
+                document.getElementById('tokensMoved').textContent = data.stats.tokens_moved || '-';
+
+                // Smart Money Consensus
+                renderConsensus(data.consensus || []);
+
+                // Activity
+                renderActivity(data.activity || []);
+
+                // Fund leaderboard
+                renderFundLeaderboard(data.fund_leaderboard || []);
+
+                // Whale alerts
+                renderWhales(data.whales || []);
 
             } catch (e) {
                 console.error('Error:', e);
-                document.getElementById('activityList').innerHTML =
-                    '<div class="error">Failed to load: ' + e.message + '</div>';
+                document.getElementById('activityList').innerHTML = `<div class="error">Failed to load: ${e.message}</div>`;
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Refresh';
             }
         }
 
+        function renderConsensus(consensus) {
+            const grid = document.getElementById('consensusGrid');
+            if (!consensus.length) {
+                grid.innerHTML = '<div class="loading">No consensus signals yet</div>';
+                return;
+            }
+            grid.innerHTML = consensus.map(c => `
+                <div class="consensus-card ${c.signal.toLowerCase()}" onclick="showTokenDetail('${c.token}')">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span class="consensus-token">${c.token}</span>
+                        <span class="consensus-signal ${c.signal.toLowerCase()}">${c.signal}</span>
+                    </div>
+                    <div class="consensus-flow ${c.net >= 0 ? 'positive' : 'negative'}">${fmt.signed(c.net)}</div>
+                    <div class="consensus-meta">
+                        ${c.buyer_count} buying, ${c.seller_count} selling
+                    </div>
+                    <div class="consensus-meta" style="color:#5856d6;">
+                        ${c.buyers.slice(0,3).join(', ')}${c.buyers.length > 3 ? '...' : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderActivity(activity) {
+            const list = document.getElementById('activityList');
+            document.getElementById('activityCount').textContent = `${activity.length} transactions`;
+
+            if (!activity.length) {
+                list.innerHTML = '<div class="loading">No activity found</div>';
+                return;
+            }
+
+            list.innerHTML = activity.map(a => `
+                <div class="activity-item ${a.usd >= 500000 ? 'whale' : ''}">
+                    <span class="time">${a.time_ago}</span>
+                    <span class="fund" onclick="showFundDetail('${a.fund_id}')">${a.fund}</span>
+                    <span class="action ${a.action.toLowerCase()}">${a.action}</span>
+                    <span class="token" onclick="showTokenDetail('${a.token}')">${a.token}</span>
+                    <span class="amount">${fmt.num(a.amount)}</span>
+                    <span class="usd ${a.usd >= 500000 ? 'whale' : ''}">${fmt.usd(a.usd)}</span>
+                    <span class="counterparty">${a.counterparty}</span>
+                    <span class="chain">${a.chain}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderFundLeaderboard(funds) {
+            const list = document.getElementById('fundList');
+            if (!funds.length) {
+                list.innerHTML = '<div class="loading">No fund data</div>';
+                return;
+            }
+            list.innerHTML = funds.map(f => `
+                <div class="fund-item" onclick="showFundDetail('${f.fund_id}')">
+                    <div>
+                        <div class="fund-name">${f.name}</div>
+                        <div class="fund-volume">${f.tx_count} txs / ${fmt.usd(f.volume)} vol</div>
+                    </div>
+                    <div class="fund-net ${f.net >= 0 ? 'positive' : 'negative'}">${fmt.signed(f.net)}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderWhales(whales) {
+            const list = document.getElementById('whaleList');
+            if (!whales.length) {
+                list.innerHTML = '<div class="loading">No whale transactions</div>';
+                return;
+            }
+            list.innerHTML = whales.map(w => `
+                <div class="whale-item">
+                    <div class="whale-header">
+                        <span class="fund" onclick="showFundDetail('${w.fund_id}')">${w.fund}</span>
+                        <span class="whale-amount">${fmt.usd(w.usd)}</span>
+                    </div>
+                    <div class="whale-detail">
+                        <span class="action ${w.action.toLowerCase()}">${w.action}</span>
+                        <span class="token" onclick="showTokenDetail('${w.token}')">${w.token}</span>
+                        &middot; ${w.time_ago}
+                    </div>
+                </div>
+            `).join('');
+        }
+
         async function showTokenDetail(token) {
             const modal = document.getElementById('tokenModal');
-            const title = document.getElementById('modalTitle');
             const body = document.getElementById('modalBody');
-
-            title.textContent = `${token} - Who's Accumulating vs Selling`;
+            document.getElementById('modalTitle').textContent = `${token} - Fund Activity`;
             body.innerHTML = '<div class="loading">Loading token data...</div>';
             modal.classList.add('active');
 
@@ -409,45 +568,38 @@
                 const data = await res.json();
 
                 let html = `
-                    <div class="summary-row">
+                    <div class="summary-grid">
                         <div class="summary-item">
                             <div class="summary-label">Net Accumulated (30d)</div>
-                            <div class="summary-value green">${fmt.usd(data.summary.total_accumulated_30d)}</div>
+                            <div class="summary-value" style="color:#34c759">${fmt.usd(data.summary.total_accumulated_30d)}</div>
                         </div>
                         <div class="summary-item">
                             <div class="summary-label">Net Sold (30d)</div>
-                            <div class="summary-value red">${fmt.usd(data.summary.total_sold_30d)}</div>
+                            <div class="summary-value" style="color:#ff3b30">${fmt.usd(data.summary.total_sold_30d)}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Accumulators</div>
+                            <div class="summary-label">Funds Buying</div>
                             <div class="summary-value">${data.summary.accumulator_count}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Sellers</div>
+                            <div class="summary-label">Funds Selling</div>
                             <div class="summary-value">${data.summary.seller_count}</div>
                         </div>
                     </div>
                 `;
 
-                if (data.accumulators.length > 0) {
+                if (data.accumulators.length) {
                     html += `
                         <div class="section-title green">Accumulators (Net Buyers)</div>
-                        <table class="entity-table">
-                            <thead>
-                                <tr>
-                                    <th>Entity</th>
-                                    <th>7D Net</th>
-                                    <th>30D Net</th>
-                                    <th>90D Net</th>
-                                </tr>
-                            </thead>
+                        <table class="data-table">
+                            <thead><tr><th>Fund</th><th>7D Net</th><th>30D Net</th><th>90D Net</th></tr></thead>
                             <tbody>
                                 ${data.accumulators.map(e => `
                                     <tr>
                                         <td>${e.name}</td>
-                                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signedUsd(e.net_7d)}</td>
-                                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signedUsd(e.net_30d)}</td>
-                                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signedUsd(e.net_90d)}</td>
+                                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
+                                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
+                                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -455,25 +607,18 @@
                     `;
                 }
 
-                if (data.sellers.length > 0) {
+                if (data.sellers.length) {
                     html += `
                         <div class="section-title red">Sellers (Net Sellers)</div>
-                        <table class="entity-table">
-                            <thead>
-                                <tr>
-                                    <th>Entity</th>
-                                    <th>7D Net</th>
-                                    <th>30D Net</th>
-                                    <th>90D Net</th>
-                                </tr>
-                            </thead>
+                        <table class="data-table">
+                            <thead><tr><th>Fund</th><th>7D Net</th><th>30D Net</th><th>90D Net</th></tr></thead>
                             <tbody>
                                 ${data.sellers.map(e => `
                                     <tr>
                                         <td>${e.name}</td>
-                                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signedUsd(e.net_7d)}</td>
-                                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signedUsd(e.net_30d)}</td>
-                                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signedUsd(e.net_90d)}</td>
+                                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
+                                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
+                                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -481,30 +626,116 @@
                     `;
                 }
 
-                if (data.accumulators.length === 0 && data.sellers.length === 0) {
-                    html += '<div class="loading">No significant activity found for this token</div>';
+                if (!data.accumulators.length && !data.sellers.length) {
+                    html += '<div class="loading">No significant fund activity for this token</div>';
                 }
 
                 body.innerHTML = html;
-
             } catch (e) {
-                body.innerHTML = '<div class="error">Failed to load token data: ' + e.message + '</div>';
+                body.innerHTML = `<div class="error">Failed to load: ${e.message}</div>`;
             }
+        }
+
+        function showFundDetail(fundId) {
+            if (!cachedData || !cachedData.activity) return;
+
+            const modal = document.getElementById('fundModal');
+            const body = document.getElementById('fundModalBody');
+            const fundActivity = cachedData.activity.filter(a => a.fund_id === fundId);
+            const fundName = fundActivity[0]?.fund || fundId;
+
+            document.getElementById('fundModalTitle').textContent = `${fundName} - Recent Activity`;
+
+            if (!fundActivity.length) {
+                body.innerHTML = '<div class="loading">No activity found for this fund</div>';
+            } else {
+                // Calculate stats
+                const received = fundActivity.filter(a => a.action === 'Received').reduce((s, a) => s + a.usd, 0);
+                const sent = fundActivity.filter(a => a.action === 'Sent').reduce((s, a) => s + a.usd, 0);
+
+                // Group by token
+                const tokenMap = {};
+                fundActivity.forEach(a => {
+                    if (!tokenMap[a.token]) tokenMap[a.token] = { received: 0, sent: 0 };
+                    if (a.action === 'Received') tokenMap[a.token].received += a.usd;
+                    else tokenMap[a.token].sent += a.usd;
+                });
+                const tokens = Object.entries(tokenMap)
+                    .map(([t, d]) => ({ token: t, net: d.received - d.sent, ...d }))
+                    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+
+                body.innerHTML = `
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">Total Received</div>
+                            <div class="summary-value" style="color:#34c759">${fmt.usd(received)}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Total Sent</div>
+                            <div class="summary-value" style="color:#ff3b30">${fmt.usd(sent)}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Net Flow</div>
+                            <div class="summary-value" style="color:${received - sent >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(received - sent)}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Transactions</div>
+                            <div class="summary-value">${fundActivity.length}</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Token Breakdown</div>
+                    <table class="data-table">
+                        <thead><tr><th>Token</th><th>Received</th><th>Sent</th><th>Net</th></tr></thead>
+                        <tbody>
+                            ${tokens.slice(0, 15).map(t => `
+                                <tr>
+                                    <td style="cursor:pointer" onclick="closeModal();showTokenDetail('${t.token}')">${t.token}</td>
+                                    <td class="positive">${fmt.usd(t.received)}</td>
+                                    <td class="negative">${fmt.usd(t.sent)}</td>
+                                    <td class="${t.net >= 0 ? 'positive' : 'negative'}">${fmt.signed(t.net)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div class="section-title">Recent Transactions</div>
+                    <table class="data-table">
+                        <thead><tr><th>Time</th><th>Action</th><th>Token</th><th>Amount</th></tr></thead>
+                        <tbody>
+                            ${fundActivity.slice(0, 20).map(a => `
+                                <tr>
+                                    <td style="font-family:'SF Mono',monospace">${a.time_ago}</td>
+                                    <td class="${a.action === 'Received' ? 'positive' : 'negative'}">${a.action}</td>
+                                    <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${a.token}')">${a.token}</td>
+                                    <td>${fmt.usd(a.usd)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            modal.classList.add('active');
         }
 
         function closeModal() {
             document.getElementById('tokenModal').classList.remove('active');
         }
+        function closeFundModal() {
+            document.getElementById('fundModal').classList.remove('active');
+        }
 
-        // Close modal on escape or click outside
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeModal();
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { closeModal(); closeFundModal(); }
         });
-        document.getElementById('tokenModal').addEventListener('click', (e) => {
+        document.getElementById('tokenModal').addEventListener('click', e => {
             if (e.target.classList.contains('modal')) closeModal();
         });
+        document.getElementById('fundModal').addEventListener('click', e => {
+            if (e.target.classList.contains('modal')) closeFundModal();
+        });
 
-        // Load on start
         document.addEventListener('DOMContentLoaded', loadActivity);
         document.getElementById('minUsd').addEventListener('change', loadActivity);
     </script>

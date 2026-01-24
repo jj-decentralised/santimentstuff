@@ -208,24 +208,83 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
     total_received = sum(a["usd"] for a in all_activity if a["action"] == "Received")
     total_sent = sum(a["usd"] for a in all_activity if a["action"] == "Sent")
 
-    token_flows = {}
+    # Token flows with fund tracking
+    token_data = {}
     for a in all_activity:
         token = a["token"]
-        if token not in token_flows:
-            token_flows[token] = {"received": 0, "sent": 0}
+        if token not in token_data:
+            token_data[token] = {"received": 0, "sent": 0, "buyers": set(), "sellers": set()}
         if a["action"] == "Received":
-            token_flows[token]["received"] += a["usd"]
+            token_data[token]["received"] += a["usd"]
+            token_data[token]["buyers"].add(a["fund"])
         else:
-            token_flows[token]["sent"] += a["usd"]
+            token_data[token]["sent"] += a["usd"]
+            token_data[token]["sellers"].add(a["fund"])
 
+    # Top tokens by flow
     top_tokens = sorted(
         [
             {"token": t, "net": d["received"] - d["sent"], "received": d["received"], "sent": d["sent"]}
-            for t, d in token_flows.items()
+            for t, d in token_data.items()
         ],
         key=lambda x: abs(x["net"]),
         reverse=True,
     )[:10]
+
+    # Smart Money Consensus - tokens with multiple funds buying/selling
+    consensus = []
+    for token, data in token_data.items():
+        net = data["received"] - data["sent"]
+        buyer_count = len(data["buyers"])
+        seller_count = len(data["sellers"])
+        # Only include if 2+ funds involved and significant volume
+        if (buyer_count >= 2 or seller_count >= 2) and (data["received"] + data["sent"]) > 50000:
+            consensus.append({
+                "token": token,
+                "net": net,
+                "received": data["received"],
+                "sent": data["sent"],
+                "buyer_count": buyer_count,
+                "seller_count": seller_count,
+                "buyers": list(data["buyers"])[:5],
+                "sellers": list(data["sellers"])[:5],
+                "signal": "BULLISH" if net > 0 and buyer_count > seller_count else "BEARISH" if net < 0 and seller_count > buyer_count else "MIXED",
+            })
+    # Sort by number of funds involved
+    consensus.sort(key=lambda x: x["buyer_count"] + x["seller_count"], reverse=True)
+
+    # Fund leaderboard - activity by fund
+    fund_stats = {}
+    for a in all_activity:
+        fid = a["fund_id"]
+        if fid not in fund_stats:
+            fund_stats[fid] = {"name": a["fund"], "received": 0, "sent": 0, "tx_count": 0}
+        fund_stats[fid]["tx_count"] += 1
+        if a["action"] == "Received":
+            fund_stats[fid]["received"] += a["usd"]
+        else:
+            fund_stats[fid]["sent"] += a["usd"]
+
+    fund_leaderboard = sorted(
+        [
+            {
+                "fund_id": fid,
+                "name": d["name"],
+                "received": d["received"],
+                "sent": d["sent"],
+                "net": d["received"] - d["sent"],
+                "volume": d["received"] + d["sent"],
+                "tx_count": d["tx_count"],
+            }
+            for fid, d in fund_stats.items()
+        ],
+        key=lambda x: x["volume"],
+        reverse=True,
+    )[:15]
+
+    # Whale alerts - largest single transactions
+    whale_threshold = 500000  # $500K+
+    whales = [a for a in all_activity if a["usd"] >= whale_threshold][:20]
 
     return {
         "activity": all_activity[:200],
@@ -234,8 +293,13 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
             "total_sent": total_sent,
             "net_flow": total_received - total_sent,
             "transaction_count": len(all_activity),
+            "active_funds": len(fund_stats),
+            "tokens_moved": len(token_data),
         },
         "top_tokens": top_tokens,
+        "consensus": consensus[:10],
+        "fund_leaderboard": fund_leaderboard,
+        "whales": whales,
     }
 
 
