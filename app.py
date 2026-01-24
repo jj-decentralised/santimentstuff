@@ -1,7 +1,9 @@
 """Fund Activity Tracker - What are funds doing today?"""
 
 import os
-from datetime import datetime, timedelta
+import threading
+import time
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -12,6 +14,7 @@ from fastapi.responses import HTMLResponse
 # Config
 BASE_URL = "https://api.arkm.com"
 BASE_DIR = Path(__file__).parent
+CACHE_REFRESH_SECONDS = 300  # 5 minutes
 
 # Verified fund entities from Arkham Intelligence (type: "fund")
 # These IDs are verified to exist and be classified as funds in Arkham's database
@@ -79,6 +82,14 @@ ENTITIES = {
     "silveridge-holdings": "Silveridge Holdings",
 }
 
+# In-memory cache
+cache = {
+    "activity": None,
+    "last_updated": None,
+    "is_refreshing": False,
+}
+cache_lock = threading.Lock()
+
 app = FastAPI(title="Fund Activity Tracker")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -96,7 +107,7 @@ def fetch_fund_transfers(fund_id: str, limit: int = 50, min_usd: int = 10000) ->
                 "base": fund_id,
                 "limit": limit,
                 "sortDir": "desc",
-                "usdGte": min_usd,  # Filter at API level for efficiency
+                "usdGte": min_usd,
             },
             headers={"API-Key": get_api_key()},
             timeout=30,
@@ -110,12 +121,10 @@ def fetch_fund_transfers(fund_id: str, limit: int = 50, min_usd: int = 10000) ->
 
 def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
     """Parse a transfer into a clean activity item."""
-    # Skip if no USD value
     usd = tx.get("historicalUSD", 0) or 0
-    if usd < 1000:  # Skip small transfers
+    if usd < 1000:
         return None
 
-    # Determine direction
     to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
     from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
 
@@ -128,7 +137,6 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
     else:
         return None
 
-    # Parse timestamp
     ts = tx.get("blockTimestamp", "")
     try:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -141,7 +149,6 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
             time_str = f"{time_ago.seconds // 60}m ago"
     except:
         time_str = "?"
-        dt = datetime.now()
 
     return {
         "timestamp": ts,
@@ -159,30 +166,22 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
     }
 
 
-@app.get("/api/activity")
-def get_activity(
-    min_usd: int = Query(10000, description="Minimum USD value"),
-    limit_per_entity: int = Query(30, description="Max transfers per entity"),
-):
-    """Get recent activity across all entities."""
+def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dict:
+    """Build full activity data from all entities."""
     all_activity = []
 
     for entity_id, entity_name in ENTITIES.items():
-        # Pass min_usd to API for efficient filtering
         transfers = fetch_fund_transfers(entity_id, limit=limit_per_entity, min_usd=min_usd)
         for tx in transfers:
             item = parse_transfer(tx, entity_id, entity_name)
-            if item:  # Already filtered by API
+            if item:
                 all_activity.append(item)
 
-    # Sort by timestamp desc
     all_activity.sort(key=lambda x: x["timestamp"], reverse=True)
 
-    # Aggregate stats
     total_received = sum(a["usd"] for a in all_activity if a["action"] == "Received")
     total_sent = sum(a["usd"] for a in all_activity if a["action"] == "Sent")
 
-    # Token summary
     token_flows = {}
     for a in all_activity:
         token = a["token"]
@@ -193,7 +192,6 @@ def get_activity(
         else:
             token_flows[token]["sent"] += a["usd"]
 
-    # Top tokens by net flow
     top_tokens = sorted(
         [
             {"token": t, "net": d["received"] - d["sent"], "received": d["received"], "sent": d["sent"]}
@@ -204,7 +202,7 @@ def get_activity(
     )[:10]
 
     return {
-        "activity": all_activity[:200],  # Limit response
+        "activity": all_activity[:200],
         "stats": {
             "total_received": total_received,
             "total_sent": total_sent,
@@ -215,16 +213,80 @@ def get_activity(
     }
 
 
+def refresh_cache():
+    """Refresh the activity cache."""
+    global cache
+    with cache_lock:
+        if cache["is_refreshing"]:
+            return
+        cache["is_refreshing"] = True
+
+    try:
+        print(f"[{datetime.now()}] Refreshing activity cache...")
+        data = build_activity_data()
+        with cache_lock:
+            cache["activity"] = data
+            cache["last_updated"] = datetime.now()
+        print(f"[{datetime.now()}] Cache refreshed with {len(data['activity'])} transactions")
+    except Exception as e:
+        print(f"[{datetime.now()}] Cache refresh error: {e}")
+    finally:
+        with cache_lock:
+            cache["is_refreshing"] = False
+
+
+def background_refresh_loop():
+    """Background thread that refreshes cache every 5 minutes."""
+    while True:
+        refresh_cache()
+        time.sleep(CACHE_REFRESH_SECONDS)
+
+
+@app.on_event("startup")
+def startup_event():
+    """Start background cache refresh on app startup."""
+    # Start background thread
+    thread = threading.Thread(target=background_refresh_loop, daemon=True)
+    thread.start()
+    print(f"Started background cache refresh (every {CACHE_REFRESH_SECONDS}s)")
+
+
+@app.get("/api/activity")
+def get_activity(
+    min_usd: int = Query(10000, description="Minimum USD value"),
+    limit_per_entity: int = Query(30, description="Max transfers per entity"),
+):
+    """Get recent activity across all entities (from cache)."""
+    with cache_lock:
+        if cache["activity"] is not None:
+            data = cache["activity"].copy()
+            data["cached"] = True
+            data["cache_age_seconds"] = (
+                (datetime.now() - cache["last_updated"]).total_seconds()
+                if cache["last_updated"]
+                else None
+            )
+            return data
+
+    # No cache yet, build synchronously (first request)
+    return build_activity_data(min_usd=min_usd, limit_per_entity=limit_per_entity)
+
+
+@app.get("/api/activity/refresh")
+def force_refresh():
+    """Force a cache refresh."""
+    thread = threading.Thread(target=refresh_cache, daemon=True)
+    thread.start()
+    return {"status": "refresh_started"}
+
+
 @app.get("/api/token/{token_symbol}")
 def get_token_activity(token_symbol: str):
     """Get accumulation/distribution for a specific token across all entities."""
     token_symbol = token_symbol.upper()
-
-    # Track activity by entity and time period
     entity_activity = {}
 
     for entity_id, entity_name in ENTITIES.items():
-        # Use lower min_usd for token drilldown to capture more activity
         transfers = fetch_fund_transfers(entity_id, limit=100, min_usd=1000)
 
         for tx in transfers:
@@ -233,8 +295,6 @@ def get_token_activity(token_symbol: str):
                 continue
 
             usd = tx.get("historicalUSD", 0) or 0
-
-            # Parse timestamp
             ts = tx.get("blockTimestamp", "")
             try:
                 dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
@@ -242,7 +302,6 @@ def get_token_activity(token_symbol: str):
             except:
                 continue
 
-            # Determine direction
             to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
             from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
 
@@ -253,7 +312,6 @@ def get_token_activity(token_symbol: str):
             else:
                 continue
 
-            # Initialize entity tracking
             if entity_id not in entity_activity:
                 entity_activity[entity_id] = {
                     "name": entity_name,
@@ -262,7 +320,6 @@ def get_token_activity(token_symbol: str):
                     "90d": {"received": 0, "sent": 0},
                 }
 
-            # Add to appropriate time buckets
             if days_ago <= 7:
                 entity_activity[entity_id]["7d"][direction] += usd
             if days_ago <= 30:
@@ -270,14 +327,12 @@ def get_token_activity(token_symbol: str):
             if days_ago <= 90:
                 entity_activity[entity_id]["90d"][direction] += usd
 
-    # Calculate net flows and categorize
     results = []
     for entity_id, data in entity_activity.items():
         net_7d = data["7d"]["received"] - data["7d"]["sent"]
         net_30d = data["30d"]["received"] - data["30d"]["sent"]
         net_90d = data["90d"]["received"] - data["90d"]["sent"]
 
-        # Only include if there's meaningful activity
         if abs(net_30d) > 1000 or abs(net_90d) > 1000:
             results.append({
                 "entity_id": entity_id,
@@ -293,10 +348,7 @@ def get_token_activity(token_symbol: str):
                 "sent_90d": data["90d"]["sent"],
             })
 
-    # Sort by 30d net flow
     results.sort(key=lambda x: x["net_30d"], reverse=True)
-
-    # Separate accumulators and sellers
     accumulators = [r for r in results if r["net_30d"] > 0]
     sellers = [r for r in results if r["net_30d"] < 0]
 
@@ -316,7 +368,18 @@ def get_token_activity(token_symbol: str):
 @app.get("/health")
 def health():
     key = get_api_key()
-    return {"status": "ok", "api_key_set": bool(key), "entities_tracked": len(ENTITIES)}
+    with cache_lock:
+        cache_status = {
+            "has_cache": cache["activity"] is not None,
+            "last_updated": cache["last_updated"].isoformat() if cache["last_updated"] else None,
+            "is_refreshing": cache["is_refreshing"],
+        }
+    return {
+        "status": "ok",
+        "api_key_set": bool(key),
+        "entities_tracked": len(ENTITIES),
+        "cache": cache_status,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
