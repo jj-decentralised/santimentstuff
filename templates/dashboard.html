@@ -17,7 +17,7 @@
         .header {
             background: #fff;
             border-bottom: 1px solid #d2d2d7;
-            padding: 0.75rem 1.5rem;
+            padding: 0.6rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -26,42 +26,159 @@
             z-index: 100;
         }
         .header h1 { font-size: 1rem; font-weight: 600; }
-        .header-right { display: flex; gap: 0.75rem; align-items: center; }
+        .header-right { display: flex; gap: 0.5rem; align-items: center; }
         .header-right select, .header-right button {
-            padding: 0.4rem 0.75rem;
+            padding: 0.35rem 0.6rem;
             border-radius: 6px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }
         .header-right select { border: 1px solid #d2d2d7; background: #fff; }
         .header-right button { background: #0071e3; color: #fff; border: none; cursor: pointer; }
-        .header-right button:hover { background: #0077ed; }
-        .cache-info { font-size: 0.7rem; color: #86868b; }
+        .cache-info { font-size: 0.65rem; color: #86868b; }
 
-        .container { max-width: 1800px; margin: 0 auto; padding: 1rem; }
+        .container { max-width: 1800px; margin: 0 auto; padding: 0.75rem; }
 
-        /* Stats row */
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 0.75rem;
-            margin-bottom: 1rem;
+        /* Key metrics bar */
+        .metrics-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
         }
-        .stat {
+        .metric {
+            background: #fff;
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            min-width: 120px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .metric-label { font-size: 0.6rem; color: #86868b; text-transform: uppercase; letter-spacing: 0.3px; }
+        .metric-value { font-size: 1.1rem; font-weight: 600; font-family: 'SF Mono', monospace; }
+        .metric-value.green { color: #34c759; }
+        .metric-value.red { color: #ff3b30; }
+        .metric-sub { font-size: 0.6rem; color: #86868b; }
+
+        /* Signal cards */
+        .signals-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .signal-card {
             background: #fff;
             border-radius: 10px;
-            padding: 0.75rem 1rem;
+            overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
-        .stat-label { font-size: 0.65rem; color: #86868b; text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat-value { font-size: 1.25rem; font-weight: 600; font-family: 'SF Mono', monospace; }
-        .stat-value.green { color: #34c759; }
-        .stat-value.red { color: #ff3b30; }
+        .signal-header {
+            padding: 0.5rem 0.75rem;
+            font-weight: 600;
+            font-size: 0.7rem;
+            background: #fafafa;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .signal-badge {
+            font-size: 0.6rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .signal-badge.bullish { background: #d1f2d9; color: #1d7a3a; }
+        .signal-badge.bearish { background: #ffd9d6; color: #c41e3a; }
+        .signal-badge.neutral { background: #e8e8ed; color: #666; }
+        .signal-body { padding: 0.5rem 0.75rem; max-height: 200px; overflow-y: auto; }
+
+        /* Exchange flow card */
+        .exchange-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 0.75rem;
+        }
+        .exchange-stat:last-child { border-bottom: none; }
+        .exchange-label { color: #666; }
+        .exchange-value { font-family: 'SF Mono', monospace; font-weight: 500; }
+
+        /* Category breakdown */
+        .category-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 0.75rem;
+        }
+        .category-name {
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+        }
+        .category-name.stable { background: #e8f5e9; color: #2e7d32; }
+        .category-name.l1 { background: #e3f2fd; color: #1565c0; }
+        .category-name.l2 { background: #f3e5f5; color: #7b1fa2; }
+        .category-name.defi { background: #fff3e0; color: #e65100; }
+        .category-name.meme { background: #fce4ec; color: #c2185b; }
+        .category-name.ai { background: #e0f7fa; color: #00838f; }
+        .category-name.other { background: #f5f5f5; color: #666; }
+        .category-flow { font-family: 'SF Mono', monospace; }
+
+        /* Emerging tokens */
+        .emerging-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid #f5f5f5;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .emerging-item:hover { background: #fafafa; margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; }
+        .emerging-token { font-weight: 600; color: #af7e00; }
+        .emerging-funds { font-size: 0.65rem; color: #5856d6; }
+        .emerging-action { font-size: 0.6rem; font-weight: 600; padding: 0.1rem 0.3rem; border-radius: 3px; }
+        .emerging-action.accumulating { background: #d1f2d9; color: #1d7a3a; }
+        .emerging-action.distributing { background: #ffd9d6; color: #c41e3a; }
+
+        /* Consensus cards */
+        .consensus-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.4rem;
+            padding: 0.5rem;
+        }
+        .consensus-card {
+            border: 1px solid #e8e8ed;
+            border-radius: 8px;
+            padding: 0.6rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .consensus-card:hover { border-color: #0071e3; background: #f8f8fa; }
+        .consensus-card.bullish { border-left: 3px solid #34c759; }
+        .consensus-card.bearish { border-left: 3px solid #ff3b30; }
+        .consensus-card.mixed { border-left: 3px solid #ff9500; }
+        .consensus-top { display: flex; justify-content: space-between; align-items: center; }
+        .consensus-token { font-weight: 600; font-size: 0.85rem; }
+        .consensus-signal { font-size: 0.55rem; font-weight: 600; padding: 0.1rem 0.3rem; border-radius: 3px; }
+        .consensus-signal.bullish { background: #d1f2d9; color: #1d7a3a; }
+        .consensus-signal.bearish { background: #ffd9d6; color: #c41e3a; }
+        .consensus-signal.mixed { background: #fff0d6; color: #996300; }
+        .consensus-flow { font-family: 'SF Mono', monospace; font-size: 0.7rem; margin-top: 0.2rem; }
+        .consensus-meta { font-size: 0.6rem; color: #86868b; margin-top: 0.2rem; }
 
         /* Main grid */
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 340px;
-            gap: 1rem;
+            grid-template-columns: 1fr 300px;
+            gap: 0.75rem;
         }
 
         .card {
@@ -71,109 +188,84 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .card-header {
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 0.75rem;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             background: #fafafa;
             border-bottom: 1px solid #f0f0f0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .card-header .badge {
+        .badge {
             background: #e8e8ed;
-            padding: 0.2rem 0.5rem;
+            padding: 0.15rem 0.4rem;
             border-radius: 4px;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             font-weight: 500;
         }
 
-        /* Consensus section */
-        .consensus-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.5rem;
-            padding: 0.75rem;
-        }
-        .consensus-card {
-            border: 1px solid #e8e8ed;
-            border-radius: 8px;
-            padding: 0.75rem;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .consensus-card:hover { border-color: #0071e3; background: #f5f5f7; }
-        .consensus-card.bullish { border-left: 3px solid #34c759; }
-        .consensus-card.bearish { border-left: 3px solid #ff3b30; }
-        .consensus-card.mixed { border-left: 3px solid #ff9500; }
-        .consensus-token { font-weight: 600; color: #1d1d1f; font-size: 0.9rem; }
-        .consensus-signal { font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.4rem; border-radius: 3px; }
-        .consensus-signal.bullish { background: #d1f2d9; color: #1d7a3a; }
-        .consensus-signal.bearish { background: #ffd9d6; color: #c41e3a; }
-        .consensus-signal.mixed { background: #fff0d6; color: #996300; }
-        .consensus-meta { font-size: 0.7rem; color: #86868b; margin-top: 0.4rem; }
-        .consensus-flow { font-family: 'SF Mono', monospace; font-size: 0.75rem; margin-top: 0.25rem; }
-
         /* Activity list */
-        .activity-scroll { max-height: 500px; overflow-y: auto; }
+        .activity-scroll { max-height: 450px; overflow-y: auto; }
         .activity-item {
             display: grid;
-            grid-template-columns: 55px 95px 55px 70px 75px 80px 1fr 55px;
-            gap: 0.4rem;
-            padding: 0.5rem 0.75rem;
+            grid-template-columns: 50px 90px 50px 65px 70px 75px 1fr 50px;
+            gap: 0.3rem;
+            padding: 0.4rem 0.6rem;
             border-bottom: 1px solid #f5f5f5;
             align-items: center;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
         }
         .activity-item:hover { background: #fafafa; }
         .activity-item.whale { background: #fffbeb; }
+        .activity-item.exchange { background: #f0f7ff; }
 
-        .time { color: #86868b; font-family: 'SF Mono', monospace; font-size: 0.7rem; }
-        .fund { color: #5856d6; font-weight: 500; cursor: pointer; }
+        .time { color: #86868b; font-family: 'SF Mono', monospace; font-size: 0.65rem; }
+        .fund { color: #5856d6; font-weight: 500; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .fund:hover { text-decoration: underline; }
-        .action { font-weight: 600; font-size: 0.7rem; }
+        .action { font-weight: 600; font-size: 0.65rem; }
         .action.received { color: #34c759; }
         .action.sent { color: #ff3b30; }
         .token { color: #af7e00; font-weight: 600; cursor: pointer; }
         .token:hover { text-decoration: underline; }
-        .amount { font-family: 'SF Mono', monospace; color: #86868b; font-size: 0.7rem; }
+        .amount { font-family: 'SF Mono', monospace; color: #86868b; font-size: 0.65rem; }
         .usd { font-family: 'SF Mono', monospace; font-weight: 500; }
         .usd.whale { color: #ff9500; font-weight: 700; }
-        .counterparty { color: #86868b; font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chain { font-size: 0.6rem; background: #e8e8ed; padding: 0.1rem 0.3rem; border-radius: 3px; text-transform: uppercase; }
+        .counterparty { color: #86868b; font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .counterparty.exchange { color: #0071e3; font-weight: 500; }
+        .chain { font-size: 0.55rem; background: #e8e8ed; padding: 0.1rem 0.25rem; border-radius: 3px; text-transform: uppercase; }
 
-        /* Right sidebar */
-        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
+        /* Sidebar */
+        .sidebar { display: flex; flex-direction: column; gap: 0.75rem; }
+        .sidebar-scroll { max-height: 220px; overflow-y: auto; }
 
-        .fund-list, .whale-list { max-height: 280px; overflow-y: auto; }
         .fund-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.5rem 0.75rem;
+            padding: 0.4rem 0.6rem;
             border-bottom: 1px solid #f5f5f5;
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
         }
         .fund-item:hover { background: #fafafa; }
         .fund-name { font-weight: 500; color: #5856d6; }
-        .fund-volume { font-family: 'SF Mono', monospace; color: #86868b; }
-        .fund-net { font-family: 'SF Mono', monospace; font-weight: 500; }
+        .fund-meta { font-size: 0.6rem; color: #86868b; }
+        .fund-net { font-family: 'SF Mono', monospace; font-weight: 500; font-size: 0.75rem; }
         .fund-net.positive { color: #34c759; }
         .fund-net.negative { color: #ff3b30; }
 
         .whale-item {
-            padding: 0.5rem 0.75rem;
+            padding: 0.4rem 0.6rem;
             border-bottom: 1px solid #f5f5f5;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
         }
-        .whale-item:hover { background: #fafafa; }
         .whale-header { display: flex; justify-content: space-between; align-items: center; }
         .whale-amount { font-family: 'SF Mono', monospace; font-weight: 600; color: #ff9500; }
-        .whale-detail { color: #86868b; font-size: 0.7rem; margin-top: 0.2rem; }
+        .whale-detail { color: #86868b; font-size: 0.65rem; margin-top: 0.15rem; }
 
-        .loading { text-align: center; padding: 2rem; color: #86868b; }
-        .error { color: #ff3b30; padding: 1rem; background: #fff5f5; margin: 0.5rem; border-radius: 6px; }
+        .loading { text-align: center; padding: 1.5rem; color: #86868b; font-size: 0.75rem; }
+        .error { color: #ff3b30; padding: 0.75rem; background: #fff5f5; margin: 0.5rem; border-radius: 6px; font-size: 0.75rem; }
 
         /* Modal */
         .modal {
@@ -191,12 +283,12 @@
             background: #fff;
             border-radius: 12px;
             width: 90%;
-            max-width: 900px;
-            max-height: 85vh;
+            max-width: 800px;
+            max-height: 80vh;
             overflow-y: auto;
         }
         .modal-header {
-            padding: 1rem 1.25rem;
+            padding: 0.75rem 1rem;
             border-bottom: 1px solid #e8e8ed;
             display: flex;
             justify-content: space-between;
@@ -206,54 +298,53 @@
             position: sticky;
             top: 0;
         }
-        .modal-header h2 { font-size: 1rem; }
+        .modal-header h2 { font-size: 0.9rem; }
         .modal-close {
             background: none;
             border: none;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             cursor: pointer;
             color: #86868b;
-            padding: 0.25rem;
         }
-        .modal-body { padding: 1.25rem; }
+        .modal-body { padding: 1rem; }
 
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 0.75rem;
-            margin-bottom: 1.25rem;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
         }
         .summary-item {
             background: #f5f5f7;
-            padding: 0.75rem;
+            padding: 0.6rem;
             border-radius: 8px;
             text-align: center;
         }
-        .summary-label { font-size: 0.65rem; color: #86868b; text-transform: uppercase; }
-        .summary-value { font-size: 1.1rem; font-weight: 600; font-family: 'SF Mono', monospace; }
+        .summary-label { font-size: 0.6rem; color: #86868b; text-transform: uppercase; }
+        .summary-value { font-size: 1rem; font-weight: 600; font-family: 'SF Mono', monospace; }
 
         .section-title {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 600;
-            margin: 1.25rem 0 0.5rem;
-            padding-bottom: 0.4rem;
+            margin: 1rem 0 0.4rem;
+            padding-bottom: 0.3rem;
             border-bottom: 1px solid #e8e8ed;
         }
         .section-title.green { color: #34c759; }
         .section-title.red { color: #ff3b30; }
 
-        .data-table { width: 100%; font-size: 0.75rem; border-collapse: collapse; }
+        .data-table { width: 100%; font-size: 0.7rem; border-collapse: collapse; }
         .data-table th {
             text-align: left;
-            padding: 0.4rem 0.5rem;
+            padding: 0.3rem 0.4rem;
             color: #86868b;
             font-weight: 500;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             text-transform: uppercase;
             border-bottom: 1px solid #e8e8ed;
         }
         .data-table td {
-            padding: 0.4rem 0.5rem;
+            padding: 0.3rem 0.4rem;
             border-bottom: 1px solid #f5f5f5;
             font-family: 'SF Mono', monospace;
         }
@@ -262,15 +353,15 @@
         .data-table .negative { color: #ff3b30; }
 
         @media (max-width: 1200px) {
+            .signals-row { grid-template-columns: 1fr 1fr; }
             .main-grid { grid-template-columns: 1fr; }
-            .stats { grid-template-columns: repeat(3, 1fr); }
-            .consensus-grid { grid-template-columns: repeat(2, 1fr); }
         }
         @media (max-width: 768px) {
-            .stats { grid-template-columns: repeat(2, 1fr); }
-            .activity-item { grid-template-columns: 50px 80px 50px 60px 70px 1fr; }
+            .signals-row { grid-template-columns: 1fr; }
+            .metrics-bar { gap: 0.3rem; }
+            .metric { min-width: 100px; padding: 0.4rem 0.5rem; }
+            .activity-item { grid-template-columns: 45px 75px 45px 55px 65px 1fr; }
             .activity-item .counterparty, .activity-item .chain { display: none; }
-            .summary-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
@@ -284,46 +375,84 @@
                 <option value="50000">Min $50K</option>
                 <option value="100000" selected>Min $100K</option>
                 <option value="500000">Min $500K</option>
-                <option value="1000000">Min $1M</option>
             </select>
             <button id="refreshBtn" onclick="loadActivity()">Refresh</button>
         </div>
     </header>
 
     <main class="container">
-        <!-- Stats -->
-        <section class="stats">
-            <div class="stat">
-                <div class="stat-label">Total Inflows</div>
-                <div class="stat-value green" id="totalReceived">-</div>
+        <!-- Key Metrics -->
+        <section class="metrics-bar">
+            <div class="metric">
+                <div class="metric-label">Net Flow</div>
+                <div class="metric-value" id="netFlow">-</div>
             </div>
-            <div class="stat">
-                <div class="stat-label">Total Outflows</div>
-                <div class="stat-value red" id="totalSent">-</div>
+            <div class="metric">
+                <div class="metric-label">Last 4h</div>
+                <div class="metric-value" id="recentNet">-</div>
+                <div class="metric-sub" id="recentCount">-</div>
             </div>
-            <div class="stat">
-                <div class="stat-label">Net Flow</div>
-                <div class="stat-value" id="netFlow">-</div>
+            <div class="metric">
+                <div class="metric-label">Exchange Flow</div>
+                <div class="metric-value" id="exchangeNet">-</div>
+                <div class="metric-sub" id="exchangeSignal">-</div>
             </div>
-            <div class="stat">
-                <div class="stat-label">Transactions</div>
-                <div class="stat-value" id="txCount">-</div>
+            <div class="metric">
+                <div class="metric-label">Inflows</div>
+                <div class="metric-value green" id="totalReceived">-</div>
             </div>
-            <div class="stat">
-                <div class="stat-label">Active Funds</div>
-                <div class="stat-value" id="activeFunds">-</div>
+            <div class="metric">
+                <div class="metric-label">Outflows</div>
+                <div class="metric-value red" id="totalSent">-</div>
             </div>
-            <div class="stat">
-                <div class="stat-label">Tokens Moved</div>
-                <div class="stat-value" id="tokensMoved">-</div>
+            <div class="metric">
+                <div class="metric-label">Active</div>
+                <div class="metric-value" id="activeFunds">-</div>
+                <div class="metric-sub">funds</div>
+            </div>
+        </section>
+
+        <!-- Signal Cards Row -->
+        <section class="signals-row">
+            <!-- Exchange Flows -->
+            <div class="signal-card">
+                <div class="signal-header">
+                    Exchange Flows
+                    <span class="signal-badge" id="exchangeBadge">-</span>
+                </div>
+                <div class="signal-body" id="exchangeBody">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="signal-card">
+                <div class="signal-header">
+                    Category Breakdown
+                    <span class="badge">Where money is moving</span>
+                </div>
+                <div class="signal-body" id="categoryBody">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Emerging/New Positions -->
+            <div class="signal-card">
+                <div class="signal-header">
+                    Early Signals
+                    <span class="badge">1-3 funds only</span>
+                </div>
+                <div class="signal-body" id="emergingBody">
+                    <div class="loading">Loading...</div>
+                </div>
             </div>
         </section>
 
         <!-- Smart Money Consensus -->
-        <section class="card" style="margin-bottom: 1rem;">
+        <section class="card" style="margin-bottom: 0.75rem;">
             <div class="card-header">
                 Smart Money Consensus
-                <span class="badge">Multiple funds same direction = stronger signal</span>
+                <span class="badge">Multiple funds = stronger signal</span>
             </div>
             <div class="consensus-grid" id="consensusGrid">
                 <div class="loading">Loading...</div>
@@ -334,28 +463,28 @@
         <section class="main-grid">
             <div class="card">
                 <div class="card-header">
-                    Recent Activity
-                    <span class="badge" id="activityCount">0 transactions</span>
+                    Activity Feed
+                    <span class="badge" id="activityCount">0</span>
                 </div>
                 <div class="activity-scroll" id="activityList">
-                    <div class="loading">Loading activity...</div>
+                    <div class="loading">Loading...</div>
                 </div>
             </div>
 
             <div class="sidebar">
                 <div class="card">
                     <div class="card-header">Most Active Funds</div>
-                    <div class="fund-list" id="fundList">
+                    <div class="sidebar-scroll" id="fundList">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        Whale Transactions
+                        Whale Alerts
                         <span class="badge">$500K+</span>
                     </div>
-                    <div class="whale-list" id="whaleList">
+                    <div class="sidebar-scroll" id="whaleList">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
@@ -370,9 +499,7 @@
                 <h2 id="modalTitle">Token Details</h2>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-            <div class="modal-body" id="modalBody">
-                <div class="loading">Loading...</div>
-            </div>
+            <div class="modal-body" id="modalBody"></div>
         </div>
     </div>
 
@@ -383,9 +510,7 @@
                 <h2 id="fundModalTitle">Fund Activity</h2>
                 <button class="modal-close" onclick="closeFundModal()">&times;</button>
             </div>
-            <div class="modal-body" id="fundModalBody">
-                <div class="loading">Loading...</div>
-            </div>
+            <div class="modal-body" id="fundModalBody"></div>
         </div>
     </div>
 
@@ -397,7 +522,7 @@
                 if (v === null || v === undefined) return '-';
                 const abs = Math.abs(v);
                 if (abs >= 1e9) return '$' + (v/1e9).toFixed(2) + 'B';
-                if (abs >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
+                if (abs >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
                 if (abs >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
                 return '$' + v.toFixed(0);
             },
@@ -408,111 +533,170 @@
             },
             num: (v) => {
                 if (!v) return '0';
-                if (Math.abs(v) >= 1e9) return (v/1e9).toFixed(2) + 'B';
-                if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(2) + 'M';
+                if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1) + 'M';
                 if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1) + 'K';
-                return v.toFixed(2);
+                return v.toFixed(1);
             }
         };
 
         async function loadActivity() {
             const btn = document.getElementById('refreshBtn');
             btn.disabled = true;
-            btn.textContent = 'Loading...';
+            btn.textContent = '...';
 
             try {
                 const res = await fetch(`/api/activity?min_usd=${document.getElementById('minUsd').value}`);
                 const data = await res.json();
                 cachedData = data;
 
-                // Handle loading state
                 if (data.loading) {
-                    document.getElementById('activityList').innerHTML = `<div class="loading">${data.message || 'Loading...'}</div>`;
-                    document.getElementById('consensusGrid').innerHTML = '<div class="loading">Building cache...</div>';
-                    document.getElementById('fundList').innerHTML = '<div class="loading">...</div>';
-                    document.getElementById('whaleList').innerHTML = '<div class="loading">...</div>';
-                    setTimeout(loadActivity, 10000);
+                    ['activityList', 'consensusGrid', 'fundList', 'whaleList', 'exchangeBody', 'categoryBody', 'emergingBody']
+                        .forEach(id => document.getElementById(id).innerHTML = `<div class="loading">${data.message || 'Loading...'}</div>`);
+                    setTimeout(loadActivity, 8000);
                     return;
                 }
 
-                // Cache info
                 if (data.cache_age_seconds) {
                     const mins = Math.floor(data.cache_age_seconds / 60);
-                    document.getElementById('cacheInfo').textContent = `Updated ${mins}m ago`;
+                    document.getElementById('cacheInfo').textContent = `${mins}m ago`;
                 }
 
-                // Stats
-                document.getElementById('totalReceived').textContent = fmt.usd(data.stats.total_received);
-                document.getElementById('totalSent').textContent = fmt.usd(data.stats.total_sent);
+                // Metrics
+                const s = data.stats;
+                document.getElementById('totalReceived').textContent = fmt.usd(s.total_received);
+                document.getElementById('totalSent').textContent = fmt.usd(s.total_sent);
                 const netEl = document.getElementById('netFlow');
-                netEl.textContent = fmt.signed(data.stats.net_flow);
-                netEl.className = 'stat-value ' + (data.stats.net_flow >= 0 ? 'green' : 'red');
-                document.getElementById('txCount').textContent = data.stats.transaction_count;
-                document.getElementById('activeFunds').textContent = data.stats.active_funds || '-';
-                document.getElementById('tokensMoved').textContent = data.stats.tokens_moved || '-';
+                netEl.textContent = fmt.signed(s.net_flow);
+                netEl.className = 'metric-value ' + (s.net_flow >= 0 ? 'green' : 'red');
 
-                // Smart Money Consensus
-                renderConsensus(data.consensus || []);
+                const recentEl = document.getElementById('recentNet');
+                recentEl.textContent = fmt.signed(s.recent_net);
+                recentEl.className = 'metric-value ' + (s.recent_net >= 0 ? 'green' : 'red');
+                document.getElementById('recentCount').textContent = `${s.recent_count} txs`;
 
-                // Activity
-                renderActivity(data.activity || []);
+                document.getElementById('activeFunds').textContent = s.active_funds;
 
-                // Fund leaderboard
-                renderFundLeaderboard(data.fund_leaderboard || []);
+                // Exchange flows
+                const ex = data.exchange_flows || {};
+                const exNetEl = document.getElementById('exchangeNet');
+                exNetEl.textContent = fmt.signed(ex.net || 0);
+                exNetEl.className = 'metric-value ' + (ex.net >= 0 ? 'green' : 'red');
+                const exSig = document.getElementById('exchangeSignal');
+                exSig.textContent = ex.net > 0 ? 'buying' : ex.net < 0 ? 'selling' : '-';
 
-                // Whale alerts
-                renderWhales(data.whales || []);
+                renderExchangeFlows(data.exchange_flows);
+                renderCategories(data.categories);
+                renderEmerging(data.emerging_tokens);
+                renderConsensus(data.consensus);
+                renderActivity(data.activity);
+                renderFundLeaderboard(data.fund_leaderboard);
+                renderWhales(data.whales);
 
             } catch (e) {
-                console.error('Error:', e);
-                document.getElementById('activityList').innerHTML = `<div class="error">Failed to load: ${e.message}</div>`;
+                console.error(e);
+                document.getElementById('activityList').innerHTML = `<div class="error">Error: ${e.message}</div>`;
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Refresh';
             }
         }
 
+        function renderExchangeFlows(ex) {
+            const body = document.getElementById('exchangeBody');
+            const badge = document.getElementById('exchangeBadge');
+
+            if (!ex) {
+                body.innerHTML = '<div class="loading">No data</div>';
+                return;
+            }
+
+            badge.textContent = ex.signal;
+            badge.className = 'signal-badge ' + ex.signal.toLowerCase();
+
+            body.innerHTML = `
+                <div class="exchange-stat">
+                    <span class="exchange-label">From exchanges (buying)</span>
+                    <span class="exchange-value" style="color:#34c759">${fmt.usd(ex.from_exchange)}</span>
+                </div>
+                <div class="exchange-stat">
+                    <span class="exchange-label">To exchanges (selling)</span>
+                    <span class="exchange-value" style="color:#ff3b30">${fmt.usd(ex.to_exchange)}</span>
+                </div>
+                <div class="exchange-stat">
+                    <span class="exchange-label"><strong>Net (buy - sell)</strong></span>
+                    <span class="exchange-value" style="color:${ex.net >= 0 ? '#34c759' : '#ff3b30'};font-weight:600">${fmt.signed(ex.net)}</span>
+                </div>
+            `;
+        }
+
+        function renderCategories(cats) {
+            const body = document.getElementById('categoryBody');
+            if (!cats || !cats.length) {
+                body.innerHTML = '<div class="loading">No data</div>';
+                return;
+            }
+            body.innerHTML = cats.filter(c => c.volume > 10000).map(c => `
+                <div class="category-item">
+                    <span class="category-name ${c.category}">${c.category}</span>
+                    <span class="category-flow ${c.net >= 0 ? 'positive' : 'negative'}" style="color:${c.net >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(c.net)}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderEmerging(tokens) {
+            const body = document.getElementById('emergingBody');
+            if (!tokens || !tokens.length) {
+                body.innerHTML = '<div class="loading">No early signals</div>';
+                return;
+            }
+            body.innerHTML = tokens.map(t => `
+                <div class="emerging-item" onclick="showTokenDetail('${t.token}')">
+                    <div>
+                        <span class="emerging-token">${t.token}</span>
+                        <span class="emerging-action ${t.action}">${t.action}</span>
+                        <div class="emerging-funds">${t.funds.slice(0,2).join(', ')}</div>
+                    </div>
+                    <span style="font-family:'SF Mono',monospace;color:${t.net >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(t.net)}</span>
+                </div>
+            `).join('');
+        }
+
         function renderConsensus(consensus) {
             const grid = document.getElementById('consensusGrid');
-            if (!consensus.length) {
-                grid.innerHTML = '<div class="loading">No consensus signals yet</div>';
+            if (!consensus || !consensus.length) {
+                grid.innerHTML = '<div class="loading">No consensus signals</div>';
                 return;
             }
             grid.innerHTML = consensus.map(c => `
                 <div class="consensus-card ${c.signal.toLowerCase()}" onclick="showTokenDetail('${c.token}')">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div class="consensus-top">
                         <span class="consensus-token">${c.token}</span>
                         <span class="consensus-signal ${c.signal.toLowerCase()}">${c.signal}</span>
                     </div>
-                    <div class="consensus-flow ${c.net >= 0 ? 'positive' : 'negative'}">${fmt.signed(c.net)}</div>
-                    <div class="consensus-meta">
-                        ${c.buyer_count} buying, ${c.seller_count} selling
-                    </div>
-                    <div class="consensus-meta" style="color:#5856d6;">
-                        ${c.buyers.slice(0,3).join(', ')}${c.buyers.length > 3 ? '...' : ''}
-                    </div>
+                    <div class="consensus-flow" style="color:${c.net >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(c.net)}</div>
+                    <div class="consensus-meta">${c.buyer_count} buying, ${c.seller_count} selling</div>
                 </div>
             `).join('');
         }
 
         function renderActivity(activity) {
             const list = document.getElementById('activityList');
-            document.getElementById('activityCount').textContent = `${activity.length} transactions`;
+            document.getElementById('activityCount').textContent = `${activity.length} txs`;
 
             if (!activity.length) {
-                list.innerHTML = '<div class="loading">No activity found</div>';
+                list.innerHTML = '<div class="loading">No activity</div>';
                 return;
             }
 
             list.innerHTML = activity.map(a => `
-                <div class="activity-item ${a.usd >= 500000 ? 'whale' : ''}">
+                <div class="activity-item ${a.usd >= 500000 ? 'whale' : ''} ${a.is_exchange ? 'exchange' : ''}">
                     <span class="time">${a.time_ago}</span>
                     <span class="fund" onclick="showFundDetail('${a.fund_id}')">${a.fund}</span>
                     <span class="action ${a.action.toLowerCase()}">${a.action}</span>
                     <span class="token" onclick="showTokenDetail('${a.token}')">${a.token}</span>
                     <span class="amount">${fmt.num(a.amount)}</span>
                     <span class="usd ${a.usd >= 500000 ? 'whale' : ''}">${fmt.usd(a.usd)}</span>
-                    <span class="counterparty">${a.counterparty}</span>
+                    <span class="counterparty ${a.is_exchange ? 'exchange' : ''}">${a.counterparty}</span>
                     <span class="chain">${a.chain}</span>
                 </div>
             `).join('');
@@ -521,14 +705,14 @@
         function renderFundLeaderboard(funds) {
             const list = document.getElementById('fundList');
             if (!funds.length) {
-                list.innerHTML = '<div class="loading">No fund data</div>';
+                list.innerHTML = '<div class="loading">No data</div>';
                 return;
             }
             list.innerHTML = funds.map(f => `
                 <div class="fund-item" onclick="showFundDetail('${f.fund_id}')">
                     <div>
                         <div class="fund-name">${f.name}</div>
-                        <div class="fund-volume">${f.tx_count} txs / ${fmt.usd(f.volume)} vol</div>
+                        <div class="fund-meta">${f.tx_count} txs${f.exchange_sells > 0 ? ' · ' + fmt.usd(f.exchange_sells) + ' to CEX' : ''}</div>
                     </div>
                     <div class="fund-net ${f.net >= 0 ? 'positive' : 'negative'}">${fmt.signed(f.net)}</div>
                 </div>
@@ -538,10 +722,10 @@
         function renderWhales(whales) {
             const list = document.getElementById('whaleList');
             if (!whales.length) {
-                list.innerHTML = '<div class="loading">No whale transactions</div>';
+                list.innerHTML = '<div class="loading">No whales</div>';
                 return;
             }
-            list.innerHTML = whales.map(w => `
+            list.innerHTML = whales.slice(0, 10).map(w => `
                 <div class="whale-item">
                     <div class="whale-header">
                         <span class="fund" onclick="showFundDetail('${w.fund_id}')">${w.fund}</span>
@@ -549,8 +733,7 @@
                     </div>
                     <div class="whale-detail">
                         <span class="action ${w.action.toLowerCase()}">${w.action}</span>
-                        <span class="token" onclick="showTokenDetail('${w.token}')">${w.token}</span>
-                        &middot; ${w.time_ago}
+                        <span class="token" onclick="showTokenDetail('${w.token}')">${w.token}</span> · ${w.time_ago}
                     </div>
                 </div>
             `).join('');
@@ -560,7 +743,7 @@
             const modal = document.getElementById('tokenModal');
             const body = document.getElementById('modalBody');
             document.getElementById('modalTitle').textContent = `${token} - Fund Activity`;
-            body.innerHTML = '<div class="loading">Loading token data...</div>';
+            body.innerHTML = '<div class="loading">Loading...</div>';
             modal.classList.add('active');
 
             try {
@@ -570,171 +753,104 @@
                 let html = `
                     <div class="summary-grid">
                         <div class="summary-item">
-                            <div class="summary-label">Net Accumulated (30d)</div>
+                            <div class="summary-label">Accumulated (30d)</div>
                             <div class="summary-value" style="color:#34c759">${fmt.usd(data.summary.total_accumulated_30d)}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Net Sold (30d)</div>
+                            <div class="summary-label">Sold (30d)</div>
                             <div class="summary-value" style="color:#ff3b30">${fmt.usd(data.summary.total_sold_30d)}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Funds Buying</div>
+                            <div class="summary-label">Buyers</div>
                             <div class="summary-value">${data.summary.accumulator_count}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Funds Selling</div>
+                            <div class="summary-label">Sellers</div>
                             <div class="summary-value">${data.summary.seller_count}</div>
                         </div>
                     </div>
                 `;
 
                 if (data.accumulators.length) {
-                    html += `
-                        <div class="section-title green">Accumulators (Net Buyers)</div>
-                        <table class="data-table">
-                            <thead><tr><th>Fund</th><th>7D Net</th><th>30D Net</th><th>90D Net</th></tr></thead>
-                            <tbody>
-                                ${data.accumulators.map(e => `
-                                    <tr>
-                                        <td>${e.name}</td>
-                                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
-                                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
-                                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
+                    html += `<div class="section-title green">Accumulators</div>
+                        <table class="data-table"><thead><tr><th>Fund</th><th>7D</th><th>30D</th><th>90D</th></tr></thead><tbody>
+                        ${data.accumulators.map(e => `<tr><td>${e.name}</td>
+                            <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
+                            <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
+                            <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td></tr>`).join('')}
+                        </tbody></table>`;
                 }
 
                 if (data.sellers.length) {
-                    html += `
-                        <div class="section-title red">Sellers (Net Sellers)</div>
-                        <table class="data-table">
-                            <thead><tr><th>Fund</th><th>7D Net</th><th>30D Net</th><th>90D Net</th></tr></thead>
-                            <tbody>
-                                ${data.sellers.map(e => `
-                                    <tr>
-                                        <td>${e.name}</td>
-                                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
-                                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
-                                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
+                    html += `<div class="section-title red">Sellers</div>
+                        <table class="data-table"><thead><tr><th>Fund</th><th>7D</th><th>30D</th><th>90D</th></tr></thead><tbody>
+                        ${data.sellers.map(e => `<tr><td>${e.name}</td>
+                            <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
+                            <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
+                            <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td></tr>`).join('')}
+                        </tbody></table>`;
                 }
 
-                if (!data.accumulators.length && !data.sellers.length) {
-                    html += '<div class="loading">No significant fund activity for this token</div>';
-                }
-
+                if (!data.accumulators.length && !data.sellers.length) html += '<div class="loading">No significant activity</div>';
                 body.innerHTML = html;
             } catch (e) {
-                body.innerHTML = `<div class="error">Failed to load: ${e.message}</div>`;
+                body.innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }
         }
 
         function showFundDetail(fundId) {
-            if (!cachedData || !cachedData.activity) return;
-
+            if (!cachedData?.activity) return;
             const modal = document.getElementById('fundModal');
             const body = document.getElementById('fundModalBody');
-            const fundActivity = cachedData.activity.filter(a => a.fund_id === fundId);
-            const fundName = fundActivity[0]?.fund || fundId;
+            const fa = cachedData.activity.filter(a => a.fund_id === fundId);
+            const name = fa[0]?.fund || fundId;
 
-            document.getElementById('fundModalTitle').textContent = `${fundName} - Recent Activity`;
+            document.getElementById('fundModalTitle').textContent = `${name}`;
 
-            if (!fundActivity.length) {
-                body.innerHTML = '<div class="loading">No activity found for this fund</div>';
+            if (!fa.length) {
+                body.innerHTML = '<div class="loading">No activity</div>';
             } else {
-                // Calculate stats
-                const received = fundActivity.filter(a => a.action === 'Received').reduce((s, a) => s + a.usd, 0);
-                const sent = fundActivity.filter(a => a.action === 'Sent').reduce((s, a) => s + a.usd, 0);
+                const recv = fa.filter(a => a.action === 'Received').reduce((s, a) => s + a.usd, 0);
+                const sent = fa.filter(a => a.action === 'Sent').reduce((s, a) => s + a.usd, 0);
+                const exSent = fa.filter(a => a.action === 'Sent' && a.is_exchange).reduce((s, a) => s + a.usd, 0);
 
-                // Group by token
-                const tokenMap = {};
-                fundActivity.forEach(a => {
-                    if (!tokenMap[a.token]) tokenMap[a.token] = { received: 0, sent: 0 };
-                    if (a.action === 'Received') tokenMap[a.token].received += a.usd;
-                    else tokenMap[a.token].sent += a.usd;
+                const tm = {};
+                fa.forEach(a => {
+                    if (!tm[a.token]) tm[a.token] = { r: 0, s: 0 };
+                    if (a.action === 'Received') tm[a.token].r += a.usd; else tm[a.token].s += a.usd;
                 });
-                const tokens = Object.entries(tokenMap)
-                    .map(([t, d]) => ({ token: t, net: d.received - d.sent, ...d }))
-                    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+                const tokens = Object.entries(tm).map(([t, d]) => ({ token: t, net: d.r - d.s, ...d })).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
 
                 body.innerHTML = `
                     <div class="summary-grid">
-                        <div class="summary-item">
-                            <div class="summary-label">Total Received</div>
-                            <div class="summary-value" style="color:#34c759">${fmt.usd(received)}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Total Sent</div>
-                            <div class="summary-value" style="color:#ff3b30">${fmt.usd(sent)}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Net Flow</div>
-                            <div class="summary-value" style="color:${received - sent >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(received - sent)}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Transactions</div>
-                            <div class="summary-value">${fundActivity.length}</div>
-                        </div>
+                        <div class="summary-item"><div class="summary-label">Received</div><div class="summary-value" style="color:#34c759">${fmt.usd(recv)}</div></div>
+                        <div class="summary-item"><div class="summary-label">Sent</div><div class="summary-value" style="color:#ff3b30">${fmt.usd(sent)}</div></div>
+                        <div class="summary-item"><div class="summary-label">Net</div><div class="summary-value" style="color:${recv-sent>=0?'#34c759':'#ff3b30'}">${fmt.signed(recv-sent)}</div></div>
+                        <div class="summary-item"><div class="summary-label">To Exchanges</div><div class="summary-value" style="color:#ff9500">${fmt.usd(exSent)}</div></div>
                     </div>
-
-                    <div class="section-title">Token Breakdown</div>
-                    <table class="data-table">
-                        <thead><tr><th>Token</th><th>Received</th><th>Sent</th><th>Net</th></tr></thead>
-                        <tbody>
-                            ${tokens.slice(0, 15).map(t => `
-                                <tr>
-                                    <td style="cursor:pointer" onclick="closeModal();showTokenDetail('${t.token}')">${t.token}</td>
-                                    <td class="positive">${fmt.usd(t.received)}</td>
-                                    <td class="negative">${fmt.usd(t.sent)}</td>
-                                    <td class="${t.net >= 0 ? 'positive' : 'negative'}">${fmt.signed(t.net)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-
-                    <div class="section-title">Recent Transactions</div>
-                    <table class="data-table">
-                        <thead><tr><th>Time</th><th>Action</th><th>Token</th><th>Amount</th></tr></thead>
-                        <tbody>
-                            ${fundActivity.slice(0, 20).map(a => `
-                                <tr>
-                                    <td style="font-family:'SF Mono',monospace">${a.time_ago}</td>
-                                    <td class="${a.action === 'Received' ? 'positive' : 'negative'}">${a.action}</td>
-                                    <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${a.token}')">${a.token}</td>
-                                    <td>${fmt.usd(a.usd)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                `;
+                    <div class="section-title">Tokens</div>
+                    <table class="data-table"><thead><tr><th>Token</th><th>In</th><th>Out</th><th>Net</th></tr></thead><tbody>
+                    ${tokens.slice(0,12).map(t => `<tr><td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${t.token}')">${t.token}</td>
+                        <td class="positive">${fmt.usd(t.r)}</td><td class="negative">${fmt.usd(t.s)}</td>
+                        <td class="${t.net>=0?'positive':'negative'}">${fmt.signed(t.net)}</td></tr>`).join('')}
+                    </tbody></table>
+                    <div class="section-title">Recent</div>
+                    <table class="data-table"><thead><tr><th>Time</th><th>Action</th><th>Token</th><th>USD</th></tr></thead><tbody>
+                    ${fa.slice(0,15).map(a => `<tr><td style="font-family:'SF Mono',monospace">${a.time_ago}</td>
+                        <td class="${a.action==='Received'?'positive':'negative'}">${a.action}</td>
+                        <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${a.token}')">${a.token}</td>
+                        <td>${fmt.usd(a.usd)}</td></tr>`).join('')}
+                    </tbody></table>`;
             }
-
             modal.classList.add('active');
         }
 
-        function closeModal() {
-            document.getElementById('tokenModal').classList.remove('active');
-        }
-        function closeFundModal() {
-            document.getElementById('fundModal').classList.remove('active');
-        }
+        function closeModal() { document.getElementById('tokenModal').classList.remove('active'); }
+        function closeFundModal() { document.getElementById('fundModal').classList.remove('active'); }
 
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') { closeModal(); closeFundModal(); }
-        });
-        document.getElementById('tokenModal').addEventListener('click', e => {
-            if (e.target.classList.contains('modal')) closeModal();
-        });
-        document.getElementById('fundModal').addEventListener('click', e => {
-            if (e.target.classList.contains('modal')) closeFundModal();
-        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeFundModal(); } });
+        document.getElementById('tokenModal').addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(); });
+        document.getElementById('fundModal').addEventListener('click', e => { if (e.target.classList.contains('modal')) closeFundModal(); });
 
         document.addEventListener('DOMContentLoaded', loadActivity);
         document.getElementById('minUsd').addEventListener('change', loadActivity);

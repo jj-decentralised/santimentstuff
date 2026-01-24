@@ -123,6 +123,34 @@ def fetch_fund_transfers(fund_id: str, limit: int = 50, min_usd: int = 10000) ->
         return []
 
 
+# Known exchanges for flow analysis
+EXCHANGES = {
+    "binance", "coinbase", "kraken", "okx", "bybit", "bitfinex", "kucoin",
+    "huobi", "gate-io", "gemini", "bitstamp", "ftx", "crypto-com", "mexc",
+}
+
+# Token categories for grouping
+TOKEN_CATEGORIES = {
+    # Stablecoins
+    "USDT": "stable", "USDC": "stable", "DAI": "stable", "USDE": "stable",
+    "FRAX": "stable", "TUSD": "stable", "BUSD": "stable", "USDP": "stable",
+    # Major L1s
+    "ETH": "l1", "WETH": "l1", "BTC": "l1", "WBTC": "l1", "BTCB": "l1",
+    "SOL": "l1", "AVAX": "l1", "BNB": "l1", "ADA": "l1", "DOT": "l1",
+    # L2s
+    "ARB": "l2", "OP": "l2", "MATIC": "l2", "BASE": "l2", "STRK": "l2",
+    # DeFi
+    "UNI": "defi", "AAVE": "defi", "MKR": "defi", "LDO": "defi", "CRV": "defi",
+    "COMP": "defi", "SNX": "defi", "SUSHI": "defi", "YFI": "defi", "PENDLE": "defi",
+    "ENA": "defi", "EIGEN": "defi", "MORPHO": "defi",
+    # Meme
+    "DOGE": "meme", "SHIB": "meme", "PEPE": "meme", "FLOKI": "meme",
+    "BONK": "meme", "WIF": "meme", "TRUMP": "meme", "MEME": "meme",
+    # AI
+    "FET": "ai", "AGIX": "ai", "RNDR": "ai", "TAO": "ai", "NEAR": "ai",
+}
+
+
 def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
     """Parse a transfer into a clean activity item."""
     usd = tx.get("historicalUSD", 0) or 0
@@ -135,16 +163,25 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
     if to_entity.get("id") == fund_id:
         action = "Received"
         counterparty = from_entity.get("name") or "Unknown"
+        counterparty_id = from_entity.get("id") or ""
+        counterparty_type = from_entity.get("type") or ""
     elif from_entity.get("id") == fund_id:
         action = "Sent"
         counterparty = to_entity.get("name") or "Unknown"
+        counterparty_id = to_entity.get("id") or ""
+        counterparty_type = to_entity.get("type") or ""
     else:
         return None
 
+    # Detect exchange involvement
+    is_exchange = counterparty_type == "cex" or counterparty_id in EXCHANGES
+
     ts = tx.get("blockTimestamp", "")
+    hours_ago = 0
     try:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
         time_ago = datetime.now(dt.tzinfo) - dt
+        hours_ago = time_ago.total_seconds() / 3600
         if time_ago.days > 0:
             time_str = f"{time_ago.days}d ago"
         elif time_ago.seconds > 3600:
@@ -154,17 +191,23 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
     except:
         time_str = "?"
 
+    token = (tx.get("tokenSymbol") or "???").upper()
+
     return {
         "timestamp": ts,
         "time_ago": time_str,
+        "hours_ago": hours_ago,
         "fund_id": fund_id,
         "fund": fund_name,
         "action": action,
-        "token": (tx.get("tokenSymbol") or "???").upper(),
+        "token": token,
         "token_name": tx.get("tokenName") or "",
+        "category": TOKEN_CATEGORIES.get(token, "other"),
         "amount": tx.get("unitValue", 0) or 0,
         "usd": usd,
         "counterparty": counterparty[:25],
+        "counterparty_type": counterparty_type,
+        "is_exchange": is_exchange,
         "chain": tx.get("chain", ""),
         "tx_hash": tx.get("transactionHash", ""),
     }
@@ -208,12 +251,16 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
     total_received = sum(a["usd"] for a in all_activity if a["action"] == "Received")
     total_sent = sum(a["usd"] for a in all_activity if a["action"] == "Sent")
 
-    # Token flows with fund tracking
+    # Token flows with fund tracking and categories
     token_data = {}
     for a in all_activity:
         token = a["token"]
         if token not in token_data:
-            token_data[token] = {"received": 0, "sent": 0, "buyers": set(), "sellers": set()}
+            token_data[token] = {
+                "received": 0, "sent": 0,
+                "buyers": set(), "sellers": set(),
+                "category": a.get("category", "other"),
+            }
         if a["action"] == "Received":
             token_data[token]["received"] += a["usd"]
             token_data[token]["buyers"].add(a["fund"])
@@ -224,7 +271,11 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
     # Top tokens by flow
     top_tokens = sorted(
         [
-            {"token": t, "net": d["received"] - d["sent"], "received": d["received"], "sent": d["sent"]}
+            {
+                "token": t, "net": d["received"] - d["sent"],
+                "received": d["received"], "sent": d["sent"],
+                "category": d["category"],
+            }
             for t, d in token_data.items()
         ],
         key=lambda x: abs(x["net"]),
@@ -237,10 +288,10 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
         net = data["received"] - data["sent"]
         buyer_count = len(data["buyers"])
         seller_count = len(data["sellers"])
-        # Only include if 2+ funds involved and significant volume
         if (buyer_count >= 2 or seller_count >= 2) and (data["received"] + data["sent"]) > 50000:
             consensus.append({
                 "token": token,
+                "category": data["category"],
                 "net": net,
                 "received": data["received"],
                 "sent": data["sent"],
@@ -250,20 +301,70 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
                 "sellers": list(data["sellers"])[:5],
                 "signal": "BULLISH" if net > 0 and buyer_count > seller_count else "BEARISH" if net < 0 and seller_count > buyer_count else "MIXED",
             })
-    # Sort by number of funds involved
     consensus.sort(key=lambda x: x["buyer_count"] + x["seller_count"], reverse=True)
 
-    # Fund leaderboard - activity by fund
+    # === EXCHANGE FLOW ANALYSIS ===
+    exchange_flows = {"to_exchange": 0, "from_exchange": 0, "to_exchange_txs": [], "from_exchange_txs": []}
+    for a in all_activity:
+        if a.get("is_exchange"):
+            if a["action"] == "Sent":  # Fund sending TO exchange = likely selling
+                exchange_flows["to_exchange"] += a["usd"]
+                if len(exchange_flows["to_exchange_txs"]) < 10:
+                    exchange_flows["to_exchange_txs"].append(a)
+            else:  # Fund receiving FROM exchange = likely buying
+                exchange_flows["from_exchange"] += a["usd"]
+                if len(exchange_flows["from_exchange_txs"]) < 10:
+                    exchange_flows["from_exchange_txs"].append(a)
+    exchange_flows["net"] = exchange_flows["from_exchange"] - exchange_flows["to_exchange"]
+    exchange_flows["signal"] = "BULLISH" if exchange_flows["net"] > 0 else "BEARISH" if exchange_flows["net"] < 0 else "NEUTRAL"
+
+    # === CATEGORY BREAKDOWN ===
+    category_flows = {}
+    for a in all_activity:
+        cat = a.get("category", "other")
+        if cat not in category_flows:
+            category_flows[cat] = {"received": 0, "sent": 0}
+        if a["action"] == "Received":
+            category_flows[cat]["received"] += a["usd"]
+        else:
+            category_flows[cat]["sent"] += a["usd"]
+
+    categories = sorted(
+        [
+            {
+                "category": cat,
+                "received": d["received"],
+                "sent": d["sent"],
+                "net": d["received"] - d["sent"],
+                "volume": d["received"] + d["sent"],
+            }
+            for cat, d in category_flows.items()
+        ],
+        key=lambda x: x["volume"],
+        reverse=True,
+    )
+
+    # === RECENT ACTIVITY (Last 4 hours) ===
+    recent_4h = [a for a in all_activity if a.get("hours_ago", 999) <= 4]
+    recent_received = sum(a["usd"] for a in recent_4h if a["action"] == "Received")
+    recent_sent = sum(a["usd"] for a in recent_4h if a["action"] == "Sent")
+
+    # === FUND LEADERBOARD ===
     fund_stats = {}
+    fund_tokens = {}  # Track tokens per fund for "new position" detection
     for a in all_activity:
         fid = a["fund_id"]
         if fid not in fund_stats:
-            fund_stats[fid] = {"name": a["fund"], "received": 0, "sent": 0, "tx_count": 0}
+            fund_stats[fid] = {"name": a["fund"], "received": 0, "sent": 0, "tx_count": 0, "exchange_sells": 0}
+            fund_tokens[fid] = set()
         fund_stats[fid]["tx_count"] += 1
+        fund_tokens[fid].add(a["token"])
         if a["action"] == "Received":
             fund_stats[fid]["received"] += a["usd"]
         else:
             fund_stats[fid]["sent"] += a["usd"]
+            if a.get("is_exchange"):
+                fund_stats[fid]["exchange_sells"] += a["usd"]
 
     fund_leaderboard = sorted(
         [
@@ -275,6 +376,8 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
                 "net": d["received"] - d["sent"],
                 "volume": d["received"] + d["sent"],
                 "tx_count": d["tx_count"],
+                "exchange_sells": d["exchange_sells"],
+                "token_count": len(fund_tokens.get(fid, [])),
             }
             for fid, d in fund_stats.items()
         ],
@@ -282,9 +385,27 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
         reverse=True,
     )[:15]
 
-    # Whale alerts - largest single transactions
-    whale_threshold = 500000  # $500K+
+    # === WHALE ALERTS ===
+    whale_threshold = 500000
     whales = [a for a in all_activity if a["usd"] >= whale_threshold][:20]
+
+    # === NEW/UNUSUAL TOKENS (tokens with only 1-2 funds touching them recently) ===
+    # These could be early signals
+    emerging_tokens = []
+    for token, data in token_data.items():
+        total_funds = len(data["buyers"] | data["sellers"])
+        if 1 <= total_funds <= 3 and (data["received"] + data["sent"]) > 50000:
+            # Skip stablecoins
+            if data["category"] != "stable":
+                emerging_tokens.append({
+                    "token": token,
+                    "category": data["category"],
+                    "funds": list(data["buyers"] | data["sellers"]),
+                    "net": data["received"] - data["sent"],
+                    "volume": data["received"] + data["sent"],
+                    "action": "accumulating" if data["received"] > data["sent"] else "distributing",
+                })
+    emerging_tokens.sort(key=lambda x: x["volume"], reverse=True)
 
     return {
         "activity": all_activity[:200],
@@ -295,11 +416,20 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
             "transaction_count": len(all_activity),
             "active_funds": len(fund_stats),
             "tokens_moved": len(token_data),
+            # Recent activity (4h)
+            "recent_received": recent_received,
+            "recent_sent": recent_sent,
+            "recent_net": recent_received - recent_sent,
+            "recent_count": len(recent_4h),
         },
         "top_tokens": top_tokens,
         "consensus": consensus[:10],
         "fund_leaderboard": fund_leaderboard,
         "whales": whales,
+        # New analytics
+        "exchange_flows": exchange_flows,
+        "categories": categories,
+        "emerging_tokens": emerging_tokens[:8],
     }
 
 
