@@ -340,6 +340,17 @@
 
                 document.getElementById('txCount').textContent = data.stats.transaction_count;
 
+                // Handle loading state (cache still building)
+                if (data.loading) {
+                    document.getElementById('activityList').innerHTML =
+                        '<div class="loading">' + (data.message || 'Loading...') + '</div>';
+                    document.getElementById('tokenList').innerHTML =
+                        '<div class="loading">Waiting for cache...</div>';
+                    // Auto-refresh in 10 seconds
+                    setTimeout(loadActivity, 10000);
+                    return;
+                }
+
                 // Update activity list
                 const list = document.getElementById('activityList');
                 if (!data.activity || data.activity.length === 0) {

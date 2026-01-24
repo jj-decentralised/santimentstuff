@@ -267,9 +267,21 @@ def get_activity(
                 else None
             )
             return data
+        is_refreshing = cache["is_refreshing"]
 
-    # No cache yet, build synchronously (first request)
-    return build_activity_data(min_usd=min_usd, limit_per_entity=limit_per_entity)
+    # No cache yet - return loading state instead of blocking
+    return {
+        "activity": [],
+        "stats": {
+            "total_received": 0,
+            "total_sent": 0,
+            "net_flow": 0,
+            "transaction_count": 0,
+        },
+        "top_tokens": [],
+        "loading": True,
+        "message": "Cache is building, please refresh in ~60 seconds..." if is_refreshing else "Starting cache build...",
+    }
 
 
 @app.get("/api/activity/refresh")
