@@ -4,7 +4,6 @@ import os
 import time
 import httpx
 
-API_KEY = os.environ.get("ARKHAM_API_KEY", "")
 BASE_URL = "https://api.arkm.com"
 
 FUNDS = [
@@ -21,8 +20,17 @@ FUNDS = [
 ]
 
 
+def get_api_key():
+    """Get API key at request time."""
+    return os.environ.get("ARKHAM_API_KEY", "")
+
+
 def get_headers():
-    return {"API-Key": API_KEY}
+    """Get headers with API key."""
+    key = get_api_key()
+    if not key:
+        print("WARNING: ARKHAM_API_KEY not set!")
+    return {"API-Key": key}
 
 
 def get_entity(entity_id: str) -> dict | None:
