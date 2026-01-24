@@ -6,17 +6,63 @@ import httpx
 
 BASE_URL = "https://api.arkm.com"
 
+# ~50 verified fund entities in Arkham
 FUNDS = [
+    # Tier 1 - Major Crypto VCs
     "a16z",
+    "paradigm-capital",
     "polychain-capital",
     "dragonfly-capital",
-    "three-arrows-capital",
+    "pantera-capital",
+    "sequoia-capital",
+    "blockchain-capital",
+    "multicoin-capital",
+    "placeholder-vc",
+    "variant-fund",
+    "haun-ventures",
+    "framework-ventures",
+    "1confirmation",
+    "electric-capital",
+    # Trading Firms & Market Makers
     "jump-trading",
+    "wintermute",
+    "alameda-research",
+    "cumberland",
+    "b2c2",
+    "genesis-trading",
     "galaxy-digital",
+    "dwf-labs",
+    "akuna-capital",
+    # Institutional
+    "grayscale",
+    "bitwise",
+    "ark-invest",
+    "digital-currency-group",
+    "coinbase",
+    "circle",
+    "winklevoss-capital",
+    # Crypto Funds
     "spartan-group",
     "animoca-brands",
-    "electric-capital",
     "binance-labs",
+    "mirana-ventures",
+    "ngc-ventures",
+    "fabric-ventures",
+    "delphi-digital",
+    "maven-11",
+    "mechanism-capital",
+    "abraxas-capital-heka-funds",
+    # Defunct/Historical (for reference)
+    "three-arrows-capital",
+    "ftx",
+    "blockfi",
+    "nexo",
+    # Notable Individuals (optional)
+    "vitalik-buterin",
+    "justin-sun",
+    "cz-binance",
+    "brian-armstrong",
+    "do-kwon",
 ]
 
 
