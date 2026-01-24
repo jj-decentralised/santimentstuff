@@ -1,159 +1,191 @@
-"""Fund Portfolio Tracker - Simple FastAPI app."""
+"""Fund Activity Tracker - What are funds doing today?"""
 
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+import httpx
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 
-from core import arkham_client as arkham
-
-# Paths
+# Config
+BASE_URL = "https://api.arkm.com"
 BASE_DIR = Path(__file__).parent
-TEMPLATES_DIR = BASE_DIR / "templates"
 
-# App
-app = FastAPI(title="Fund Portfolio Tracker")
+# Major funds to track
+FUNDS = {
+    "jump-trading": "Jump Crypto",
+    "wintermute": "Wintermute",
+    "galaxy-digital": "Galaxy Digital",
+    "dragonfly-capital": "Dragonfly",
+    "a16z": "a16z",
+    "paradigm-capital": "Paradigm",
+    "pantera-capital": "Pantera",
+    "polychain-capital": "Polychain",
+    "blockchain-capital": "Blockchain Capital",
+    "multicoin-capital": "Multicoin",
+    "framework-ventures": "Framework",
+    "placeholder-vc": "Placeholder",
+    "variant-fund": "Variant",
+    "electric-capital": "Electric Capital",
+    "1confirmation": "1confirmation",
+    "spartan-group": "Spartan",
+    "animoca-brands": "Animoca",
+    "binance-labs": "Binance Labs",
+    "coinbase": "Coinbase",
+    "grayscale": "Grayscale",
+    "cumberland": "Cumberland",
+    "genesis-trading": "Genesis",
+    "dwf-labs": "DWF Labs",
+    "alameda-research": "Alameda",
+    "three-arrows-capital": "3AC",
+    "circle": "Circle",
+    "digital-currency-group": "DCG",
+    "ftx": "FTX",
+}
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+app = FastAPI(title="Fund Activity Tracker")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Dashboard page."""
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+def get_api_key():
+    return os.environ.get("ARKHAM_API_KEY", "")
+
+
+def fetch_fund_transfers(fund_id: str, limit: int = 50) -> list:
+    """Fetch recent transfers for a fund."""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/transfers",
+            params={"base": fund_id, "limit": limit, "sortDir": "desc"},
+            headers={"API-Key": get_api_key()},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json().get("transfers", [])
+    except Exception as e:
+        print(f"Error fetching {fund_id}: {e}")
+        return []
+
+
+def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
+    """Parse a transfer into a clean activity item."""
+    # Skip if no USD value
+    usd = tx.get("historicalUSD", 0) or 0
+    if usd < 1000:  # Skip small transfers
+        return None
+
+    # Determine direction
+    to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
+    from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
+
+    if to_entity.get("id") == fund_id:
+        action = "Received"
+        counterparty = from_entity.get("name") or "Unknown"
+    elif from_entity.get("id") == fund_id:
+        action = "Sent"
+        counterparty = to_entity.get("name") or "Unknown"
+    else:
+        return None
+
+    # Parse timestamp
+    ts = tx.get("blockTimestamp", "")
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        time_ago = datetime.now(dt.tzinfo) - dt
+        if time_ago.days > 0:
+            time_str = f"{time_ago.days}d ago"
+        elif time_ago.seconds > 3600:
+            time_str = f"{time_ago.seconds // 3600}h ago"
+        else:
+            time_str = f"{time_ago.seconds // 60}m ago"
+    except:
+        time_str = "?"
+        dt = datetime.now()
+
+    return {
+        "timestamp": ts,
+        "time_ago": time_str,
+        "fund_id": fund_id,
+        "fund": fund_name,
+        "action": action,
+        "token": (tx.get("tokenSymbol") or "???").upper(),
+        "token_name": tx.get("tokenName") or "",
+        "amount": tx.get("unitValue", 0) or 0,
+        "usd": usd,
+        "counterparty": counterparty[:25],
+        "chain": tx.get("chain", ""),
+        "tx_hash": tx.get("transactionHash", ""),
+    }
+
+
+@app.get("/api/activity")
+def get_activity(
+    min_usd: int = Query(10000, description="Minimum USD value"),
+    limit_per_fund: int = Query(20, description="Max transfers per fund"),
+):
+    """Get recent activity across all funds."""
+    all_activity = []
+
+    for fund_id, fund_name in FUNDS.items():
+        transfers = fetch_fund_transfers(fund_id, limit=limit_per_fund)
+        for tx in transfers:
+            item = parse_transfer(tx, fund_id, fund_name)
+            if item and item["usd"] >= min_usd:
+                all_activity.append(item)
+
+    # Sort by timestamp desc
+    all_activity.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    # Aggregate stats
+    total_received = sum(a["usd"] for a in all_activity if a["action"] == "Received")
+    total_sent = sum(a["usd"] for a in all_activity if a["action"] == "Sent")
+
+    # Token summary
+    token_flows = {}
+    for a in all_activity:
+        token = a["token"]
+        if token not in token_flows:
+            token_flows[token] = {"received": 0, "sent": 0}
+        if a["action"] == "Received":
+            token_flows[token]["received"] += a["usd"]
+        else:
+            token_flows[token]["sent"] += a["usd"]
+
+    # Top tokens by net flow
+    top_tokens = sorted(
+        [
+            {"token": t, "net": d["received"] - d["sent"], "received": d["received"], "sent": d["sent"]}
+            for t, d in token_flows.items()
+        ],
+        key=lambda x: abs(x["net"]),
+        reverse=True,
+    )[:10]
+
+    return {
+        "activity": all_activity[:200],  # Limit response
+        "stats": {
+            "total_received": total_received,
+            "total_sent": total_sent,
+            "net_flow": total_received - total_sent,
+            "transaction_count": len(all_activity),
+        },
+        "top_tokens": top_tokens,
+    }
 
 
 @app.get("/health")
 def health():
-    """Health check."""
-    key = os.environ.get("ARKHAM_API_KEY", "")
-    return {
-        "status": "ok",
-        "api_key_set": bool(key),
-        "api_key_preview": key[:8] + "..." if key else "NOT SET",
-    }
+    key = get_api_key()
+    return {"status": "ok", "api_key_set": bool(key), "funds_tracked": len(FUNDS)}
 
 
-@app.get("/api/funds")
-def get_funds():
-    """List all funds."""
-    funds = arkham.list_funds()
-    return {"funds": funds}
-
-
-@app.get("/api/fund/{fund_id}")
-def get_fund(fund_id: str):
-    """Get fund details with holdings and P/L."""
-    # Get entity info
-    entity = arkham.get_entity(fund_id)
-    if not entity:
-        return {"error": "Fund not found"}
-
-    # Get portfolio
-    raw_portfolio = arkham.get_portfolio(fund_id)
-    holdings = arkham.parse_portfolio(raw_portfolio)
-
-    # Get transfers for cost basis
-    raw_transfers = arkham.get_transfers(fund_id, limit=200)
-
-    # Calculate cost basis and P/L
-    holdings_with_pnl = arkham.calculate_cost_basis(holdings, raw_transfers)
-
-    # Totals
-    total_value = sum(h["value_usd"] for h in holdings_with_pnl)
-    total_cost = sum(h["cost_basis"] for h in holdings_with_pnl)
-    total_pnl = sum(h["pnl"] for h in holdings_with_pnl)
-    total_pnl_pct = (total_pnl / total_cost * 100) if total_cost > 0 else 0
-
-    return {
-        "fund": {
-            "id": entity.get("id"),
-            "name": entity.get("name"),
-            "type": entity.get("type"),
-        },
-        "total_value": total_value,
-        "total_cost_basis": total_cost,
-        "total_pnl": total_pnl,
-        "total_pnl_pct": total_pnl_pct,
-        "holdings": holdings_with_pnl,
-    }
-
-
-@app.get("/api/fund/{fund_id}/activity")
-def get_fund_activity(fund_id: str):
-    """Get recent activity for a fund."""
-    raw_transfers = arkham.get_transfers(fund_id, limit=50)
-    activity = arkham.parse_transfers(raw_transfers, fund_id)
-    return {"activity": activity}
-
-
-@app.get("/api/fund/{fund_id}/flows")
-def get_fund_flows(fund_id: str):
-    """Get flow data for charts."""
-    raw_flows = arkham.get_flows(fund_id)
-
-    # Simplify for frontend
-    flows = {}
-    for chain, data in raw_flows.items():
-        if isinstance(data, list) and data:
-            # Get last 60 data points
-            recent = data[-60:]
-            flows[chain] = {
-                "total_inflow": recent[-1].get("cumulativeInflow", 0) if recent else 0,
-                "total_outflow": recent[-1].get("cumulativeOutflow", 0) if recent else 0,
-                "points": [
-                    {
-                        "time": p.get("time"),
-                        "inflow": p.get("cumulativeInflow", 0),
-                        "outflow": p.get("cumulativeOutflow", 0),
-                    }
-                    for p in recent
-                ],
-            }
-
-    return {"flows": flows}
-
-
-@app.get("/api/compare")
-def compare_funds():
-    """Compare all funds."""
-    results = []
-
-    for fund_id in arkham.FUNDS:
-        try:
-            entity = arkham.get_entity(fund_id)
-            if not entity:
-                continue
-
-            raw_portfolio = arkham.get_portfolio(fund_id)
-            holdings = arkham.parse_portfolio(raw_portfolio)
-            total_value = sum(h["value_usd"] for h in holdings)
-
-            results.append({
-                "id": fund_id,
-                "name": entity.get("name", fund_id),
-                "total_value": total_value,
-                "holdings_count": len(holdings),
-                "top_holdings": [
-                    {"symbol": h["symbol"], "value": h["value_usd"]}
-                    for h in holdings[:5]
-                ],
-            })
-        except Exception as e:
-            print(f"Error comparing {fund_id}: {e}")
-
-    results.sort(key=lambda x: x["total_value"], reverse=True)
-    return {"funds": results}
+@app.get("/", response_class=HTMLResponse)
+def index():
+    """Serve the dashboard."""
+    html_path = BASE_DIR / "templates" / "dashboard.html"
+    return html_path.read_text()
 
 
 if __name__ == "__main__":
