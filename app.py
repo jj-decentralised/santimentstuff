@@ -544,134 +544,17 @@ def force_refresh():
     return {"status": "refresh_started"}
 
 
-def fetch_token_transfers(token_symbol: str, limit: int = 500, min_usd: int = 10000) -> list:
-    """Fetch recent transfers for a specific token from Arkham."""
-    try:
-        r = httpx.get(
-            f"{BASE_URL}/transfers",
-            params={
-                "tokens": token_symbol.lower(),
-                "limit": limit,
-                "sortDir": "desc",
-                "usdGte": min_usd,
-            },
-            headers={"API-Key": get_api_key()},
-            timeout=30,
-        )
-        r.raise_for_status()
-        return r.json().get("transfers", [])
-    except Exception as e:
-        print(f"Error fetching token transfers for {token_symbol}: {e}")
-        return []
-
-
-def get_entity_info(entity_id: str) -> dict | None:
-    """Get entity info from Arkham API."""
-    try:
-        r = httpx.get(
-            f"{BASE_URL}/intelligence/entity/{entity_id}",
-            headers={"API-Key": get_api_key()},
-            timeout=10,
-        )
-        if r.status_code == 200:
-            return r.json()
-    except:
-        pass
-    return None
-
-
 @app.get("/api/token/{token_symbol}")
 def get_token_activity(token_symbol: str):
-    """Get comprehensive activity for a specific token - ALL prominent entities."""
+    """Get comprehensive activity for a specific token across all tracked entities."""
     token_symbol = token_symbol.upper()
-
-    # Collect entity activity from multiple sources
     entity_activity = {}
-    all_transactions = []
 
-    # 1. First, fetch token-specific transfers to find ALL entities touching this token
-    token_transfers = fetch_token_transfers(token_symbol, limit=500, min_usd=5000)
-
-    for tx in token_transfers:
-        usd = tx.get("historicalUSD", 0) or 0
-        if usd < 5000:
-            continue
-
-        ts = tx.get("blockTimestamp", "")
-        try:
-            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            days_ago = (datetime.now(dt.tzinfo) - dt).days
-            time_ago = f"{days_ago}d ago" if days_ago > 0 else "today"
-        except:
-            days_ago = 999
-            time_ago = "?"
-
-        to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
-        from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
-
-        # Process both sides of the transaction
-        for entity, direction in [(to_entity, "received"), (from_entity, "sent")]:
-            entity_id = entity.get("id")
-            entity_name = entity.get("name")
-            entity_type = entity.get("type", "")
-
-            if not entity_id or not entity_name:
-                continue
-
-            # Skip exchanges, bridges, DEXs, protocols
-            if entity_type in EXCLUDED_TYPES:
-                continue
-
-            # Determine if this is a notable entity
-            is_tracked = entity_id in ENTITIES or entity_id in NOTABLE_TRADERS
-            is_fund = entity_type == "fund"
-            is_individual = entity_type == "individual"
-
-            # Include: tracked entities, funds, or individuals (potential whales)
-            if not (is_tracked or is_fund or is_individual):
-                continue
-
-            if entity_id not in entity_activity:
-                entity_activity[entity_id] = {
-                    "name": entity_name,
-                    "type": entity_type,
-                    "is_tracked": is_tracked,
-                    "is_market_maker": entity_id in MARKET_MAKERS,
-                    "7d": {"received": 0, "sent": 0, "txs": []},
-                    "30d": {"received": 0, "sent": 0, "txs": []},
-                    "90d": {"received": 0, "sent": 0, "txs": []},
-                    "all_txs": [],
-                }
-
-            tx_record = {
-                "timestamp": ts,
-                "time_ago": time_ago,
-                "days_ago": days_ago,
-                "direction": direction,
-                "usd": usd,
-                "amount": tx.get("unitValue", 0) or 0,
-                "chain": tx.get("chain", ""),
-                "tx_hash": tx.get("transactionHash", ""),
-                "counterparty": from_entity.get("name") if direction == "received" else to_entity.get("name"),
-                "counterparty_type": from_entity.get("type") if direction == "received" else to_entity.get("type"),
-            }
-
-            entity_activity[entity_id]["all_txs"].append(tx_record)
-
-            if days_ago <= 7:
-                entity_activity[entity_id]["7d"][direction] += usd
-                entity_activity[entity_id]["7d"]["txs"].append(tx_record)
-            if days_ago <= 30:
-                entity_activity[entity_id]["30d"][direction] += usd
-                entity_activity[entity_id]["30d"]["txs"].append(tx_record)
-            if days_ago <= 90:
-                entity_activity[entity_id]["90d"][direction] += usd
-                entity_activity[entity_id]["90d"]["txs"].append(tx_record)
-
-    # 2. Also check our tracked entities for this token (catches more data)
+    # All entities to check (funds + notable traders)
     all_entities = {**ENTITIES, **NOTABLE_TRADERS}
 
     def check_entity(entity_id: str, entity_name: str):
+        """Fetch transfers for an entity and filter for the target token."""
         transfers = fetch_fund_transfers(entity_id, limit=100, min_usd=1000)
         results = []
         for tx in transfers:
@@ -681,14 +564,19 @@ def get_token_activity(token_symbol: str):
             results.append(tx)
         return entity_id, results
 
-    # Concurrent fetch for tracked entities
+    # Concurrent fetch for all tracked entities
     with ThreadPoolExecutor(max_workers=15) as executor:
         futures = {executor.submit(check_entity, eid, ename): eid for eid, ename in all_entities.items()}
         for future in as_completed(futures):
             entity_id = futures[future]
             try:
                 eid, transfers = future.result()
+                if not transfers:
+                    continue
+
                 entity_name = all_entities.get(eid, eid)
+                is_fund = eid in ENTITIES
+                is_mm = eid in MARKET_MAKERS
 
                 for tx in transfers:
                     usd = tx.get("historicalUSD", 0) or 0
@@ -721,9 +609,9 @@ def get_token_activity(token_symbol: str):
                     if eid not in entity_activity:
                         entity_activity[eid] = {
                             "name": entity_name,
-                            "type": "fund" if eid in ENTITIES else "individual",
+                            "type": "fund" if is_fund else "individual",
                             "is_tracked": True,
-                            "is_market_maker": eid in MARKET_MAKERS,
+                            "is_market_maker": is_mm,
                             "7d": {"received": 0, "sent": 0, "txs": []},
                             "30d": {"received": 0, "sent": 0, "txs": []},
                             "90d": {"received": 0, "sent": 0, "txs": []},
