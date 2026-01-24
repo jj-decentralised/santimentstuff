@@ -828,6 +828,180 @@ def get_fund_activity(fund_id: str):
     }
 
 
+def fetch_fund_portfolio(fund_id: str) -> dict:
+    """Fetch portfolio/holdings for a fund from Arkham."""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/portfolio/entity/{fund_id}",
+            headers={"API-Key": get_api_key()},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            return r.json()
+    except Exception as e:
+        print(f"Error fetching portfolio for {fund_id}: {e}")
+    return {}
+
+
+def calculate_fund_pnl(fund_id: str, fund_name: str) -> dict:
+    """Calculate P/L for a fund based on transfers and current holdings."""
+    # Fetch transfers to calculate cost basis
+    transfers = fetch_fund_transfers(fund_id, limit=500, min_usd=100)
+
+    # Fetch current portfolio
+    portfolio = fetch_fund_portfolio(fund_id)
+
+    # Track token flows from transfers
+    token_flows = {}  # token -> {bought_usd, sold_usd, bought_amount, sold_amount}
+
+    for tx in transfers:
+        token = (tx.get("tokenSymbol") or "").upper()
+        if not token:
+            continue
+
+        usd = tx.get("historicalUSD", 0) or 0
+        amount = tx.get("unitValue", 0) or 0
+
+        to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
+        from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
+
+        if token not in token_flows:
+            token_flows[token] = {"bought_usd": 0, "sold_usd": 0, "bought_amount": 0, "sold_amount": 0}
+
+        if to_entity.get("id") == fund_id:
+            # Received = bought
+            token_flows[token]["bought_usd"] += usd
+            token_flows[token]["bought_amount"] += amount
+        elif from_entity.get("id") == fund_id:
+            # Sent = sold
+            token_flows[token]["sold_usd"] += usd
+            token_flows[token]["sold_amount"] += amount
+
+    # Parse portfolio for current holdings
+    current_holdings = {}
+    portfolio_value = 0
+
+    # Portfolio structure varies - try different formats
+    holdings_list = portfolio.get("holdings", []) or portfolio.get("tokens", []) or []
+    if isinstance(portfolio, dict) and "chains" in portfolio:
+        # Flatten chain-based portfolio
+        for chain_data in portfolio.get("chains", {}).values():
+            if isinstance(chain_data, dict):
+                holdings_list.extend(chain_data.get("tokens", []))
+
+    for holding in holdings_list:
+        if isinstance(holding, dict):
+            token = (holding.get("symbol") or holding.get("token", {}).get("symbol") or "").upper()
+            value = holding.get("valueUsd") or holding.get("value") or holding.get("usdValue") or 0
+            amount = holding.get("amount") or holding.get("balance") or 0
+
+            if token and value > 100:  # Only significant holdings
+                current_holdings[token] = {
+                    "amount": amount,
+                    "current_value": value,
+                }
+                portfolio_value += value
+
+    # Calculate P/L per token
+    token_pnl = []
+    total_cost_basis = 0
+    total_current_value = 0
+    total_realized_pnl = 0
+
+    for token, flows in token_flows.items():
+        net_amount = flows["bought_amount"] - flows["sold_amount"]
+        cost_basis = flows["bought_usd"]
+        proceeds = flows["sold_usd"]
+
+        # Realized P/L from sales
+        if flows["sold_amount"] > 0 and flows["bought_amount"] > 0:
+            avg_cost = flows["bought_usd"] / flows["bought_amount"] if flows["bought_amount"] > 0 else 0
+            realized_pnl = proceeds - (avg_cost * flows["sold_amount"])
+        else:
+            realized_pnl = 0
+
+        # Current value from portfolio or estimate
+        current_value = 0
+        if token in current_holdings:
+            current_value = current_holdings[token]["current_value"]
+        elif net_amount > 0 and flows["bought_amount"] > 0:
+            # Estimate: use avg buy price as current price (conservative)
+            avg_price = flows["bought_usd"] / flows["bought_amount"]
+            current_value = net_amount * avg_price
+
+        # Unrealized P/L
+        remaining_cost_basis = cost_basis * (net_amount / flows["bought_amount"]) if flows["bought_amount"] > 0 else 0
+        unrealized_pnl = current_value - remaining_cost_basis if net_amount > 0 else 0
+
+        if abs(cost_basis) > 1000 or abs(current_value) > 1000:
+            token_pnl.append({
+                "token": token,
+                "bought_usd": flows["bought_usd"],
+                "sold_usd": flows["sold_usd"],
+                "net_amount": net_amount,
+                "cost_basis": remaining_cost_basis,
+                "current_value": current_value,
+                "realized_pnl": realized_pnl,
+                "unrealized_pnl": unrealized_pnl,
+                "total_pnl": realized_pnl + unrealized_pnl,
+            })
+            total_cost_basis += remaining_cost_basis
+            total_current_value += current_value
+            total_realized_pnl += realized_pnl
+
+    token_pnl.sort(key=lambda x: abs(x["total_pnl"]), reverse=True)
+
+    return {
+        "fund_id": fund_id,
+        "name": fund_name,
+        "token_count": len([t for t in token_pnl if t["current_value"] > 0]),
+        "portfolio_value": portfolio_value if portfolio_value > 0 else total_current_value,
+        "total_cost_basis": total_cost_basis,
+        "total_current_value": total_current_value,
+        "total_realized_pnl": total_realized_pnl,
+        "total_unrealized_pnl": total_current_value - total_cost_basis,
+        "total_pnl": total_realized_pnl + (total_current_value - total_cost_basis),
+        "tokens": token_pnl[:15],
+    }
+
+
+@app.get("/api/fund-pnl")
+def get_all_fund_pnl():
+    """Get P/L data for all tracked funds."""
+    results = []
+
+    # Fetch P/L for each fund concurrently
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(calculate_fund_pnl, fid, fname): fid for fid, fname in ENTITIES.items()}
+        for future in as_completed(futures):
+            fund_id = futures[future]
+            try:
+                result = future.result()
+                if result["total_cost_basis"] > 0 or result["portfolio_value"] > 0:
+                    results.append(result)
+            except Exception as e:
+                print(f"Error calculating P/L for {fund_id}: {e}")
+
+    # Sort by portfolio value
+    results.sort(key=lambda x: x["portfolio_value"], reverse=True)
+
+    return {
+        "funds": results,
+        "summary": {
+            "total_funds": len(results),
+            "total_portfolio_value": sum(f["portfolio_value"] for f in results),
+            "total_pnl": sum(f["total_pnl"] for f in results),
+        }
+    }
+
+
+@app.get("/api/fund-pnl/{fund_id}")
+def get_fund_pnl(fund_id: str):
+    """Get detailed P/L for a specific fund."""
+    fund_name = ENTITIES.get(fund_id, NOTABLE_TRADERS.get(fund_id, fund_id))
+    return calculate_fund_pnl(fund_id, fund_name)
+
+
 @app.get("/health")
 def health():
     key = get_api_key()
@@ -849,6 +1023,13 @@ def health():
 def index():
     """Serve the dashboard."""
     html_path = BASE_DIR / "templates" / "dashboard.html"
+    return html_path.read_text()
+
+
+@app.get("/pnl", response_class=HTMLResponse)
+def pnl_page():
+    """Serve the Fund P/L page."""
+    html_path = BASE_DIR / "templates" / "pnl.html"
     return html_path.read_text()
 
 
