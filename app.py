@@ -1002,6 +1002,183 @@ def get_fund_pnl(fund_id: str):
     return calculate_fund_pnl(fund_id, fund_name)
 
 
+def generate_signals():
+    """Generate all actionable signals from cached activity data."""
+    with cache_lock:
+        if cache["activity"] is None:
+            return None
+        data = cache["activity"].copy()
+
+    activity = data.get("activity", [])
+    if not activity:
+        return None
+
+    now = datetime.now()
+    signals = {
+        "accumulation_alerts": [],  # 3+ funds buying same token in 24h
+        "exit_signals": [],         # Multiple funds sending to exchanges
+        "conviction_plays": [],     # Funds adding to existing positions
+        "pre_pump": [],             # Unusual inflow spikes
+        "smart_money_buys": [],     # What profitable traders are buying
+    }
+
+    # Group activity by token
+    token_activity = {}
+    for tx in activity:
+        token = tx.get("token", "")
+        if not token or token in ["USDT", "USDC", "DAI", "USDE"]:  # Skip stables
+            continue
+
+        if token not in token_activity:
+            token_activity[token] = {"buys": [], "sells": [], "exchange_sells": []}
+
+        if tx.get("action") == "Received":
+            token_activity[token]["buys"].append(tx)
+        else:
+            token_activity[token]["sells"].append(tx)
+            if tx.get("is_exchange"):
+                token_activity[token]["exchange_sells"].append(tx)
+
+    # 1. ACCUMULATION ALERTS - 3+ funds buying same token in 24h
+    for token, data in token_activity.items():
+        buys = data["buys"]
+        # Filter to last 24h
+        recent_buys = [b for b in buys if "h" in b.get("time_ago", "") or b.get("time_ago") == "today"]
+
+        unique_funds = list(set(b["fund"] for b in recent_buys))
+        if len(unique_funds) >= 3:
+            total_usd = sum(b["usd"] for b in recent_buys)
+            signals["accumulation_alerts"].append({
+                "token": token,
+                "fund_count": len(unique_funds),
+                "funds": unique_funds[:5],
+                "total_usd": total_usd,
+                "buys": len(recent_buys),
+                "strength": "STRONG" if len(unique_funds) >= 5 else "MODERATE",
+            })
+
+    # Sort by fund count
+    signals["accumulation_alerts"].sort(key=lambda x: x["fund_count"], reverse=True)
+
+    # 2. EXIT SIGNALS - Multiple funds sending to exchanges
+    for token, data in token_activity.items():
+        exchange_sells = data["exchange_sells"]
+        if len(exchange_sells) >= 2:
+            unique_funds = list(set(s["fund"] for s in exchange_sells))
+            if len(unique_funds) >= 2:
+                total_usd = sum(s["usd"] for s in exchange_sells)
+                signals["exit_signals"].append({
+                    "token": token,
+                    "fund_count": len(unique_funds),
+                    "funds": unique_funds[:5],
+                    "total_usd": total_usd,
+                    "severity": "HIGH" if len(unique_funds) >= 3 or total_usd >= 1000000 else "MEDIUM",
+                })
+
+    signals["exit_signals"].sort(key=lambda x: x["total_usd"], reverse=True)
+
+    # 3. CONVICTION PLAYS - Funds with multiple buys of same token (adding to position)
+    fund_token_buys = {}
+    for tx in activity:
+        if tx.get("action") != "Received":
+            continue
+        token = tx.get("token", "")
+        if not token or token in ["USDT", "USDC", "DAI", "USDE"]:
+            continue
+
+        fund = tx.get("fund", "")
+        key = f"{fund}|{token}"
+        if key not in fund_token_buys:
+            fund_token_buys[key] = {"fund": fund, "fund_id": tx.get("fund_id"), "token": token, "buys": [], "total_usd": 0}
+        fund_token_buys[key]["buys"].append(tx)
+        fund_token_buys[key]["total_usd"] += tx.get("usd", 0)
+
+    for key, data in fund_token_buys.items():
+        if len(data["buys"]) >= 2 and data["total_usd"] >= 50000:
+            signals["conviction_plays"].append({
+                "fund": data["fund"],
+                "fund_id": data["fund_id"],
+                "token": data["token"],
+                "buy_count": len(data["buys"]),
+                "total_usd": data["total_usd"],
+                "conviction": "HIGH" if len(data["buys"]) >= 3 or data["total_usd"] >= 500000 else "MEDIUM",
+            })
+
+    signals["conviction_plays"].sort(key=lambda x: x["total_usd"], reverse=True)
+
+    # 4. PRE-PUMP DETECTION - Tokens with high buy/sell ratio and multiple funds
+    for token, data in token_activity.items():
+        buy_usd = sum(b["usd"] for b in data["buys"])
+        sell_usd = sum(s["usd"] for s in data["sells"])
+
+        if buy_usd < 100000:  # Minimum threshold
+            continue
+
+        unique_buyers = len(set(b["fund"] for b in data["buys"]))
+
+        # Strong buy signal: high buy/sell ratio + multiple funds
+        if sell_usd > 0:
+            ratio = buy_usd / sell_usd
+        else:
+            ratio = 10 if buy_usd > 0 else 0
+
+        if ratio >= 3 and unique_buyers >= 2:
+            signals["pre_pump"].append({
+                "token": token,
+                "buy_usd": buy_usd,
+                "sell_usd": sell_usd,
+                "ratio": round(ratio, 1),
+                "unique_buyers": unique_buyers,
+                "funds": list(set(b["fund"] for b in data["buys"]))[:5],
+                "signal_strength": "STRONG" if ratio >= 5 and unique_buyers >= 3 else "MODERATE",
+            })
+
+    signals["pre_pump"].sort(key=lambda x: x["ratio"] * x["unique_buyers"], reverse=True)
+
+    # 5. SMART MONEY BUYS - Recent buys from notable traders
+    notable_ids = set(NOTABLE_TRADERS.keys())
+    smart_buys = []
+    for tx in activity:
+        if tx.get("action") != "Received":
+            continue
+        if tx.get("fund_id") in notable_ids:
+            token = tx.get("token", "")
+            if token and token not in ["USDT", "USDC", "DAI", "USDE"]:
+                smart_buys.append({
+                    "trader": tx.get("fund"),
+                    "trader_id": tx.get("fund_id"),
+                    "token": token,
+                    "usd": tx.get("usd", 0),
+                    "time_ago": tx.get("time_ago"),
+                })
+
+    signals["smart_money_buys"] = smart_buys[:20]
+
+    return signals
+
+
+@app.get("/api/signals")
+def get_signals():
+    """Get all actionable trading signals."""
+    signals = generate_signals()
+    if signals is None:
+        return {
+            "loading": True,
+            "message": "Cache is building, please wait...",
+        }
+    return {
+        "signals": signals,
+        "generated_at": datetime.now().isoformat(),
+        "summary": {
+            "accumulation_alerts": len(signals["accumulation_alerts"]),
+            "exit_signals": len(signals["exit_signals"]),
+            "conviction_plays": len(signals["conviction_plays"]),
+            "pre_pump": len(signals["pre_pump"]),
+            "smart_money_buys": len(signals["smart_money_buys"]),
+        }
+    }
+
+
 @app.get("/health")
 def health():
     key = get_api_key()
@@ -1030,6 +1207,13 @@ def index():
 def pnl_page():
     """Serve the Fund P/L page."""
     html_path = BASE_DIR / "templates" / "pnl.html"
+    return html_path.read_text()
+
+
+@app.get("/signals", response_class=HTMLResponse)
+def signals_page():
+    """Serve the Signals page."""
+    html_path = BASE_DIR / "templates" / "signals.html"
     return html_path.read_text()
 
 
