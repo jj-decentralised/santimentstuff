@@ -87,12 +87,17 @@ def get_api_key():
     return os.environ.get("ARKHAM_API_KEY", "")
 
 
-def fetch_fund_transfers(fund_id: str, limit: int = 50) -> list:
-    """Fetch recent transfers for a fund."""
+def fetch_fund_transfers(fund_id: str, limit: int = 50, min_usd: int = 10000) -> list:
+    """Fetch recent transfers for a fund with minimum USD filter."""
     try:
         r = httpx.get(
             f"{BASE_URL}/transfers",
-            params={"base": fund_id, "limit": limit, "sortDir": "desc"},
+            params={
+                "base": fund_id,
+                "limit": limit,
+                "sortDir": "desc",
+                "usdGte": min_usd,  # Filter at API level for efficiency
+            },
             headers={"API-Key": get_api_key()},
             timeout=30,
         )
@@ -157,16 +162,17 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
 @app.get("/api/activity")
 def get_activity(
     min_usd: int = Query(10000, description="Minimum USD value"),
-    limit_per_entity: int = Query(15, description="Max transfers per entity"),
+    limit_per_entity: int = Query(30, description="Max transfers per entity"),
 ):
     """Get recent activity across all entities."""
     all_activity = []
 
     for entity_id, entity_name in ENTITIES.items():
-        transfers = fetch_fund_transfers(entity_id, limit=limit_per_entity)
+        # Pass min_usd to API for efficient filtering
+        transfers = fetch_fund_transfers(entity_id, limit=limit_per_entity, min_usd=min_usd)
         for tx in transfers:
             item = parse_transfer(tx, entity_id, entity_name)
-            if item and item["usd"] >= min_usd:
+            if item:  # Already filtered by API
                 all_activity.append(item)
 
     # Sort by timestamp desc
@@ -218,7 +224,8 @@ def get_token_activity(token_symbol: str):
     entity_activity = {}
 
     for entity_id, entity_name in ENTITIES.items():
-        transfers = fetch_fund_transfers(entity_id, limit=100)
+        # Use lower min_usd for token drilldown to capture more activity
+        transfers = fetch_fund_transfers(entity_id, limit=100, min_usd=1000)
 
         for tx in transfers:
             tx_token = (tx.get("tokenSymbol") or "").upper()
@@ -226,8 +233,6 @@ def get_token_activity(token_symbol: str):
                 continue
 
             usd = tx.get("historicalUSD", 0) or 0
-            if usd < 1000:
-                continue
 
             # Parse timestamp
             ts = tx.get("blockTimestamp", "")
