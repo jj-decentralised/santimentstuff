@@ -18,11 +18,9 @@ BASE_DIR = Path(__file__).parent
 CACHE_REFRESH_SECONDS = 300  # 5 minutes
 
 # Verified fund entities from Arkham Intelligence (type: "fund")
-# These IDs are verified to exist and be classified as funds in Arkham's database
+# EXCLUDES market makers - we only want real investment signals
 ENTITIES = {
     # Major VCs & Crypto Funds
-    "jump-trading": "Jump Crypto",
-    "wintermute": "Wintermute",
     "a16z": "a16z",
     "paradigm-capital": "Paradigm",
     "pantera-capital": "Pantera Capital",
@@ -36,6 +34,10 @@ ENTITIES = {
     "placeholder-vc": "Placeholder VC",
     "hack-vc": "Hack VC",
     "banklessvc": "Bankless VC",
+    "1confirmation": "1confirmation",
+    "spartan-group": "Spartan Group",
+    "framework-ventures": "Framework Ventures",
+    "binance-labs": "YZi Labs (Binance Labs)",
     # Asset Managers & Institutional
     "grayscale": "Grayscale",
     "galaxy-digital": "Galaxy Digital",
@@ -46,22 +48,7 @@ ENTITIES = {
     "delphi-digital": "Delphi Digital",
     "maven-11": "Maven 11",
     "mirana-ventures": "Mirana Ventures",
-    # Market Makers (type: fund)
-    "cumberland": "Cumberland DRW",
-    "dwf-labs": "DWF Labs",
-    "tokka-labs": "Tokka Labs",
-    "akuna-capital": "Akuna Capital",
     "winklevoss-capital": "Winklevoss Capital",
-    # Additional VCs
-    "1confirmation": "1confirmation",
-    "spartan-group": "Spartan Group",
-    "framework-ventures": "Framework Ventures",
-    "binance-labs": "YZi Labs (Binance Labs)",
-    # Market Makers (additional)
-    "gsr-markets": "GSR Markets",
-    "amber": "Amber Group",
-    "b2c2": "B2C2 Group",
-    "jane-street": "Jane Street",
     # Institutional ETF
     "blackrock": "BlackRock",
     "fidelity": "Fidelity FBTC ETF",
