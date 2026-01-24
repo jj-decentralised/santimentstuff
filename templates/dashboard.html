@@ -282,9 +282,9 @@
         .modal-content {
             background: #fff;
             border-radius: 12px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 80vh;
+            width: 95%;
+            max-width: 1000px;
+            max-height: 85vh;
             overflow-y: auto;
         }
         .modal-header {
@@ -742,56 +742,130 @@
         async function showTokenDetail(token) {
             const modal = document.getElementById('tokenModal');
             const body = document.getElementById('modalBody');
-            document.getElementById('modalTitle').textContent = `${token} - Fund Activity`;
-            body.innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('modalTitle').textContent = `${token} - Who's Touching It`;
+            body.innerHTML = '<div class="loading">Loading comprehensive data...</div>';
             modal.classList.add('active');
 
             try {
                 const res = await fetch(`/api/token/${token}`);
                 const data = await res.json();
 
+                const typeLabel = (type) => {
+                    const labels = { fund: 'Fund', individual: 'Trader', '': 'Unknown' };
+                    return labels[type] || type;
+                };
+
+                const entityRow = (e, showType = true) => `
+                    <tr class="${e.is_market_maker ? 'mm-row' : ''}" style="${e.is_market_maker ? 'opacity:0.7' : ''}">
+                        <td>
+                            <span>${e.name}</span>
+                            ${showType ? `<span class="entity-type-badge ${e.type}">${typeLabel(e.type)}${e.is_market_maker ? ' (MM)' : ''}</span>` : ''}
+                        </td>
+                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
+                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
+                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td>
+                        <td style="font-size:0.6rem;color:#86868b">${e.tx_count_30d || 0} txs</td>
+                    </tr>`;
+
                 let html = `
-                    <div class="summary-grid">
+                    <style>
+                        .entity-type-badge { font-size:0.55rem; padding:0.1rem 0.3rem; border-radius:3px; margin-left:0.3rem; }
+                        .entity-type-badge.fund { background:#e3f2fd; color:#1565c0; }
+                        .entity-type-badge.individual { background:#fff3e0; color:#e65100; }
+                        .tx-timeline { max-height:200px; overflow-y:auto; font-size:0.7rem; }
+                        .tx-row { display:grid; grid-template-columns:60px 100px 60px 70px 80px 1fr; gap:0.3rem; padding:0.3rem 0.5rem; border-bottom:1px solid #f5f5f5; align-items:center; }
+                        .tx-row:hover { background:#fafafa; }
+                        .tx-entity { color:#5856d6; font-weight:500; }
+                        .tx-dir { font-size:0.6rem; font-weight:600; }
+                        .tx-dir.received { color:#34c759; }
+                        .tx-dir.sent { color:#ff3b30; }
+                        .section-tabs { display:flex; gap:0.5rem; margin-bottom:0.5rem; }
+                        .section-tab { padding:0.3rem 0.6rem; border-radius:4px; font-size:0.7rem; cursor:pointer; border:1px solid #e8e8ed; }
+                        .section-tab.active { background:#0071e3; color:white; border-color:#0071e3; }
+                    </style>
+                    <div class="summary-grid" style="grid-template-columns:repeat(6,1fr)">
                         <div class="summary-item">
-                            <div class="summary-label">Accumulated (30d)</div>
+                            <div class="summary-label">Net (30d)</div>
+                            <div class="summary-value" style="color:${data.summary.total_accumulated_30d - data.summary.total_sold_30d >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(data.summary.total_accumulated_30d - data.summary.total_sold_30d)}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Accumulated</div>
                             <div class="summary-value" style="color:#34c759">${fmt.usd(data.summary.total_accumulated_30d)}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Sold (30d)</div>
+                            <div class="summary-label">Sold</div>
                             <div class="summary-value" style="color:#ff3b30">${fmt.usd(data.summary.total_sold_30d)}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Buyers</div>
-                            <div class="summary-value">${data.summary.accumulator_count}</div>
+                            <div class="summary-label">Total Entities</div>
+                            <div class="summary-value">${data.summary.total_entities}</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-label">Sellers</div>
-                            <div class="summary-value">${data.summary.seller_count}</div>
+                            <div class="summary-label">Smart $ Buying</div>
+                            <div class="summary-value" style="color:#34c759">${data.summary.smart_money_accumulating}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Smart $ Selling</div>
+                            <div class="summary-value" style="color:#ff3b30">${data.summary.smart_money_selling}</div>
                         </div>
                     </div>
                 `;
 
-                if (data.accumulators.length) {
-                    html += `<div class="section-title green">Accumulators</div>
-                        <table class="data-table"><thead><tr><th>Fund</th><th>7D</th><th>30D</th><th>90D</th></tr></thead><tbody>
-                        ${data.accumulators.map(e => `<tr><td>${e.name}</td>
-                            <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
-                            <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
-                            <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td></tr>`).join('')}
+                // Smart Money section (non-market makers)
+                const smartAccum = data.smart_money?.accumulators || [];
+                const smartSell = data.smart_money?.sellers || [];
+
+                if (smartAccum.length || smartSell.length) {
+                    html += `<div class="section-title" style="color:#5856d6">Smart Money (Funds & Traders)</div>`;
+
+                    if (smartAccum.length) {
+                        html += `<div style="font-size:0.65rem;color:#34c759;font-weight:600;margin:0.5rem 0 0.3rem">ACCUMULATING</div>
+                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>90D</th><th>Activity</th></tr></thead><tbody>
+                            ${smartAccum.map(e => entityRow(e)).join('')}
+                            </tbody></table>`;
+                    }
+
+                    if (smartSell.length) {
+                        html += `<div style="font-size:0.65rem;color:#ff3b30;font-weight:600;margin:0.5rem 0 0.3rem">DISTRIBUTING</div>
+                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>90D</th><th>Activity</th></tr></thead><tbody>
+                            ${smartSell.map(e => entityRow(e)).join('')}
+                            </tbody></table>`;
+                    }
+                }
+
+                // Market Makers section
+                const mmAccum = data.market_makers?.accumulators || [];
+                const mmSell = data.market_makers?.sellers || [];
+
+                if (mmAccum.length || mmSell.length) {
+                    html += `<div class="section-title" style="color:#86868b;margin-top:1rem">Market Makers (for context)</div>
+                        <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>90D</th><th>Activity</th></tr></thead><tbody>
+                        ${[...mmAccum, ...mmSell].map(e => entityRow(e, false)).join('')}
                         </tbody></table>`;
                 }
 
-                if (data.sellers.length) {
-                    html += `<div class="section-title red">Sellers</div>
-                        <table class="data-table"><thead><tr><th>Fund</th><th>7D</th><th>30D</th><th>90D</th></tr></thead><tbody>
-                        ${data.sellers.map(e => `<tr><td>${e.name}</td>
-                            <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
-                            <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
-                            <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td></tr>`).join('')}
-                        </tbody></table>`;
+                // Recent transactions timeline
+                const txs = data.recent_transactions || [];
+                if (txs.length) {
+                    html += `<div class="section-title" style="margin-top:1rem">Recent Transactions</div>
+                        <div class="tx-timeline">
+                            ${txs.slice(0, 30).map(tx => `
+                                <div class="tx-row">
+                                    <span style="font-size:0.6rem;color:#86868b">${tx.time_ago}</span>
+                                    <span class="tx-entity">${tx.entity}</span>
+                                    <span class="tx-dir ${tx.direction}">${tx.direction === 'received' ? 'IN' : 'OUT'}</span>
+                                    <span style="font-family:'SF Mono',monospace">${fmt.usd(tx.usd)}</span>
+                                    <span style="font-size:0.6rem;color:#86868b">${tx.counterparty || '-'}</span>
+                                    <span style="font-size:0.55rem;background:#e8e8ed;padding:0.1rem 0.2rem;border-radius:2px">${tx.chain}</span>
+                                </div>
+                            `).join('')}
+                        </div>`;
                 }
 
-                if (!data.accumulators.length && !data.sellers.length) html += '<div class="loading">No significant activity</div>';
+                if (!data.accumulators.length && !data.sellers.length) {
+                    html += '<div class="loading" style="margin-top:1rem">No significant activity found for this token</div>';
+                }
+
                 body.innerHTML = html;
             } catch (e) {
                 body.innerHTML = `<div class="error">Error: ${e.message}</div>`;
