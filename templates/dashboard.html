@@ -872,51 +872,67 @@
             }
         }
 
-        function showFundDetail(fundId) {
-            if (!cachedData?.activity) return;
+        async function showFundDetail(fundId) {
             const modal = document.getElementById('fundModal');
             const body = document.getElementById('fundModalBody');
-            const fa = cachedData.activity.filter(a => a.fund_id === fundId);
-            const name = fa[0]?.fund || fundId;
-
-            document.getElementById('fundModalTitle').textContent = `${name}`;
-
-            if (!fa.length) {
-                body.innerHTML = '<div class="loading">No activity</div>';
-            } else {
-                const recv = fa.filter(a => a.action === 'Received').reduce((s, a) => s + a.usd, 0);
-                const sent = fa.filter(a => a.action === 'Sent').reduce((s, a) => s + a.usd, 0);
-                const exSent = fa.filter(a => a.action === 'Sent' && a.is_exchange).reduce((s, a) => s + a.usd, 0);
-
-                const tm = {};
-                fa.forEach(a => {
-                    if (!tm[a.token]) tm[a.token] = { r: 0, s: 0 };
-                    if (a.action === 'Received') tm[a.token].r += a.usd; else tm[a.token].s += a.usd;
-                });
-                const tokens = Object.entries(tm).map(([t, d]) => ({ token: t, net: d.r - d.s, ...d })).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
-
-                body.innerHTML = `
-                    <div class="summary-grid">
-                        <div class="summary-item"><div class="summary-label">Received</div><div class="summary-value" style="color:#34c759">${fmt.usd(recv)}</div></div>
-                        <div class="summary-item"><div class="summary-label">Sent</div><div class="summary-value" style="color:#ff3b30">${fmt.usd(sent)}</div></div>
-                        <div class="summary-item"><div class="summary-label">Net</div><div class="summary-value" style="color:${recv-sent>=0?'#34c759':'#ff3b30'}">${fmt.signed(recv-sent)}</div></div>
-                        <div class="summary-item"><div class="summary-label">To Exchanges</div><div class="summary-value" style="color:#ff9500">${fmt.usd(exSent)}</div></div>
-                    </div>
-                    <div class="section-title">Tokens</div>
-                    <table class="data-table"><thead><tr><th>Token</th><th>In</th><th>Out</th><th>Net</th></tr></thead><tbody>
-                    ${tokens.slice(0,12).map(t => `<tr><td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${t.token}')">${t.token}</td>
-                        <td class="positive">${fmt.usd(t.r)}</td><td class="negative">${fmt.usd(t.s)}</td>
-                        <td class="${t.net>=0?'positive':'negative'}">${fmt.signed(t.net)}</td></tr>`).join('')}
-                    </tbody></table>
-                    <div class="section-title">Recent</div>
-                    <table class="data-table"><thead><tr><th>Time</th><th>Action</th><th>Token</th><th>USD</th></tr></thead><tbody>
-                    ${fa.slice(0,15).map(a => `<tr><td style="font-family:'SF Mono',monospace">${a.time_ago}</td>
-                        <td class="${a.action==='Received'?'positive':'negative'}">${a.action}</td>
-                        <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${a.token}')">${a.token}</td>
-                        <td>${fmt.usd(a.usd)}</td></tr>`).join('')}
-                    </tbody></table>`;
-            }
+            document.getElementById('fundModalTitle').textContent = fundId;
+            body.innerHTML = '<div class="loading">Loading fund data...</div>';
             modal.classList.add('active');
+
+            try {
+                const res = await fetch(`/api/fund/${fundId}`);
+                const data = await res.json();
+
+                document.getElementById('fundModalTitle').textContent = data.name || fundId;
+
+                const s = data.stats;
+                const tokens = data.tokens || [];
+                const txs = data.transactions || [];
+
+                let html = `
+                    <div class="summary-grid" style="grid-template-columns:repeat(5,1fr)">
+                        <div class="summary-item"><div class="summary-label">Received</div><div class="summary-value" style="color:#34c759">${fmt.usd(s.received)}</div></div>
+                        <div class="summary-item"><div class="summary-label">Sent</div><div class="summary-value" style="color:#ff3b30">${fmt.usd(s.sent)}</div></div>
+                        <div class="summary-item"><div class="summary-label">Net</div><div class="summary-value" style="color:${s.net>=0?'#34c759':'#ff3b30'}">${fmt.signed(s.net)}</div></div>
+                        <div class="summary-item"><div class="summary-label">To Exchanges</div><div class="summary-value" style="color:#ff9500">${fmt.usd(s.exchange_sent)}</div></div>
+                        <div class="summary-item"><div class="summary-label">Tokens</div><div class="summary-value">${s.unique_tokens}</div></div>
+                    </div>
+                `;
+
+                if (tokens.length) {
+                    html += `<div class="section-title">Token Activity</div>
+                        <table class="data-table"><thead><tr><th>Token</th><th>In</th><th>Out</th><th>Net</th></tr></thead><tbody>
+                        ${tokens.slice(0,15).map(t => `<tr>
+                            <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${t.token}')">${t.token}</td>
+                            <td class="positive">${fmt.usd(t.received)}</td>
+                            <td class="negative">${fmt.usd(t.sent)}</td>
+                            <td class="${t.net>=0?'positive':'negative'}">${fmt.signed(t.net)}</td>
+                        </tr>`).join('')}
+                        </tbody></table>`;
+                }
+
+                if (txs.length) {
+                    html += `<div class="section-title">Recent Transactions (${s.tx_count} total)</div>
+                        <div style="max-height:200px;overflow-y:auto">
+                        <table class="data-table"><thead><tr><th>Time</th><th>Action</th><th>Token</th><th>USD</th><th>Counterparty</th></tr></thead><tbody>
+                        ${txs.slice(0,25).map(tx => `<tr>
+                            <td style="font-family:'SF Mono',monospace;font-size:0.65rem">${tx.time_ago}</td>
+                            <td class="${tx.direction==='received'?'positive':'negative'}">${tx.direction === 'received' ? 'IN' : 'OUT'}</td>
+                            <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${tx.token}')">${tx.token}</td>
+                            <td>${fmt.usd(tx.usd)}</td>
+                            <td style="font-size:0.65rem;color:${tx.is_exchange?'#0071e3':'#86868b'}">${tx.counterparty?.slice(0,20) || '-'}</td>
+                        </tr>`).join('')}
+                        </tbody></table></div>`;
+                }
+
+                if (!tokens.length && !txs.length) {
+                    html += '<div class="loading">No recent activity found for this entity</div>';
+                }
+
+                body.innerHTML = html;
+            } catch (e) {
+                body.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
         }
 
         function closeModal() { document.getElementById('tokenModal').classList.remove('active'); }

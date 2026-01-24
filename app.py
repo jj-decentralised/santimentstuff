@@ -734,6 +734,113 @@ def get_token_activity(token_symbol: str):
     }
 
 
+@app.get("/api/fund/{fund_id}")
+def get_fund_activity(fund_id: str):
+    """Get comprehensive activity for a specific fund/entity."""
+    all_entities = {**ENTITIES, **NOTABLE_TRADERS}
+    fund_name = all_entities.get(fund_id, fund_id)
+
+    # Fetch transfers for this fund
+    transfers = fetch_fund_transfers(fund_id, limit=200, min_usd=1000)
+
+    if not transfers:
+        return {
+            "fund_id": fund_id,
+            "name": fund_name,
+            "tokens": [],
+            "transactions": [],
+            "stats": {"received": 0, "sent": 0, "net": 0, "tx_count": 0, "exchange_sent": 0, "unique_tokens": 0},
+        }
+
+    # Process transfers
+    token_data = {}
+    transactions = []
+
+    for tx in transfers:
+        usd = tx.get("historicalUSD", 0) or 0
+        if usd < 1000:
+            continue
+
+        ts = tx.get("blockTimestamp", "")
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            days_ago = (datetime.now(dt.tzinfo) - dt).days
+            time_ago = f"{days_ago}d ago" if days_ago > 0 else "today"
+        except:
+            days_ago = 999
+            time_ago = "?"
+
+        to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
+        from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
+
+        if to_entity.get("id") == fund_id:
+            direction = "received"
+            counterparty = from_entity.get("name") or "Unknown"
+            counterparty_type = from_entity.get("type") or ""
+        elif from_entity.get("id") == fund_id:
+            direction = "sent"
+            counterparty = to_entity.get("name") or "Unknown"
+            counterparty_type = to_entity.get("type") or ""
+        else:
+            continue
+
+        token = (tx.get("tokenSymbol") or "???").upper()
+        is_exchange = counterparty_type == "cex"
+
+        # Track token activity
+        if token not in token_data:
+            token_data[token] = {"received": 0, "sent": 0}
+
+        token_data[token][direction] += usd
+
+        transactions.append({
+            "timestamp": ts,
+            "time_ago": time_ago,
+            "days_ago": days_ago,
+            "direction": direction,
+            "token": token,
+            "amount": tx.get("unitValue", 0) or 0,
+            "usd": usd,
+            "counterparty": counterparty,
+            "counterparty_type": counterparty_type,
+            "is_exchange": is_exchange,
+            "chain": tx.get("chain", ""),
+        })
+
+    # Build token summary
+    tokens = []
+    for token, data in token_data.items():
+        net = data["received"] - data["sent"]
+        tokens.append({
+            "token": token,
+            "received": data["received"],
+            "sent": data["sent"],
+            "net": net,
+        })
+    tokens.sort(key=lambda x: abs(x["net"]), reverse=True)
+
+    # Calculate stats
+    total_received = sum(t["received"] for t in tokens)
+    total_sent = sum(t["sent"] for t in tokens)
+    exchange_sent = sum(tx["usd"] for tx in transactions if tx["direction"] == "sent" and tx["is_exchange"])
+
+    return {
+        "fund_id": fund_id,
+        "name": fund_name,
+        "is_tracked": fund_id in ENTITIES or fund_id in NOTABLE_TRADERS,
+        "tokens": tokens[:20],
+        "transactions": transactions[:50],
+        "stats": {
+            "received": total_received,
+            "sent": total_sent,
+            "net": total_received - total_sent,
+            "tx_count": len(transactions),
+            "exchange_sent": exchange_sent,
+            "unique_tokens": len(tokens),
+        },
+    }
+
+
 @app.get("/health")
 def health():
     key = get_api_key()
