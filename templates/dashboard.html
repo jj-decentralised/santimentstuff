@@ -4,116 +4,410 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fund Portfolio Tracker</title>
-    <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+
+        .header { background: #fff; padding: 1rem 2rem; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.25rem; }
+        .header select { padding: 0.5rem 1rem; font-size: 1rem; border: 1px solid #ddd; border-radius: 4px; min-width: 250px; }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: #fff; padding: 1.25rem; border-radius: 8px; border: 1px solid #ddd; }
+        .stat-label { font-size: 0.75rem; color: #666; text-transform: uppercase; margin-bottom: 0.5rem; }
+        .stat-value { font-size: 1.5rem; font-weight: 600; font-family: monospace; }
+        .stat-value.positive { color: #059669; }
+        .stat-value.negative { color: #dc2626; }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: #fff; border-radius: 8px; border: 1px solid #ddd; padding: 1.25rem; }
+        .card h3 { font-size: 0.875rem; margin-bottom: 1rem; }
+        .card canvas { max-height: 250px; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #eee; }
+        th { color: #666; font-size: 0.75rem; text-transform: uppercase; }
+        td { font-family: monospace; }
+        .positive { color: #059669; }
+        .negative { color: #dc2626; }
+
+        .loading { text-align: center; padding: 2rem; color: #666; }
+        .error { color: #dc2626; padding: 1rem; background: #fef2f2; border-radius: 4px; margin-bottom: 1rem; }
+
+        .compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .fund-card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; cursor: pointer; transition: box-shadow 0.2s; }
+        .fund-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .fund-card h4 { margin-bottom: 0.5rem; }
+        .fund-card .value { font-size: 1.25rem; font-weight: 600; font-family: monospace; margin-bottom: 0.5rem; }
+        .fund-card ul { font-size: 0.75rem; color: #666; margin-left: 1rem; }
+    </style>
 </head>
 <body>
     <header class="header">
         <h1>Fund Portfolio Tracker</h1>
-        <div class="header-controls">
-            <select id="fundSelector" class="fund-selector">
-                <option value="">Select a fund...</option>
-            </select>
-            <span id="lastUpdated" class="last-updated"></span>
-        </div>
+        <select id="fundSelect">
+            <option value="">Loading funds...</option>
+        </select>
     </header>
 
-    <main class="main-content">
-        <!-- Summary Cards -->
-        <section class="summary-cards" id="summaryCards">
-            <div class="card">
-                <div class="card-label">Total Value</div>
-                <div class="card-value" id="totalValue">-</div>
+    <main class="container">
+        <div id="error" class="error" style="display: none;"></div>
+
+        <!-- Stats -->
+        <section class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Value</div>
+                <div class="stat-value" id="totalValue">-</div>
             </div>
-            <div class="card">
-                <div class="card-label">Cost Basis</div>
-                <div class="card-value" id="costBasis">-</div>
+            <div class="stat-card">
+                <div class="stat-label">Cost Basis</div>
+                <div class="stat-value" id="costBasis">-</div>
             </div>
-            <div class="card">
-                <div class="card-label">Unrealized P/L</div>
-                <div class="card-value" id="unrealizedPnl">-</div>
+            <div class="stat-card">
+                <div class="stat-label">Unrealized P/L</div>
+                <div class="stat-value" id="pnl">-</div>
             </div>
-            <div class="card">
-                <div class="card-label">P/L %</div>
-                <div class="card-value" id="pnlPercent">-</div>
+            <div class="stat-card">
+                <div class="stat-label">P/L %</div>
+                <div class="stat-value" id="pnlPct">-</div>
             </div>
         </section>
 
-        <!-- Charts Row -->
-        <section class="charts-row">
-            <div class="chart-container">
+        <!-- Charts -->
+        <section class="grid">
+            <div class="card">
                 <h3>Portfolio Allocation</h3>
                 <canvas id="allocationChart"></canvas>
             </div>
-            <div class="chart-container">
+            <div class="card">
                 <h3>Cumulative Flows</h3>
                 <canvas id="flowChart"></canvas>
             </div>
         </section>
 
         <!-- Holdings Table -->
-        <section class="holdings-section">
+        <section class="card" style="margin-bottom: 1.5rem;">
             <h3>Holdings</h3>
-            <div class="table-container">
-                <table class="holdings-table" id="holdingsTable">
-                    <thead>
-                        <tr>
-                            <th>Token</th>
-                            <th>Chain</th>
-                            <th>Balance</th>
-                            <th>Price</th>
-                            <th>Value</th>
-                            <th>Cost Basis</th>
-                            <th>P/L</th>
-                            <th>P/L %</th>
-                        </tr>
-                    </thead>
-                    <tbody id="holdingsBody">
-                        <tr><td colspan="8" class="no-data">Select a fund to view holdings</td></tr>
-                    </tbody>
-                </table>
-            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Chain</th>
+                        <th>Balance</th>
+                        <th>Price</th>
+                        <th>Value</th>
+                        <th>Cost Basis</th>
+                        <th>P/L</th>
+                        <th>P/L %</th>
+                    </tr>
+                </thead>
+                <tbody id="holdingsTable">
+                    <tr><td colspan="8" class="loading">Select a fund to view holdings</td></tr>
+                </tbody>
+            </table>
         </section>
 
-        <!-- Recent Activity -->
-        <section class="activity-section">
+        <!-- Activity Table -->
+        <section class="card" style="margin-bottom: 1.5rem;">
             <h3>Recent Activity</h3>
-            <div class="table-container">
-                <table class="activity-table" id="activityTable">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Token</th>
-                            <th>Amount</th>
-                            <th>Value (USD)</th>
-                            <th>Counterparty</th>
-                            <th>Chain</th>
-                        </tr>
-                    </thead>
-                    <tbody id="activityBody">
-                        <tr><td colspan="7" class="no-data">Select a fund to view activity</td></tr>
-                    </tbody>
-                </table>
-            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Token</th>
+                        <th>Amount</th>
+                        <th>Value</th>
+                        <th>Counterparty</th>
+                        <th>Chain</th>
+                    </tr>
+                </thead>
+                <tbody id="activityTable">
+                    <tr><td colspan="7" class="loading">Select a fund to view activity</td></tr>
+                </tbody>
+            </table>
         </section>
 
         <!-- Fund Comparison -->
-        <section class="comparison-section">
-            <h3>Fund Comparison</h3>
-            <div class="comparison-controls">
-                <button id="compareBtn" class="btn">Compare All Funds</button>
-            </div>
-            <div class="comparison-grid" id="comparisonGrid">
-                <p class="no-data">Click "Compare All Funds" to see comparison</p>
+        <section class="card">
+            <h3>All Funds Comparison</h3>
+            <div id="compareGrid" class="compare-grid">
+                <div class="loading">Loading fund comparison...</div>
             </div>
         </section>
     </main>
 
-    <footer class="footer">
-        <p>Data powered by <a href="https://arkm.com" target="_blank">Arkham Intelligence</a></p>
-    </footer>
+    <script>
+        // Formatters
+        const fmt = {
+            usd: (v) => {
+                if (!v && v !== 0) return '-';
+                if (Math.abs(v) >= 1e9) return '$' + (v/1e9).toFixed(2) + 'B';
+                if (Math.abs(v) >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
+                if (Math.abs(v) >= 1e3) return '$' + (v/1e3).toFixed(2) + 'K';
+                return '$' + v.toFixed(2);
+            },
+            num: (v) => {
+                if (!v && v !== 0) return '-';
+                if (Math.abs(v) >= 1e9) return (v/1e9).toFixed(2) + 'B';
+                if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(2) + 'M';
+                if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(2) + 'K';
+                return v.toFixed(4);
+            },
+            pct: (v) => {
+                if (!v && v !== 0) return '-';
+                return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+            },
+            date: (s) => {
+                if (!s) return '-';
+                return new Date(s).toLocaleDateString();
+            }
+        };
 
-    <script src="/static/js/dashboard.js"></script>
+        // Charts
+        let allocationChart = null;
+        let flowChart = null;
+        const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6', '#f43f5e', '#84cc16', '#06b6d4'];
+
+        // Load funds list
+        async function loadFunds() {
+            const select = document.getElementById('fundSelect');
+            try {
+                const res = await fetch('/api/funds');
+                const data = await res.json();
+
+                if (!data.funds || data.funds.length === 0) {
+                    select.innerHTML = '<option value="">No funds found - check API key</option>';
+                    return;
+                }
+
+                select.innerHTML = '<option value="">Select a fund...</option>';
+                data.funds.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value = f.id;
+                    opt.textContent = f.name;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('Failed to load funds:', e);
+                select.innerHTML = '<option value="">Error loading funds</option>';
+                showError('Failed to load funds: ' + e.message);
+            }
+        }
+
+        // Load fund data
+        async function loadFund(fundId) {
+            if (!fundId) return;
+
+            showError(null);
+            document.getElementById('holdingsTable').innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
+            document.getElementById('activityTable').innerHTML = '<tr><td colspan="7" class="loading">Loading...</td></tr>';
+
+            try {
+                // Load fund data
+                const res = await fetch(`/api/fund/${fundId}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                // Update stats
+                document.getElementById('totalValue').textContent = fmt.usd(data.total_value);
+                document.getElementById('costBasis').textContent = fmt.usd(data.total_cost_basis);
+
+                const pnlEl = document.getElementById('pnl');
+                pnlEl.textContent = fmt.usd(data.total_pnl);
+                pnlEl.className = 'stat-value ' + (data.total_pnl >= 0 ? 'positive' : 'negative');
+
+                const pctEl = document.getElementById('pnlPct');
+                pctEl.textContent = fmt.pct(data.total_pnl_pct);
+                pctEl.className = 'stat-value ' + (data.total_pnl_pct >= 0 ? 'positive' : 'negative');
+
+                // Update holdings table
+                updateHoldings(data.holdings);
+
+                // Update allocation chart
+                updateAllocationChart(data.holdings);
+
+                // Load activity
+                const actRes = await fetch(`/api/fund/${fundId}/activity`);
+                const actData = await actRes.json();
+                updateActivity(actData.activity);
+
+                // Load flows
+                const flowRes = await fetch(`/api/fund/${fundId}/flows`);
+                const flowData = await flowRes.json();
+                updateFlowChart(flowData.flows);
+
+            } catch (e) {
+                console.error('Failed to load fund:', e);
+                showError('Failed to load fund data: ' + e.message);
+            }
+        }
+
+        function updateHoldings(holdings) {
+            const tbody = document.getElementById('holdingsTable');
+            if (!holdings || holdings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="loading">No holdings</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = holdings.map(h => `
+                <tr>
+                    <td><strong>${h.symbol}</strong><br><small style="color:#666">${h.name}</small></td>
+                    <td>${h.chain}</td>
+                    <td>${fmt.num(h.balance)}</td>
+                    <td>${fmt.usd(h.price)}</td>
+                    <td>${fmt.usd(h.value_usd)}</td>
+                    <td>${fmt.usd(h.cost_basis)}</td>
+                    <td class="${h.pnl >= 0 ? 'positive' : 'negative'}">${fmt.usd(h.pnl)}</td>
+                    <td class="${h.pnl_pct >= 0 ? 'positive' : 'negative'}">${fmt.pct(h.pnl_pct)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateActivity(activity) {
+            const tbody = document.getElementById('activityTable');
+            if (!activity || activity.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="loading">No activity</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = activity.map(a => `
+                <tr>
+                    <td>${fmt.date(a.timestamp)}</td>
+                    <td class="${a.type === 'Received' ? 'positive' : 'negative'}">${a.type}</td>
+                    <td>${a.token}</td>
+                    <td>${fmt.num(a.amount)}</td>
+                    <td>${fmt.usd(a.value_usd)}</td>
+                    <td>${a.counterparty}</td>
+                    <td>${a.chain}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateAllocationChart(holdings) {
+            const ctx = document.getElementById('allocationChart').getContext('2d');
+            if (allocationChart) allocationChart.destroy();
+
+            const top = holdings.slice(0, 8);
+            const other = holdings.slice(8).reduce((sum, h) => sum + h.value_usd, 0);
+
+            const labels = top.map(h => h.symbol);
+            const values = top.map(h => h.value_usd);
+            if (other > 0) { labels.push('Other'); values.push(other); }
+
+            allocationChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data: values, backgroundColor: COLORS }] },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'right', labels: { font: { size: 11 } } },
+                        tooltip: { callbacks: { label: (c) => `${c.label}: ${fmt.usd(c.raw)}` } }
+                    }
+                }
+            });
+        }
+
+        function updateFlowChart(flows) {
+            const ctx = document.getElementById('flowChart').getContext('2d');
+            if (flowChart) flowChart.destroy();
+
+            // Combine all chains
+            let allPoints = [];
+            Object.values(flows).forEach(chain => {
+                if (chain.points) allPoints = allPoints.concat(chain.points);
+            });
+
+            if (allPoints.length === 0) {
+                flowChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: { responsive: true }
+                });
+                return;
+            }
+
+            // Sort and take last 30
+            allPoints.sort((a, b) => new Date(a.time) - new Date(b.time));
+            const recent = allPoints.slice(-30);
+
+            flowChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: recent.map(p => fmt.date(p.time)),
+                    datasets: [
+                        { label: 'Inflow', data: recent.map(p => p.inflow), borderColor: '#10b981', fill: false, tension: 0.3, pointRadius: 0 },
+                        { label: 'Outflow', data: recent.map(p => p.outflow), borderColor: '#ef4444', fill: false, tension: 0.3, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: { ticks: { callback: v => fmt.usd(v) } }
+                    }
+                }
+            });
+        }
+
+        // Load comparison
+        async function loadComparison() {
+            const grid = document.getElementById('compareGrid');
+            try {
+                const res = await fetch('/api/compare');
+                const data = await res.json();
+
+                if (!data.funds || data.funds.length === 0) {
+                    grid.innerHTML = '<div class="loading">No funds found</div>';
+                    return;
+                }
+
+                grid.innerHTML = data.funds.map(f => `
+                    <div class="fund-card" onclick="selectFund('${f.id}')">
+                        <h4>${f.name}</h4>
+                        <div class="value">${fmt.usd(f.total_value)}</div>
+                        <div style="font-size: 0.75rem; color: #666;">${f.holdings_count} holdings</div>
+                        <ul>${f.top_holdings.map(h => `<li>${h.symbol}: ${fmt.usd(h.value)}</li>`).join('')}</ul>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to load comparison:', e);
+                grid.innerHTML = '<div class="loading">Failed to load comparison</div>';
+            }
+        }
+
+        function selectFund(fundId) {
+            document.getElementById('fundSelect').value = fundId;
+            loadFund(fundId);
+            window.scrollTo(0, 0);
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error');
+            if (msg) {
+                el.textContent = msg;
+                el.style.display = 'block';
+            } else {
+                el.style.display = 'none';
+            }
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadFunds();
+            loadComparison();
+
+            document.getElementById('fundSelect').addEventListener('change', (e) => {
+                loadFund(e.target.value);
+            });
+        });
+    </script>
 </body>
 </html>

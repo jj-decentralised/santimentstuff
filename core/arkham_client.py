@@ -1,290 +1,199 @@
-"""Async client for Arkham Intelligence API."""
+"""Simple Arkham Intelligence API client."""
 
-import asyncio
 import os
 import time
-from typing import Any
-
 import httpx
 
-from .arkham_models import Fund, TokenHolding, Transfer, FlowData, FlowDataPoint
-from .cache import CacheManager
+API_KEY = os.environ.get("ARKHAM_API_KEY", "")
+BASE_URL = "https://api.arkm.com"
+
+FUNDS = [
+    "a16z",
+    "polychain-capital",
+    "dragonfly-capital",
+    "three-arrows-capital",
+    "jump-trading",
+    "galaxy-digital",
+    "spartan-group",
+    "animoca-brands",
+    "electric-capital",
+    "binance-labs",
+]
 
 
-class RateLimiter:
-    """Token bucket rate limiter."""
-
-    def __init__(self, rate: float, burst: int = 1):
-        self.rate = rate  # requests per second
-        self.burst = burst
-        self.tokens = burst
-        self.last_update = time.monotonic()
-        self._lock = asyncio.Lock()
-
-    async def acquire(self):
-        async with self._lock:
-            now = time.monotonic()
-            elapsed = now - self.last_update
-            self.tokens = min(self.burst, self.tokens + elapsed * self.rate)
-            self.last_update = now
-
-            if self.tokens < 1:
-                wait_time = (1 - self.tokens) / self.rate
-                await asyncio.sleep(wait_time)
-                self.tokens = 0
-            else:
-                self.tokens -= 1
+def get_headers():
+    return {"API-Key": API_KEY}
 
 
-class ArkhamClient:
-    """Async client for Arkham Intelligence API."""
-
-    BASE_URL = "https://api.arkm.com"
-
-    # Known fund entity IDs
-    KNOWN_FUNDS = [
-        "a16z",
-        "polychain-capital",
-        "dragonfly-capital",
-        "three-arrows-capital",
-        "jump-trading",
-        "galaxy-digital",
-        "spartan-group",
-        "animoca-brands",
-        "electric-capital",
-        "binance-labs",
-        "paradigm",
-        "sequoia-capital",
-        "digital-currency-group",
-        "blockchain-capital",
-    ]
-
-    def __init__(self, api_key: str | None = None, cache: CacheManager | None = None):
-        self.api_key = api_key or os.environ.get("ARKHAM_API_KEY", "")
-        self.cache = cache or CacheManager()
-        self._client: httpx.AsyncClient | None = None
-
-        # Rate limiters: standard (20/s) and heavy (1/s)
-        self._standard_limiter = RateLimiter(rate=20, burst=5)
-        self._heavy_limiter = RateLimiter(rate=1, burst=1)
-
-    async def __aenter__(self):
-        await self.connect()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close()
-
-    async def connect(self):
-        self._client = httpx.AsyncClient(
-            base_url=self.BASE_URL,
-            headers={"API-Key": self.api_key},
-            timeout=30.0,
+def get_entity(entity_id: str) -> dict | None:
+    """Get entity info."""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/intelligence/entity/{entity_id}",
+            headers=get_headers(),
+            timeout=30,
         )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Error getting entity {entity_id}: {e}")
+        return None
 
-    async def close(self):
-        if self._client:
-            await self._client.aclose()
-            self._client = None
 
-    async def _request(
-        self,
-        endpoint: str,
-        params: dict | None = None,
-        heavy: bool = False,
-        cache_ttl: int | None = None,
-    ) -> Any:
-        """Make an API request with rate limiting and caching."""
-        if not self._client:
-            raise RuntimeError("Client not connected. Use 'async with' or call connect().")
-
-        # Check cache
-        cache_key = f"{endpoint}:{params}"
-        if cache_ttl:
-            cached = await self.cache.get(cache_key)
-            if cached is not None:
-                return cached
-
-        # Rate limit
-        limiter = self._heavy_limiter if heavy else self._standard_limiter
-        await limiter.acquire()
-
-        # Make request
-        response = await self._client.get(endpoint, params=params)
-        response.raise_for_status()
-
-        data = response.json()
-
-        # Cache result
-        if cache_ttl:
-            await self.cache.set(cache_key, data, cache_ttl)
-
-        return data
-
-    # === Entity Endpoints ===
-
-    async def get_entity(self, entity_id: str) -> Fund | None:
-        """Get entity information."""
-        try:
-            data = await self._request(
-                f"/intelligence/entity/{entity_id}",
-                cache_ttl=CacheManager.LONG,
-            )
-            return Fund.from_api(data)
-        except httpx.HTTPStatusError as e:
-            print(f"HTTP error fetching entity {entity_id}: {e.response.status_code}")
-            return None
-        except Exception as e:
-            print(f"Error fetching entity {entity_id}: {e}")
-            return None
-
-    async def get_available_funds(self) -> list[Fund]:
-        """Get all known funds that are available."""
-        funds = []
-        tasks = [self.get_entity(fund_id) for fund_id in self.KNOWN_FUNDS]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for i, result in enumerate(results):
-            fund_id = self.KNOWN_FUNDS[i]
-            if isinstance(result, Exception):
-                print(f"Error fetching {fund_id}: {result}")
-            elif isinstance(result, Fund):
-                # Accept fund type or any entity we successfully fetched
-                if result.type in ("fund", "exchange", "individual", "unknown"):
-                    funds.append(result)
-                    print(f"Loaded fund: {result.name} ({result.id})")
-            else:
-                print(f"No data for {fund_id}")
-
-        return funds
-
-    # === Portfolio Endpoints ===
-
-    async def get_portfolio(self, entity_id: str) -> list[TokenHolding]:
-        """Get current portfolio holdings for an entity."""
+def get_portfolio(entity_id: str) -> dict:
+    """Get portfolio holdings."""
+    try:
         now_ms = int(time.time() * 1000)
-        data = await self._request(
-            f"/portfolio/entity/{entity_id}",
+        r = httpx.get(
+            f"{BASE_URL}/portfolio/entity/{entity_id}",
             params={"time": now_ms},
-            cache_ttl=CacheManager.SHORT,
+            headers=get_headers(),
+            timeout=30,
         )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Error getting portfolio {entity_id}: {e}")
+        return {}
 
-        holdings = []
-        for chain, tokens in data.items():
-            if isinstance(tokens, dict):
-                for token_id, token_data in tokens.items():
-                    if isinstance(token_data, dict) and token_data.get("usd", 0) > 0:
-                        holding = TokenHolding.from_api(chain, token_id, token_data)
-                        holdings.append(holding)
 
-        # Sort by USD value descending
-        holdings.sort(key=lambda h: h.value_usd, reverse=True)
-        return holdings
-
-    # === Transfer Endpoints ===
-
-    async def get_transfers(
-        self,
-        entity_id: str,
-        limit: int = 100,
-        chains: list[str] | None = None,
-        sort_dir: str = "desc",
-    ) -> list[Transfer]:
-        """Get transfer history for an entity."""
-        params = {
-            "base": entity_id,
-            "limit": limit,
-            "sortDir": sort_dir,
-        }
-        if chains:
-            params["chains"] = ",".join(chains)
-
-        data = await self._request(
-            "/transfers",
-            params=params,
-            heavy=True,
-            cache_ttl=CacheManager.SHORT,
+def get_transfers(entity_id: str, limit: int = 100) -> list:
+    """Get transfer history."""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/transfers",
+            params={"base": entity_id, "limit": limit},
+            headers=get_headers(),
+            timeout=30,
         )
+        r.raise_for_status()
+        return r.json().get("transfers", [])
+    except Exception as e:
+        print(f"Error getting transfers {entity_id}: {e}")
+        return []
 
-        transfers = []
-        for tx in data.get("transfers", []):
-            transfer = Transfer.from_api(tx, entity_id)
-            transfers.append(transfer)
 
-        return transfers
-
-    async def get_all_transfers(
-        self,
-        entity_id: str,
-        token_symbol: str | None = None,
-        max_transfers: int = 1000,
-    ) -> list[Transfer]:
-        """Get all transfers for an entity, paginating as needed."""
-        all_transfers = []
-        limit = 100
-
-        while len(all_transfers) < max_transfers:
-            transfers = await self.get_transfers(
-                entity_id=entity_id,
-                limit=limit,
-                sort_dir="asc",  # Oldest first for cost basis
-            )
-
-            if not transfers:
-                break
-
-            for t in transfers:
-                if token_symbol is None or t.token_symbol == token_symbol:
-                    all_transfers.append(t)
-
-            if len(transfers) < limit:
-                break
-
-            # Rate limit between pages
-            await asyncio.sleep(1.1)
-
-        return all_transfers
-
-    # === Flow Endpoints ===
-
-    async def get_flow(self, entity_id: str) -> dict[str, FlowData]:
-        """Get historical flow data for an entity."""
-        data = await self._request(
-            f"/flow/entity/{entity_id}",
-            cache_ttl=CacheManager.MEDIUM,
+def get_flows(entity_id: str) -> dict:
+    """Get flow data."""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/flow/entity/{entity_id}",
+            headers=get_headers(),
+            timeout=30,
         )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Error getting flows {entity_id}: {e}")
+        return {}
 
-        flows = {}
-        for chain, points in data.items():
-            if isinstance(points, list) and points:
-                data_points = [FlowDataPoint.from_api(p) for p in points]
-                flows[chain] = FlowData(chain=chain, data_points=data_points)
 
-        return flows
+def list_funds() -> list[dict]:
+    """Get all available funds."""
+    funds = []
+    for fund_id in FUNDS:
+        entity = get_entity(fund_id)
+        if entity and entity.get("name"):
+            funds.append({
+                "id": entity.get("id", fund_id),
+                "name": entity.get("name", fund_id),
+                "type": entity.get("type", "fund"),
+            })
+    return funds
 
-    # === Aggregated Methods ===
 
-    async def get_fund_summary(self, entity_id: str) -> dict:
-        """Get a complete fund summary with holdings and basic info."""
-        entity, holdings, flows = await asyncio.gather(
-            self.get_entity(entity_id),
-            self.get_portfolio(entity_id),
-            self.get_flow(entity_id),
-        )
+def parse_portfolio(raw: dict) -> list[dict]:
+    """Parse portfolio into holdings list."""
+    holdings = []
+    for chain, tokens in raw.items():
+        if not isinstance(tokens, dict):
+            continue
+        for token_id, data in tokens.items():
+            if not isinstance(data, dict):
+                continue
+            usd = data.get("usd", 0)
+            if usd and usd > 0.01:
+                holdings.append({
+                    "token_id": token_id,
+                    "name": data.get("name", "Unknown"),
+                    "symbol": (data.get("symbol") or "???").upper(),
+                    "chain": chain,
+                    "balance": data.get("balance", 0),
+                    "price": data.get("price", 0),
+                    "value_usd": usd,
+                })
+    holdings.sort(key=lambda x: x["value_usd"], reverse=True)
+    return holdings
 
-        if not entity:
-            return {"error": f"Entity {entity_id} not found"}
 
-        total_value = sum(h.value_usd for h in holdings)
-        total_inflow = sum(f.total_inflow for f in flows.values())
-        total_outflow = sum(f.total_outflow for f in flows.values())
+def parse_transfers(raw: list, entity_id: str) -> list[dict]:
+    """Parse transfers into activity list."""
+    activity = []
+    for tx in raw[:50]:  # Limit to 50
+        to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
+        from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
 
-        return {
-            "fund": entity,
-            "holdings": holdings,
-            "total_value_usd": total_value,
-            "total_inflow": total_inflow,
-            "total_outflow": total_outflow,
-            "net_flow": total_inflow - total_outflow,
-            "flows": flows,
-        }
+        if to_entity.get("id") == entity_id:
+            direction = "Received"
+            counterparty = from_entity.get("name") or tx.get("fromAddress", {}).get("address", "")[:12]
+        else:
+            direction = "Sent"
+            counterparty = to_entity.get("name") or tx.get("toAddress", {}).get("address", "")[:12]
+
+        activity.append({
+            "timestamp": tx.get("blockTimestamp", ""),
+            "type": direction,
+            "token": (tx.get("tokenSymbol") or "???").upper(),
+            "amount": tx.get("unitValue", 0),
+            "value_usd": tx.get("historicalUSD", 0),
+            "counterparty": counterparty[:20] if counterparty else "Unknown",
+            "chain": tx.get("chain", ""),
+        })
+    return activity
+
+
+def calculate_cost_basis(holdings: list, transfers: list) -> dict:
+    """Calculate simple cost basis from transfers."""
+    # Group transfers by token
+    by_token = {}
+    for tx in transfers:
+        symbol = (tx.get("tokenSymbol") or "").upper()
+        if not symbol:
+            continue
+        if symbol not in by_token:
+            by_token[symbol] = {"in_usd": 0, "in_amount": 0, "out_usd": 0, "out_amount": 0}
+
+        # Determine direction
+        to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
+        amount = tx.get("unitValue", 0) or 0
+        usd = tx.get("historicalUSD", 0) or 0
+
+        if to_entity.get("id"):  # Inflow
+            by_token[symbol]["in_usd"] += usd
+            by_token[symbol]["in_amount"] += amount
+        else:  # Outflow
+            by_token[symbol]["out_usd"] += usd
+            by_token[symbol]["out_amount"] += amount
+
+    # Calculate P/L for holdings
+    result = []
+    for h in holdings:
+        symbol = h["symbol"]
+        cb = by_token.get(symbol, {})
+
+        in_usd = cb.get("in_usd", 0)
+        in_amount = cb.get("in_amount", 0)
+        avg_cost = in_usd / in_amount if in_amount > 0 else 0
+        cost_basis = avg_cost * h["balance"]
+
+        pnl = h["value_usd"] - cost_basis if cost_basis > 0 else 0
+        pnl_pct = (pnl / cost_basis * 100) if cost_basis > 0 else 0
+
+        result.append({
+            **h,
+            "cost_basis": cost_basis,
+            "pnl": pnl,
+            "pnl_pct": pnl_pct,
+        })
+
+    return result
