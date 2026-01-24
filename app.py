@@ -3,6 +3,7 @@
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -110,10 +111,13 @@ def fetch_fund_transfers(fund_id: str, limit: int = 50, min_usd: int = 10000) ->
                 "usdGte": min_usd,
             },
             headers={"API-Key": get_api_key()},
-            timeout=30,
+            timeout=15,  # Reduced timeout
         )
         r.raise_for_status()
         return r.json().get("transfers", [])
+    except httpx.TimeoutException:
+        print(f"Timeout fetching {fund_id}")
+        return []
     except Exception as e:
         print(f"Error fetching {fund_id}: {e}")
         return []
@@ -166,16 +170,38 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
     }
 
 
-def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dict:
-    """Build full activity data from all entities."""
-    all_activity = []
-
-    for entity_id, entity_name in ENTITIES.items():
-        transfers = fetch_fund_transfers(entity_id, limit=limit_per_entity, min_usd=min_usd)
+def fetch_entity_activity(entity_id: str, entity_name: str, min_usd: int, limit: int) -> list:
+    """Fetch and parse transfers for a single entity."""
+    results = []
+    try:
+        transfers = fetch_fund_transfers(entity_id, limit=limit, min_usd=min_usd)
         for tx in transfers:
             item = parse_transfer(tx, entity_id, entity_name)
             if item:
-                all_activity.append(item)
+                results.append(item)
+    except Exception as e:
+        print(f"Error processing {entity_id}: {e}")
+    return results
+
+
+def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dict:
+    """Build full activity data from all entities using concurrent requests."""
+    all_activity = []
+
+    # Fetch all entities concurrently (10 at a time)
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {
+            executor.submit(fetch_entity_activity, eid, ename, min_usd, limit_per_entity): eid
+            for eid, ename in ENTITIES.items()
+        }
+        for future in as_completed(futures):
+            entity_id = futures[future]
+            try:
+                results = future.result()
+                all_activity.extend(results)
+                print(f"  Fetched {len(results)} txs from {entity_id}")
+            except Exception as e:
+                print(f"  Failed {entity_id}: {e}")
 
     all_activity.sort(key=lambda x: x["timestamp"], reverse=True)
 
