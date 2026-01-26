@@ -16,6 +16,18 @@ NANSEN_API_KEY = os.environ.get("NANSEN_API_KEY", "5Y12GfD7Y3mbgtKdmZywPqOmGyxlK
 
 DEFAULT_CHAINS = ["solana", "ethereum", "base", "arbitrum", "polygon"]
 
+# Token quality filters - exclude shitcoins
+MIN_MARKET_CAP = 100_000_000  # $100M minimum
+MIN_TOKEN_AGE_DAYS = 30  # 30 days minimum
+
+
+def passes_token_filter(item):
+    """Check if token meets quality thresholds (mcap > $100M, age > 30d)."""
+    mcap = item.get("market_cap_usd", 0) or 0
+    age = item.get("token_age_days", 0) or 0
+    return mcap >= MIN_MARKET_CAP and age >= MIN_TOKEN_AGE_DAYS
+
+
 def nansen_headers():
     return {"apiKey": NANSEN_API_KEY, "Content-Type": "application/json"}
 
@@ -302,6 +314,10 @@ def api_flows():
     outflow_data = fetch_smart_money_netflow(chains, direction="ASC")
     outflow_items = outflow_data.get("data", [])
 
+    # Filter by quality thresholds (mcap > $100M, age > 30d)
+    inflow_items = [i for i in inflow_items if passes_token_filter(i)]
+    outflow_items = [i for i in outflow_items if passes_token_filter(i)]
+
     def parse_flow(item):
         return {
             "token": item.get("token_symbol", "???"),
@@ -336,6 +352,9 @@ def api_holdings():
 
     data = fetch_smart_money_holdings(chains)
     holdings_data = data.get("data", [])
+
+    # Filter by market cap (holdings may not have age data)
+    holdings_data = [h for h in holdings_data if (h.get("market_cap_usd", 0) or 0) >= MIN_MARKET_CAP]
 
     holdings = []
     for item in holdings_data:
@@ -593,6 +612,9 @@ def api_signals():
     # Get flows - sorted by highest inflows
     flows_data = fetch_smart_money_netflow(direction="DESC")
     netflow = flows_data.get("data", [])
+
+    # Filter by quality thresholds (mcap > $100M, age > 30d)
+    netflow = [n for n in netflow if passes_token_filter(n)]
 
     # Get trades
     trades_data = fetch_smart_money_dex_trades()
