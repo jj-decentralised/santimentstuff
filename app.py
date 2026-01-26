@@ -63,7 +63,6 @@ ENTITIES = {
     "polder-fund": "Polder Fund",
     "apollo-capital": "Apollo Crypto",
     "astelek-crypto-fund": "Astelek Crypto Fund",
-    "scp": "Symbolic Capital Partners",
     "simply-vc": "Simply VC",
     "ngc-ventures": "NGC Ventures",
     "ci-global-asset-management": "CI Global Asset Mgmt",
