@@ -159,7 +159,7 @@ def fetch_nansen_smart_money_netflow(chains: list = None) -> dict:
                     "include_smart_money_labels": ["Fund", "Smart Trader", "30D Smart Trader"],
                 },
                 "pagination": {"page": 1, "per_page": 50},
-                "order_by": [{"field": "netflow_24h_usd", "direction": "DESC"}],
+                "order_by": [{"field": "net_flow_24h_usd", "direction": "DESC"}],
             },
             timeout=30,
         )
@@ -212,7 +212,6 @@ def fetch_nansen_smart_money_dex_trades(chains: list = None) -> dict:
                 "chains": chains,
                 "filters": {
                     "include_smart_money_labels": ["Fund", "Smart Trader", "30D Smart Trader"],
-                    "value_usd": {"min": 10000},  # Min $10K trades
                 },
                 "pagination": {"page": 1, "per_page": 100},
                 "order_by": [{"field": "block_timestamp", "direction": "DESC"}],
@@ -2047,15 +2046,15 @@ def get_nansen_smart_money():
     top_outflows = []
 
     for item in netflow_data[:30]:
-        flow_24h = item.get("netflow_24h_usd", 0) or 0
+        flow_24h = item.get("net_flow_24h_usd", 0) or 0
         entry = {
             "token": item.get("token_symbol", "???"),
             "token_address": item.get("token_address", ""),
             "chain": item.get("chain", ""),
-            "netflow_1h": item.get("netflow_1h_usd", 0),
+            "netflow_1h": item.get("net_flow_1h_usd", 0),
             "netflow_24h": flow_24h,
-            "netflow_7d": item.get("netflow_7d_usd", 0),
-            "netflow_30d": item.get("netflow_30d_usd", 0),
+            "netflow_7d": item.get("net_flow_7d_usd", 0),
+            "netflow_30d": item.get("net_flow_30d_usd", 0),
             "market_cap": item.get("market_cap_usd", 0),
             "trader_count": item.get("trader_count", 0),
         }
@@ -2098,22 +2097,30 @@ def get_nansen_dex_trades():
 
     processed = []
     for trade in trades[:50]:
-        # Determine buy/sell
-        action = trade.get("action", "").upper()
-        if action not in ["BUY", "SELL"]:
-            action = "SWAP"
+        token_bought = trade.get("token_bought_symbol", "") or "???"
+        token_sold = trade.get("token_sold_symbol", "") or "???"
+        value_usd = trade.get("trade_value_usd", 0) or 0
+
+        # Skip low value trades
+        if value_usd < 1000:
+            continue
+
+        # Extract trader label (format: "emoji Label [address]")
+        trader_label = trade.get("trader_address_label", "")
+        trader_address = trade.get("trader_address", "")
+        trader_display = trader_label if trader_label else (trader_address[:10] + "..." if trader_address else "Unknown")
 
         processed.append({
             "timestamp": trade.get("block_timestamp", ""),
-            "trader": trade.get("trader_name") or trade.get("trader_address", "")[:10] + "...",
-            "trader_address": trade.get("trader_address", ""),
-            "trader_label": trade.get("trader_label", ""),
-            "action": action,
-            "token_bought": trade.get("token_bought_symbol", ""),
-            "token_sold": trade.get("token_sold_symbol", ""),
+            "trader": trader_display,
+            "trader_address": trader_address,
+            "trader_label": trader_label,
+            "action": "SWAP",
+            "token_bought": token_bought,
+            "token_sold": token_sold,
             "amount_bought": trade.get("token_bought_amount", 0),
             "amount_sold": trade.get("token_sold_amount", 0),
-            "value_usd": trade.get("value_usd", 0),
+            "value_usd": value_usd,
             "chain": trade.get("chain", ""),
         })
 
