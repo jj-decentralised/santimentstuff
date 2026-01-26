@@ -12,10 +12,14 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
-# Config
-BASE_URL = "https://api.arkm.com"
+# Config - Arkham
+ARKHAM_BASE_URL = "https://api.arkm.com"
+BASE_URL = ARKHAM_BASE_URL  # Backwards compatibility
 BASE_DIR = Path(__file__).parent
 CACHE_REFRESH_SECONDS = 300  # 5 minutes
+
+# Config - Nansen
+NANSEN_BASE_URL = "https://api.nansen.ai/api/v1"
 
 # Verified fund entities from Arkham Intelligence (type: "fund")
 # EXCLUDES market makers - we only want real investment signals
@@ -130,6 +134,168 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 def get_api_key():
     return os.environ.get("ARKHAM_API_KEY", "")
+
+
+def get_nansen_api_key():
+    return os.environ.get("NANSEN_API_KEY", "5Y12GfD7Y3mbgtKdmZywPqOmGyxlK5eN")
+
+
+# ============== NANSEN API FUNCTIONS ==============
+
+def fetch_nansen_smart_money_netflow(chains: list = None) -> dict:
+    """Fetch smart money net flows - pre-aggregated by token with 1h/24h/7d/30d flows."""
+    if chains is None:
+        chains = ["ethereum", "base", "arbitrum", "polygon", "solana"]
+
+    try:
+        r = httpx.post(
+            f"{NANSEN_BASE_URL}/smart-money/netflow",
+            headers={"apiKey": get_nansen_api_key(), "Content-Type": "application/json"},
+            json={
+                "chains": chains,
+                "filters": {
+                    "include_stablecoins": False,
+                    "include_native_tokens": False,
+                    "include_smart_money_labels": ["Fund", "Smart Trader", "30D Smart Trader"],
+                },
+                "pagination": {"page": 1, "per_page": 50},
+                "order_by": [{"field": "netflow_24h_usd", "direction": "DESC"}],
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Nansen netflow error: {e}")
+        return {"data": [], "error": str(e)}
+
+
+def fetch_nansen_smart_money_holdings(chains: list = None) -> dict:
+    """Fetch aggregated token holdings by smart money (funds + smart traders)."""
+    if chains is None:
+        chains = ["ethereum", "base", "arbitrum", "polygon", "solana"]
+
+    try:
+        r = httpx.post(
+            f"{NANSEN_BASE_URL}/smart-money/holdings",
+            headers={"apiKey": get_nansen_api_key(), "Content-Type": "application/json"},
+            json={
+                "chains": chains,
+                "filters": {
+                    "include_stablecoins": False,
+                    "include_native_tokens": False,
+                    "include_smart_money_labels": ["Fund", "Smart Trader"],
+                    "value_usd": {"min": 100000},  # Min $100K holdings
+                },
+                "pagination": {"page": 1, "per_page": 50},
+                "order_by": [{"field": "value_usd", "direction": "DESC"}],
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Nansen holdings error: {e}")
+        return {"data": [], "error": str(e)}
+
+
+def fetch_nansen_smart_money_dex_trades(chains: list = None) -> dict:
+    """Fetch real-time DEX trades from smart money (last 24h)."""
+    if chains is None:
+        chains = ["ethereum", "base", "arbitrum", "polygon", "solana"]
+
+    try:
+        r = httpx.post(
+            f"{NANSEN_BASE_URL}/smart-money/dex-trades",
+            headers={"apiKey": get_nansen_api_key(), "Content-Type": "application/json"},
+            json={
+                "chains": chains,
+                "filters": {
+                    "include_smart_money_labels": ["Fund", "Smart Trader", "30D Smart Trader"],
+                    "value_usd": {"min": 10000},  # Min $10K trades
+                },
+                "pagination": {"page": 1, "per_page": 100},
+                "order_by": [{"field": "block_timestamp", "direction": "DESC"}],
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Nansen DEX trades error: {e}")
+        return {"data": [], "error": str(e)}
+
+
+def fetch_nansen_flow_intelligence(token_address: str, chain: str = "ethereum") -> dict:
+    """Fetch flow intelligence for a token - breakdown by whale/smart money/exchange."""
+    try:
+        r = httpx.post(
+            f"{NANSEN_BASE_URL}/tgm/flow-intelligence",
+            headers={"apiKey": get_nansen_api_key(), "Content-Type": "application/json"},
+            json={
+                "chain": chain,
+                "token_address": token_address,
+                "timeframe": "24h",
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Nansen flow intelligence error: {e}")
+        return {"data": {}, "error": str(e)}
+
+
+def fetch_nansen_pnl_leaderboard(token_address: str, chain: str = "ethereum") -> dict:
+    """Fetch P/L leaderboard for a token - top traders by realized P/L."""
+    try:
+        r = httpx.post(
+            f"{NANSEN_BASE_URL}/tgm/pnl-leaderboard",
+            headers={"apiKey": get_nansen_api_key(), "Content-Type": "application/json"},
+            json={
+                "chain": chain,
+                "token_address": token_address,
+                "pagination": {"page": 1, "per_page": 20},
+                "order_by": [{"field": "realized_pnl_usd", "direction": "DESC"}],
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Nansen PnL leaderboard error: {e}")
+        return {"data": [], "error": str(e)}
+
+
+def fetch_nansen_token_screener(chains: list = None) -> dict:
+    """Fetch trending tokens with smart money activity."""
+    if chains is None:
+        chains = ["ethereum", "base", "solana"]
+
+    try:
+        r = httpx.post(
+            f"{NANSEN_BASE_URL}/token-screener",
+            headers={"apiKey": get_nansen_api_key(), "Content-Type": "application/json"},
+            json={
+                "chains": chains,
+                "timeframe": "24h",
+                "filters": {
+                    "include_smart_money_labels": ["Fund", "Smart Trader"],
+                    "market_cap_usd": {"min": 1000000},  # Min $1M mcap
+                },
+                "pagination": {"page": 1, "per_page": 30},
+                "order_by": [{"field": "net_flow_usd", "direction": "DESC"}],
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Nansen token screener error: {e}")
+        return {"data": [], "error": str(e)}
+
+
+# ============== END NANSEN API FUNCTIONS ==============
 
 
 def fetch_fund_transfers(fund_id: str, limit: int = 50, min_usd: int = 10000) -> list:
@@ -1864,6 +2030,186 @@ def alpha_page():
     """Serve the Alpha Signals page."""
     html_path = BASE_DIR / "templates" / "alpha.html"
     return html_path.read_text()
+
+
+# ============== NANSEN API ENDPOINTS ==============
+
+@app.get("/api/nansen/smart-money")
+def get_nansen_smart_money():
+    """Get Nansen smart money data - net flows, holdings, and recent trades."""
+    # Fetch all three in parallel would be ideal, but for now sequential
+    netflow = fetch_nansen_smart_money_netflow()
+    holdings = fetch_nansen_smart_money_holdings()
+
+    # Process netflow data
+    netflow_data = netflow.get("data", [])
+    top_inflows = []
+    top_outflows = []
+
+    for item in netflow_data[:30]:
+        flow_24h = item.get("netflow_24h_usd", 0) or 0
+        entry = {
+            "token": item.get("token_symbol", "???"),
+            "token_address": item.get("token_address", ""),
+            "chain": item.get("chain", ""),
+            "netflow_1h": item.get("netflow_1h_usd", 0),
+            "netflow_24h": flow_24h,
+            "netflow_7d": item.get("netflow_7d_usd", 0),
+            "netflow_30d": item.get("netflow_30d_usd", 0),
+            "market_cap": item.get("market_cap_usd", 0),
+            "trader_count": item.get("trader_count", 0),
+        }
+        if flow_24h > 0:
+            top_inflows.append(entry)
+        elif flow_24h < 0:
+            top_outflows.append(entry)
+
+    top_inflows.sort(key=lambda x: x["netflow_24h"], reverse=True)
+    top_outflows.sort(key=lambda x: x["netflow_24h"])
+
+    # Process holdings data
+    holdings_data = holdings.get("data", [])
+    top_holdings = []
+    for item in holdings_data[:20]:
+        top_holdings.append({
+            "token": item.get("token_symbol", "???"),
+            "token_address": item.get("token_address", ""),
+            "chain": item.get("chain", ""),
+            "value_usd": item.get("value_usd", 0),
+            "balance_change_24h": item.get("balance_24h_percent_change", 0),
+            "holders_count": item.get("holders_count", 0),
+            "market_cap": item.get("market_cap_usd", 0),
+        })
+
+    return {
+        "top_inflows": top_inflows[:15],
+        "top_outflows": top_outflows[:15],
+        "top_holdings": top_holdings,
+        "source": "nansen",
+        "generated_at": datetime.now().isoformat(),
+    }
+
+
+@app.get("/api/nansen/dex-trades")
+def get_nansen_dex_trades():
+    """Get real-time DEX trades from Nansen smart money."""
+    data = fetch_nansen_smart_money_dex_trades()
+    trades = data.get("data", [])
+
+    processed = []
+    for trade in trades[:50]:
+        # Determine buy/sell
+        action = trade.get("action", "").upper()
+        if action not in ["BUY", "SELL"]:
+            action = "SWAP"
+
+        processed.append({
+            "timestamp": trade.get("block_timestamp", ""),
+            "trader": trade.get("trader_name") or trade.get("trader_address", "")[:10] + "...",
+            "trader_address": trade.get("trader_address", ""),
+            "trader_label": trade.get("trader_label", ""),
+            "action": action,
+            "token_bought": trade.get("token_bought_symbol", ""),
+            "token_sold": trade.get("token_sold_symbol", ""),
+            "amount_bought": trade.get("token_bought_amount", 0),
+            "amount_sold": trade.get("token_sold_amount", 0),
+            "value_usd": trade.get("value_usd", 0),
+            "chain": trade.get("chain", ""),
+        })
+
+    return {
+        "trades": processed,
+        "count": len(processed),
+        "source": "nansen",
+        "generated_at": datetime.now().isoformat(),
+    }
+
+
+@app.get("/api/nansen/token-screener")
+def get_nansen_token_screener():
+    """Get trending tokens with smart money activity from Nansen."""
+    data = fetch_nansen_token_screener()
+    tokens = data.get("data", [])
+
+    processed = []
+    for token in tokens[:30]:
+        processed.append({
+            "token": token.get("token_symbol", "???"),
+            "token_address": token.get("token_address", ""),
+            "chain": token.get("chain", ""),
+            "price_usd": token.get("price_usd", 0),
+            "price_change_24h": token.get("price_change_percent", 0),
+            "volume_24h": token.get("volume_usd", 0),
+            "market_cap": token.get("market_cap_usd", 0),
+            "net_flow": token.get("net_flow_usd", 0),
+            "buyers": token.get("unique_buyers", 0),
+            "sellers": token.get("unique_sellers", 0),
+            "liquidity": token.get("liquidity_usd", 0),
+        })
+
+    # Sort by net flow (smart money accumulation)
+    processed.sort(key=lambda x: x.get("net_flow", 0), reverse=True)
+
+    return {
+        "tokens": processed,
+        "count": len(processed),
+        "source": "nansen",
+        "generated_at": datetime.now().isoformat(),
+    }
+
+
+@app.get("/api/nansen/token/{chain}/{token_address}")
+def get_nansen_token_intelligence(chain: str, token_address: str):
+    """Get detailed intelligence for a specific token from Nansen."""
+    # Get flow intelligence and P/L leaderboard
+    flow_intel = fetch_nansen_flow_intelligence(token_address, chain)
+    pnl_board = fetch_nansen_pnl_leaderboard(token_address, chain)
+
+    # Process flow intelligence
+    flow_data = flow_intel.get("data", {})
+    segments = {}
+    for segment in ["whale", "smart_trader", "exchange", "public_figure"]:
+        seg_data = flow_data.get(segment, {})
+        segments[segment] = {
+            "net_flow_usd": seg_data.get("net_flow_usd", 0),
+            "avg_flow_usd": seg_data.get("avg_flow_usd", 0),
+            "wallet_count": seg_data.get("wallet_count", 0),
+        }
+
+    # Process P/L leaderboard
+    pnl_data = pnl_board.get("data", [])
+    top_traders = []
+    for trader in pnl_data[:10]:
+        top_traders.append({
+            "address": trader.get("trader_address", ""),
+            "name": trader.get("trader_name", ""),
+            "realized_pnl": trader.get("realized_pnl_usd", 0),
+            "unrealized_pnl": trader.get("unrealized_pnl_usd", 0),
+            "total_roi": trader.get("total_roi", 0),
+            "holdings_usd": trader.get("holdings_usd", 0),
+            "trade_count": trader.get("trade_count", 0),
+        })
+
+    return {
+        "chain": chain,
+        "token_address": token_address,
+        "flow_segments": segments,
+        "top_traders": top_traders,
+        "source": "nansen",
+        "generated_at": datetime.now().isoformat(),
+    }
+
+
+@app.get("/smart-money", response_class=HTMLResponse)
+def smart_money_page():
+    """Serve the Smart Money page (Nansen data)."""
+    html_path = BASE_DIR / "templates" / "smart-money.html"
+    if html_path.exists():
+        return html_path.read_text()
+    return "<h1>Smart Money page coming soon</h1>"
+
+
+# ============== END NANSEN API ENDPOINTS ==============
 
 
 if __name__ == "__main__":

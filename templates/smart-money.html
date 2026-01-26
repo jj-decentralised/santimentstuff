@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Money - Nansen Intelligence</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+
+        .header {
+            background: #fff;
+            border-bottom: 1px solid #d2d2d7;
+            padding: 0.6rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 { font-size: 1rem; font-weight: 600; color: #5856d6; }
+        .header-right { display: flex; gap: 0.5rem; align-items: center; }
+        .header-right a {
+            padding: 0.35rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-decoration: none;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+
+        .summary-bar {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .summary-item {
+            background: #fff;
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            min-width: 160px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .summary-label { font-size: 0.6rem; color: #86868b; text-transform: uppercase; }
+        .summary-value { font-size: 1.2rem; font-weight: 600; }
+        .summary-value.green { color: #34c759; }
+        .summary-value.red { color: #ff3b30; }
+        .summary-value.purple { color: #5856d6; }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .card-header {
+            padding: 0.6rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            background: #fafafa;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header.inflow { border-left: 4px solid #34c759; }
+        .card-header.outflow { border-left: 4px solid #ff3b30; }
+        .card-header.holdings { border-left: 4px solid #5856d6; }
+        .card-header.trades { border-left: 4px solid #ff9500; }
+
+        .badge {
+            font-size: 0.6rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge.green { background: #d1f2d9; color: #1d7a3a; }
+        .badge.red { background: #ffd9d6; color: #c41e3a; }
+        .badge.purple { background: #f3e5f5; color: #7b1fa2; }
+        .badge.orange { background: #fff0d6; color: #996300; }
+
+        .card-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .flow-item {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #f5f5f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .flow-item:hover { background: #fafafa; }
+        .flow-item:last-child { border-bottom: none; }
+
+        .flow-left { display: flex; align-items: center; gap: 0.5rem; }
+        .flow-token {
+            font-weight: 700;
+            color: #1d1d1f;
+            min-width: 60px;
+        }
+        .flow-chain {
+            font-size: 0.6rem;
+            color: #86868b;
+            background: #f0f0f0;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+        }
+
+        .flow-right { text-align: right; }
+        .flow-amount {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .flow-amount.positive { color: #34c759; }
+        .flow-amount.negative { color: #ff3b30; }
+        .flow-meta {
+            font-size: 0.6rem;
+            color: #86868b;
+        }
+
+        .holding-item {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #f5f5f5;
+            display: grid;
+            grid-template-columns: 80px 1fr 100px 80px;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .holding-item:hover { background: #fafafa; }
+        .holding-value { font-family: 'SF Mono', monospace; font-weight: 600; color: #5856d6; }
+        .holding-change { font-size: 0.75rem; }
+        .holding-change.up { color: #34c759; }
+        .holding-change.down { color: #ff3b30; }
+
+        .trade-item {
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid #f5f5f5;
+            display: grid;
+            grid-template-columns: 100px 80px 1fr 100px 70px;
+            gap: 0.5rem;
+            align-items: center;
+            font-size: 0.75rem;
+        }
+        .trade-item:hover { background: #fafafa; }
+        .trade-item.buy { background: rgba(52, 199, 89, 0.05); }
+        .trade-item.sell { background: rgba(255, 59, 48, 0.05); }
+        .trade-action {
+            font-weight: 600;
+            font-size: 0.65rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+        }
+        .trade-action.buy { background: #d1f2d9; color: #1d7a3a; }
+        .trade-action.sell { background: #ffd9d6; color: #c41e3a; }
+        .trade-trader { color: #5856d6; font-weight: 500; }
+        .trade-tokens { font-size: 0.7rem; }
+        .trade-usd { font-family: 'SF Mono', monospace; font-weight: 600; }
+
+        .loading { text-align: center; padding: 2rem; color: #86868b; }
+        .error { color: #ff3b30; padding: 1rem; background: #fff5f5; margin: 0.5rem; border-radius: 6px; }
+
+        .source-badge {
+            font-size: 0.55rem;
+            background: #5856d6;
+            color: #fff;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            margin-left: 0.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Smart Money Intelligence <span class="source-badge">NANSEN</span></h1>
+        <div class="header-right">
+            <a href="/" style="background:#e8e8ed;color:#1d1d1f">Dashboard</a>
+            <a href="/alpha" style="background:#ff9500;color:#fff">Alpha</a>
+            <a href="/signals" style="background:#34c759;color:#fff">Signals</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="summary-bar" id="summaryBar">
+            <div class="summary-item">
+                <div class="summary-label">Top Inflow Token</div>
+                <div class="summary-value green" id="topInflow">-</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Top Outflow Token</div>
+                <div class="summary-value red" id="topOutflow">-</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Top Holding</div>
+                <div class="summary-value purple" id="topHolding">-</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Recent Trades</div>
+                <div class="summary-value" id="tradeCount">-</div>
+            </div>
+        </section>
+
+        <section class="grid-2">
+            <!-- Smart Money Inflows -->
+            <div class="card">
+                <div class="card-header inflow">
+                    Smart Money Inflows (24h)
+                    <span class="badge green">Accumulation signals</span>
+                </div>
+                <div class="card-body" id="inflowsList">
+                    <div class="loading">Loading Nansen data...</div>
+                </div>
+            </div>
+
+            <!-- Smart Money Outflows -->
+            <div class="card">
+                <div class="card-header outflow">
+                    Smart Money Outflows (24h)
+                    <span class="badge red">Distribution signals</span>
+                </div>
+                <div class="card-body" id="outflowsList">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Top Holdings -->
+        <section class="card" style="margin-bottom: 1rem;">
+            <div class="card-header holdings">
+                Smart Money Top Holdings
+                <span class="badge purple">Highest conviction positions</span>
+            </div>
+            <div class="card-body" id="holdingsList">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Recent Trades -->
+        <section class="card">
+            <div class="card-header trades">
+                Recent Smart Money Trades
+                <span class="badge orange">Live DEX activity</span>
+            </div>
+            <div class="card-body" id="tradesList">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const fmt = {
+            usd: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                const sign = v < 0 ? '-' : '+';
+                if (abs >= 1e9) return sign + '$' + (abs/1e9).toFixed(2) + 'B';
+                if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
+                return sign + '$' + abs.toFixed(0);
+            },
+            usdAbs: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                if (abs >= 1e9) return '$' + (abs/1e9).toFixed(2) + 'B';
+                if (abs >= 1e6) return '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return '$' + (abs/1e3).toFixed(0) + 'K';
+                return '$' + abs.toFixed(0);
+            },
+            pct: (v) => {
+                if (!v) return '-';
+                const sign = v > 0 ? '+' : '';
+                return sign + v.toFixed(1) + '%';
+            }
+        };
+
+        async function loadSmartMoney() {
+            try {
+                const res = await fetch('/api/nansen/smart-money');
+                const data = await res.json();
+
+                // Update summary
+                if (data.top_inflows?.length) {
+                    document.getElementById('topInflow').textContent = data.top_inflows[0].token;
+                }
+                if (data.top_outflows?.length) {
+                    document.getElementById('topOutflow').textContent = data.top_outflows[0].token;
+                }
+                if (data.top_holdings?.length) {
+                    document.getElementById('topHolding').textContent = data.top_holdings[0].token;
+                }
+
+                // Render inflows
+                const inflowsList = document.getElementById('inflowsList');
+                if (data.top_inflows?.length) {
+                    inflowsList.innerHTML = data.top_inflows.map(item => `
+                        <div class="flow-item">
+                            <div class="flow-left">
+                                <span class="flow-token">${item.token}</span>
+                                <span class="flow-chain">${item.chain}</span>
+                            </div>
+                            <div class="flow-right">
+                                <div class="flow-amount positive">${fmt.usd(item.netflow_24h)}</div>
+                                <div class="flow-meta">7d: ${fmt.usd(item.netflow_7d)} | MCap: ${fmt.usdAbs(item.market_cap)}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    inflowsList.innerHTML = '<div class="loading">No inflow data</div>';
+                }
+
+                // Render outflows
+                const outflowsList = document.getElementById('outflowsList');
+                if (data.top_outflows?.length) {
+                    outflowsList.innerHTML = data.top_outflows.map(item => `
+                        <div class="flow-item">
+                            <div class="flow-left">
+                                <span class="flow-token">${item.token}</span>
+                                <span class="flow-chain">${item.chain}</span>
+                            </div>
+                            <div class="flow-right">
+                                <div class="flow-amount negative">${fmt.usd(item.netflow_24h)}</div>
+                                <div class="flow-meta">7d: ${fmt.usd(item.netflow_7d)} | MCap: ${fmt.usdAbs(item.market_cap)}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    outflowsList.innerHTML = '<div class="loading">No outflow data</div>';
+                }
+
+                // Render holdings
+                const holdingsList = document.getElementById('holdingsList');
+                if (data.top_holdings?.length) {
+                    holdingsList.innerHTML = data.top_holdings.map(item => `
+                        <div class="holding-item">
+                            <span class="flow-token">${item.token}</span>
+                            <span class="flow-chain">${item.chain}</span>
+                            <span class="holding-value">${fmt.usdAbs(item.value_usd)}</span>
+                            <span class="holding-change ${item.balance_change_24h > 0 ? 'up' : 'down'}">${fmt.pct(item.balance_change_24h)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    holdingsList.innerHTML = '<div class="loading">No holdings data</div>';
+                }
+
+            } catch (e) {
+                console.error('Smart money error:', e);
+                document.getElementById('inflowsList').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        async function loadTrades() {
+            try {
+                const res = await fetch('/api/nansen/dex-trades');
+                const data = await res.json();
+
+                document.getElementById('tradeCount').textContent = data.count || 0;
+
+                const tradesList = document.getElementById('tradesList');
+                if (data.trades?.length) {
+                    tradesList.innerHTML = data.trades.map(t => `
+                        <div class="trade-item ${t.action.toLowerCase()}">
+                            <span class="trade-trader">${t.trader}</span>
+                            <span class="trade-action ${t.action.toLowerCase()}">${t.action}</span>
+                            <span class="trade-tokens">${t.token_sold} → ${t.token_bought}</span>
+                            <span class="trade-usd">${fmt.usdAbs(t.value_usd)}</span>
+                            <span class="flow-chain">${t.chain}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    tradesList.innerHTML = '<div class="loading">No recent trades</div>';
+                }
+            } catch (e) {
+                console.error('Trades error:', e);
+                document.getElementById('tradesList').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSmartMoney();
+            loadTrades();
+        });
+    </script>
+</body>
+</html>
