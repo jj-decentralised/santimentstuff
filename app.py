@@ -843,6 +843,79 @@ def fetch_fund_portfolio(fund_id: str) -> dict:
     return {}
 
 
+# Cache for token prices (refresh every 5 mins)
+price_cache = {"prices": {}, "last_updated": None}
+price_cache_lock = threading.Lock()
+
+
+def get_token_prices(symbols: list[str]) -> dict:
+    """Fetch current prices from CoinGecko."""
+    with price_cache_lock:
+        # Return cached if fresh (< 5 mins)
+        if price_cache["last_updated"] and (datetime.now() - price_cache["last_updated"]).seconds < 300:
+            return price_cache["prices"]
+
+    # Map common symbols to CoinGecko IDs
+    symbol_to_id = {
+        "BTC": "bitcoin", "WBTC": "bitcoin", "ETH": "ethereum", "WETH": "ethereum",
+        "SOL": "solana", "BNB": "binancecoin", "AVAX": "avalanche-2", "MATIC": "matic-network",
+        "ARB": "arbitrum", "OP": "optimism", "LINK": "chainlink", "UNI": "uniswap",
+        "AAVE": "aave", "MKR": "maker", "SNX": "synthetix-network-token", "CRV": "curve-dao-token",
+        "LDO": "lido-dao", "RPL": "rocket-pool", "DOGE": "dogecoin", "SHIB": "shiba-inu",
+        "PEPE": "pepe", "FET": "fetch-ai", "RNDR": "render-token", "INJ": "injective-protocol",
+        "SUI": "sui", "APT": "aptos", "SEI": "sei-network", "TIA": "celestia",
+        "NEAR": "near", "ATOM": "cosmos", "DOT": "polkadot", "ADA": "cardano",
+        "XRP": "ripple", "DYDX": "dydx", "GMX": "gmx", "PENDLE": "pendle",
+        "ENA": "ethena", "EIGEN": "eigenlayer", "ZRO": "layerzero", "W": "wormhole",
+        "JUP": "jupiter-exchange-solana", "JTO": "jito-governance-token", "PYTH": "pyth-network",
+        "STX": "stacks", "RUNE": "thorchain", "OSMO": "osmosis", "FTM": "fantom",
+        "BLUR": "blur", "STRK": "starknet", "ZK": "zksync", "MEME": "memecoin",
+        "WLD": "worldcoin-wld", "BONK": "bonk", "WIF": "dogwifcoin",
+    }
+
+    # Get CoinGecko IDs for requested symbols
+    ids_to_fetch = []
+    for sym in symbols:
+        sym_upper = sym.upper()
+        if sym_upper in symbol_to_id:
+            ids_to_fetch.append(symbol_to_id[sym_upper])
+
+    if not ids_to_fetch:
+        return {}
+
+    try:
+        ids_str = ",".join(set(ids_to_fetch))
+        r = httpx.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": ids_str, "vs_currencies": "usd"},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            # Convert back to symbol -> price
+            prices = {}
+            id_to_symbol = {v: k for k, v in symbol_to_id.items()}
+            for cg_id, price_data in data.items():
+                if cg_id in id_to_symbol:
+                    sym = id_to_symbol[cg_id]
+                    prices[sym] = price_data.get("usd", 0)
+                    # Also add common variants
+                    if sym == "BTC":
+                        prices["WBTC"] = prices["BTC"]
+                    if sym == "ETH":
+                        prices["WETH"] = prices["ETH"]
+
+            with price_cache_lock:
+                price_cache["prices"] = prices
+                price_cache["last_updated"] = datetime.now()
+
+            return prices
+    except Exception as e:
+        print(f"Error fetching prices: {e}")
+
+    return price_cache.get("prices", {})
+
+
 def calculate_fund_pnl(fund_id: str, fund_name: str) -> dict:
     """Calculate P/L for a fund based on transfers and current holdings."""
     # Fetch transfers to calculate cost basis
@@ -877,30 +950,9 @@ def calculate_fund_pnl(fund_id: str, fund_name: str) -> dict:
             token_flows[token]["sold_usd"] += usd
             token_flows[token]["sold_amount"] += amount
 
-    # Parse portfolio for current holdings
-    current_holdings = {}
-    portfolio_value = 0
-
-    # Portfolio structure varies - try different formats
-    holdings_list = portfolio.get("holdings", []) or portfolio.get("tokens", []) or []
-    if isinstance(portfolio, dict) and "chains" in portfolio:
-        # Flatten chain-based portfolio
-        for chain_data in portfolio.get("chains", {}).values():
-            if isinstance(chain_data, dict):
-                holdings_list.extend(chain_data.get("tokens", []))
-
-    for holding in holdings_list:
-        if isinstance(holding, dict):
-            token = (holding.get("symbol") or holding.get("token", {}).get("symbol") or "").upper()
-            value = holding.get("valueUsd") or holding.get("value") or holding.get("usdValue") or 0
-            amount = holding.get("amount") or holding.get("balance") or 0
-
-            if token and value > 100:  # Only significant holdings
-                current_holdings[token] = {
-                    "amount": amount,
-                    "current_value": value,
-                }
-                portfolio_value += value
+    # Get current prices from CoinGecko
+    all_tokens = list(token_flows.keys())
+    current_prices = get_token_prices(all_tokens)
 
     # Calculate P/L per token
     token_pnl = []
@@ -909,58 +961,79 @@ def calculate_fund_pnl(fund_id: str, fund_name: str) -> dict:
     total_realized_pnl = 0
 
     for token, flows in token_flows.items():
+        # Skip stablecoins - no meaningful P/L
+        if token in ["USDT", "USDC", "DAI", "USDE", "BUSD", "TUSD"]:
+            continue
+
         net_amount = flows["bought_amount"] - flows["sold_amount"]
-        cost_basis = flows["bought_usd"]
-        proceeds = flows["sold_usd"]
+
+        # Skip if no net position
+        if net_amount <= 0:
+            # Still calculate realized P/L from closed positions
+            if flows["sold_amount"] > 0 and flows["bought_amount"] > 0:
+                avg_cost = flows["bought_usd"] / flows["bought_amount"]
+                realized_pnl = flows["sold_usd"] - (avg_cost * flows["sold_amount"])
+                if abs(realized_pnl) > 1000:
+                    total_realized_pnl += realized_pnl
+            continue
+
+        # Cost basis for remaining position (pro-rata)
+        if flows["bought_amount"] > 0:
+            avg_cost_per_token = flows["bought_usd"] / flows["bought_amount"]
+            remaining_cost_basis = avg_cost_per_token * net_amount
+        else:
+            remaining_cost_basis = 0
+
+        # Current value using real prices
+        current_price = current_prices.get(token, 0)
+        current_value = net_amount * current_price if current_price > 0 else 0
 
         # Realized P/L from sales
         if flows["sold_amount"] > 0 and flows["bought_amount"] > 0:
-            avg_cost = flows["bought_usd"] / flows["bought_amount"] if flows["bought_amount"] > 0 else 0
-            realized_pnl = proceeds - (avg_cost * flows["sold_amount"])
+            realized_pnl = flows["sold_usd"] - (avg_cost_per_token * flows["sold_amount"])
         else:
             realized_pnl = 0
 
-        # Current value from portfolio or estimate
-        current_value = 0
-        if token in current_holdings:
-            current_value = current_holdings[token]["current_value"]
-        elif net_amount > 0 and flows["bought_amount"] > 0:
-            # Estimate: use avg buy price as current price (conservative)
-            avg_price = flows["bought_usd"] / flows["bought_amount"]
-            current_value = net_amount * avg_price
-
         # Unrealized P/L
-        remaining_cost_basis = cost_basis * (net_amount / flows["bought_amount"]) if flows["bought_amount"] > 0 else 0
-        unrealized_pnl = current_value - remaining_cost_basis if net_amount > 0 else 0
+        unrealized_pnl = current_value - remaining_cost_basis if current_value > 0 else 0
 
-        if abs(cost_basis) > 1000 or abs(current_value) > 1000:
+        # Only include if we have meaningful data
+        if remaining_cost_basis > 1000 or current_value > 1000:
             token_pnl.append({
                 "token": token,
                 "bought_usd": flows["bought_usd"],
                 "sold_usd": flows["sold_usd"],
                 "net_amount": net_amount,
+                "current_price": current_price,
                 "cost_basis": remaining_cost_basis,
                 "current_value": current_value,
                 "realized_pnl": realized_pnl,
                 "unrealized_pnl": unrealized_pnl,
                 "total_pnl": realized_pnl + unrealized_pnl,
+                "has_price": current_price > 0,
             })
             total_cost_basis += remaining_cost_basis
-            total_current_value += current_value
+            if current_value > 0:
+                total_current_value += current_value
             total_realized_pnl += realized_pnl
 
     token_pnl.sort(key=lambda x: abs(x["total_pnl"]), reverse=True)
 
+    # Calculate totals (only for tokens with prices)
+    tokens_with_price = [t for t in token_pnl if t["has_price"]]
+    total_unrealized = sum(t["unrealized_pnl"] for t in tokens_with_price)
+
     return {
         "fund_id": fund_id,
         "name": fund_name,
-        "token_count": len([t for t in token_pnl if t["current_value"] > 0]),
-        "portfolio_value": portfolio_value if portfolio_value > 0 else total_current_value,
+        "token_count": len(token_pnl),
+        "tokens_with_price": len(tokens_with_price),
+        "portfolio_value": total_current_value,
         "total_cost_basis": total_cost_basis,
         "total_current_value": total_current_value,
         "total_realized_pnl": total_realized_pnl,
-        "total_unrealized_pnl": total_current_value - total_cost_basis,
-        "total_pnl": total_realized_pnl + (total_current_value - total_cost_basis),
+        "total_unrealized_pnl": total_unrealized,
+        "total_pnl": total_realized_pnl + total_unrealized,
         "tokens": token_pnl[:15],
     }
 
