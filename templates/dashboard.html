@@ -231,6 +231,141 @@
         @media (max-width: 1000px) {
             .grid-2 { grid-template-columns: 1fr; }
         }
+
+        /* Token Search */
+        .search-section {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #fff;
+            border: 1px solid #111;
+        }
+        .search-input {
+            flex: 1;
+            max-width: 300px;
+            padding: 8px 12px;
+            font-family: inherit;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            outline: none;
+        }
+        .search-input:focus { border-color: #111; }
+        .search-btn {
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: #111;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+        }
+        .search-btn:hover { background: #333; }
+        .search-btn:disabled { background: #888; cursor: not-allowed; }
+
+        /* Search Results */
+        .search-results {
+            display: none;
+            margin-bottom: 16px;
+            background: #fff;
+            border: 1px solid #111;
+        }
+        .search-results.active { display: block; }
+        .search-result-header {
+            padding: 12px;
+            border-bottom: 1px solid #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .search-result-token {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .search-result-token img {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+        }
+        .search-result-name {
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .search-result-symbol {
+            color: #666;
+            font-size: 11px;
+        }
+        .search-result-price {
+            text-align: right;
+        }
+        .search-result-body {
+            padding: 12px;
+        }
+        .search-chain-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+        .search-chain-item:hover { background: #f9f9f9; }
+        .search-chain-item:last-child { border-bottom: none; }
+        .chain-name {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+        .flow-summary {
+            text-align: right;
+        }
+        .flow-label {
+            font-size: 9px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .add-watchlist-btn {
+            padding: 6px 12px;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: #f3f4f6;
+            color: #111;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+        .add-watchlist-btn:hover { background: #e5e7eb; }
+
+        /* Watchlist */
+        .card-header.watchlist { border-left: 4px solid #6366f1; }
+        .watchlist-empty {
+            padding: 20px;
+            text-align: center;
+            color: #888;
+            font-size: 11px;
+        }
+        .watchlist-item {
+            display: grid;
+            grid-template-columns: 90px 1fr 100px 40px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            align-items: center;
+        }
+        .watchlist-item:hover { background: #f9f9f9; }
+        .remove-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #999;
+        }
+        .remove-btn:hover { color: #dc2626; }
     </style>
 </head>
 <body>
@@ -250,6 +385,50 @@
             </div>
             <span id="lastUpdate">Loading...</span>
         </div>
+
+        <!-- Token Search -->
+        <div class="search-section">
+            <input type="text" id="tokenSearch" class="search-input" placeholder="Search any token (ONDO, SYRUP, PEPE...)">
+            <button id="searchBtn" class="search-btn" onclick="searchToken()">Search</button>
+            <span style="color: #888; font-size: 10px;">Find smart money activity for any token</span>
+        </div>
+
+        <!-- Search Results (hidden by default) -->
+        <div id="searchResults" class="search-results">
+            <div class="search-result-header">
+                <div class="search-result-token">
+                    <img id="searchResultImg" src="" alt="">
+                    <div>
+                        <div class="search-result-name" id="searchResultName">-</div>
+                        <div class="search-result-symbol" id="searchResultSymbol">-</div>
+                    </div>
+                </div>
+                <div class="search-result-price">
+                    <div style="font-weight:600" id="searchResultPrice">-</div>
+                    <div id="searchResultChange" style="font-size:11px">-</div>
+                </div>
+            </div>
+            <div class="search-result-body" id="searchResultBody">
+                <!-- Chain data populated here -->
+            </div>
+        </div>
+
+        <!-- Watchlist -->
+        <section class="card" style="margin-bottom: 16px;" id="watchlistSection">
+            <div class="card-header watchlist">
+                My Watchlist
+                <span class="badge badge-gray" id="watchlistCount">0 tokens</span>
+            </div>
+            <div class="row-header" style="grid-template-columns: 90px 1fr 100px 40px;">
+                <span>Token</span>
+                <span>Smart Money Signal</span>
+                <span style="text-align:right">Flow</span>
+                <span></span>
+            </div>
+            <div class="card-body" id="watchlistBody">
+                <div class="watchlist-empty">No tokens in watchlist. Search and add tokens above.</div>
+            </div>
+        </section>
 
         <!-- Flows -->
         <section class="grid-2">
@@ -532,18 +711,227 @@
             }
         }
 
+        // ============== TOKEN SEARCH ==============
+        let lastSearchResult = null;
+
+        async function searchToken() {
+            const input = document.getElementById('tokenSearch');
+            const btn = document.getElementById('searchBtn');
+            const symbol = input.value.trim().toUpperCase();
+
+            if (!symbol) {
+                alert('Please enter a token symbol');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Searching...';
+
+            try {
+                const res = await fetch(`/api/token/search/${symbol}`);
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Token not found');
+                }
+
+                const data = await res.json();
+                lastSearchResult = data;
+                displaySearchResults(data);
+            } catch (e) {
+                alert(e.message);
+                document.getElementById('searchResults').classList.remove('active');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Search';
+            }
+        }
+
+        function displaySearchResults(data) {
+            const container = document.getElementById('searchResults');
+            container.classList.add('active');
+
+            // Header info
+            document.getElementById('searchResultImg').src = data.image || '';
+            document.getElementById('searchResultName').textContent = data.name;
+            document.getElementById('searchResultSymbol').textContent = data.symbol;
+            document.getElementById('searchResultPrice').textContent = fmt.usdAbs(data.price_usd);
+
+            const changeEl = document.getElementById('searchResultChange');
+            const change = data.price_change_24h || 0;
+            changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '% (24h)';
+            changeEl.style.color = change >= 0 ? '#16a34a' : '#dc2626';
+
+            // Chain data
+            const body = document.getElementById('searchResultBody');
+            if (data.chains?.length) {
+                body.innerHTML = `
+                    <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <span style="font-weight: 600;">Total Smart Money Flow:</span>
+                            <span class="value ${data.summary.total_whale_flow_usd + data.summary.total_smart_flow_usd >= 0 ? 'positive' : 'negative'}">
+                                ${fmt.usd(data.summary.total_whale_flow_usd + data.summary.total_smart_flow_usd)}
+                            </span>
+                            <span style="margin-left: 8px; font-size: 10px; padding: 2px 6px; background: ${data.summary.signal === 'accumulation' ? '#dcfce7' : '#fee2e2'}; color: ${data.summary.signal === 'accumulation' ? '#166534' : '#991b1b'};">
+                                ${data.summary.signal.toUpperCase()}
+                            </span>
+                        </div>
+                        <button class="add-watchlist-btn" onclick="addToWatchlist()">+ Add to Watchlist</button>
+                    </div>
+                    <div style="font-size: 10px; color: #666; margin-bottom: 8px;">AVAILABLE ON ${data.chains.length} CHAIN(S)</div>
+                    ${data.chains.map(c => `
+                        <div class="search-chain-item" onclick="goToToken('${c.chain}', '${c.address}')">
+                            <div>
+                                <span class="chain-name">${c.chain}</span>
+                                <span style="font-size: 9px; color: #888; margin-left: 8px;">${c.address.slice(0,8)}...</span>
+                            </div>
+                            <div class="flow-summary">
+                                ${c.smart_money_flow ? `
+                                    <div class="flow-label">Whale Flow</div>
+                                    <div class="value ${c.smart_money_flow.whale_net_flow >= 0 ? 'positive' : 'negative'}">${fmt.usd(c.smart_money_flow.whale_net_flow)}</div>
+                                ` : '<span style="color:#888">No flow data</span>'}
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+            } else {
+                body.innerHTML = '<div class="loading">No chain data available</div>';
+            }
+        }
+
+        // Enter key to search
+        document.getElementById('tokenSearch')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchToken();
+        });
+
+        // ============== WATCHLIST ==============
+        const WATCHLIST_KEY = 'smartMoneyWatchlist';
+
+        function loadWatchlist() {
+            return JSON.parse(localStorage.getItem(WATCHLIST_KEY) || '[]');
+        }
+
+        function saveWatchlist(list) {
+            localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
+        }
+
+        function addToWatchlist() {
+            if (!lastSearchResult) return;
+
+            const watchlist = loadWatchlist();
+
+            // Check if already exists
+            if (watchlist.find(t => t.symbol === lastSearchResult.symbol)) {
+                alert(`${lastSearchResult.symbol} is already in your watchlist`);
+                return;
+            }
+
+            // Find the best chain (one with most flow data)
+            const bestChain = lastSearchResult.chains.find(c => c.smart_money_flow) || lastSearchResult.chains[0];
+
+            watchlist.push({
+                symbol: lastSearchResult.symbol,
+                name: lastSearchResult.name,
+                chain: bestChain?.chain || 'ethereum',
+                address: bestChain?.address || '',
+                image: lastSearchResult.image,
+                addedAt: Date.now()
+            });
+
+            saveWatchlist(watchlist);
+            renderWatchlist();
+            alert(`${lastSearchResult.symbol} added to watchlist!`);
+        }
+
+        function removeFromWatchlist(symbol) {
+            const watchlist = loadWatchlist().filter(t => t.symbol !== symbol);
+            saveWatchlist(watchlist);
+            renderWatchlist();
+        }
+
+        async function renderWatchlist() {
+            const watchlist = loadWatchlist();
+            const container = document.getElementById('watchlistBody');
+            const countEl = document.getElementById('watchlistCount');
+
+            countEl.textContent = `${watchlist.length} token${watchlist.length !== 1 ? 's' : ''}`;
+
+            if (!watchlist.length) {
+                container.innerHTML = '<div class="watchlist-empty">No tokens in watchlist. Search and add tokens above.</div>';
+                return;
+            }
+
+            // Render loading state first
+            container.innerHTML = watchlist.map(t => `
+                <div class="watchlist-item">
+                    <div>
+                        <span class="token-name">${t.symbol}</span>
+                        <span class="token-chain">${t.chain.toUpperCase()}</span>
+                    </div>
+                    <div class="meta">Loading...</div>
+                    <span class="value">-</span>
+                    <button class="remove-btn" onclick="removeFromWatchlist('${t.symbol}')" title="Remove">✕</button>
+                </div>
+            `).join('');
+
+            // Fetch fresh data for each token
+            for (const token of watchlist) {
+                try {
+                    const res = await fetch(`/api/token/search/${token.symbol}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        updateWatchlistItem(token.symbol, data);
+                    }
+                } catch (e) {
+                    console.error(`Error fetching ${token.symbol}:`, e);
+                }
+            }
+        }
+
+        function updateWatchlistItem(symbol, data) {
+            const items = document.querySelectorAll('.watchlist-item');
+            for (const item of items) {
+                if (item.querySelector('.token-name')?.textContent === symbol) {
+                    const totalFlow = (data.summary?.total_whale_flow_usd || 0) + (data.summary?.total_smart_flow_usd || 0);
+                    const signal = data.summary?.signal || 'unknown';
+                    const signalColor = signal === 'accumulation' ? '#16a34a' : '#dc2626';
+                    const signalBg = signal === 'accumulation' ? '#dcfce7' : '#fee2e2';
+
+                    item.querySelector('.meta').innerHTML = `
+                        <span style="padding: 2px 6px; background: ${signalBg}; color: ${signalColor}; font-size: 9px; text-transform: uppercase;">
+                            ${signal}
+                        </span>
+                    `;
+                    item.querySelector('.value').className = `value ${totalFlow >= 0 ? 'positive' : 'negative'}`;
+                    item.querySelector('.value').textContent = fmt.usd(totalFlow);
+
+                    // Make clickable
+                    const bestChain = data.chains?.find(c => c.smart_money_flow) || data.chains?.[0];
+                    if (bestChain) {
+                        item.style.cursor = 'pointer';
+                        item.onclick = (e) => {
+                            if (e.target.classList.contains('remove-btn')) return;
+                            goToToken(bestChain.chain, bestChain.address);
+                        };
+                    }
+                    break;
+                }
+            }
+        }
+
         // Initialize and set up real-time polling
         document.addEventListener('DOMContentLoaded', () => {
             loadFlows();
             loadTrades();
             loadHoldings();
             loadTopInflowsSummary();
+            renderWatchlist();
 
             // Real-time updates every 5 seconds
             setInterval(loadFlows, 5000);
             setInterval(loadTrades, 5000);
             setInterval(loadHoldings, 10000);
             setInterval(loadTopInflowsSummary, 5000);
+            setInterval(renderWatchlist, 30000); // Refresh watchlist every 30s
         });
     </script>
 </body>

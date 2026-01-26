@@ -299,6 +299,88 @@ def fetch_trader_transactions(address, chain="solana", days=30):
         return {"data": [], "error": str(e)}
 
 
+# ============== TOKEN SEARCH (via CoinGecko) ==============
+
+# Chain mapping from CoinGecko platform names to Nansen chain names
+COINGECKO_TO_NANSEN_CHAIN = {
+    "ethereum": "ethereum",
+    "solana": "solana",
+    "base": "base",
+    "arbitrum-one": "arbitrum",
+    "polygon-pos": "polygon",
+    "optimistic-ethereum": "optimism",
+    "binance-smart-chain": "bsc",
+    "avalanche": "avalanche",
+}
+
+
+def lookup_token_by_symbol(symbol):
+    """Search for token by symbol using CoinGecko and return contract addresses.
+
+    Returns:
+        dict with name, symbol, and addresses by chain, or None if not found
+    """
+    try:
+        # Search for the token
+        search_resp = httpx.get(
+            "https://api.coingecko.com/api/v3/search",
+            params={"query": symbol},
+            timeout=10,
+        )
+        search_resp.raise_for_status()
+        coins = search_resp.json().get("coins", [])
+
+        # Find exact symbol match (case-insensitive)
+        matching_coin = None
+        for coin in coins:
+            if coin.get("symbol", "").upper() == symbol.upper():
+                matching_coin = coin
+                break
+
+        if not matching_coin:
+            # Try first result if no exact match
+            if coins:
+                matching_coin = coins[0]
+            else:
+                return None
+
+        # Get full coin details including contract addresses
+        coin_id = matching_coin["id"]
+        detail_resp = httpx.get(
+            f"https://api.coingecko.com/api/v3/coins/{coin_id}",
+            params={"localization": "false", "tickers": "false", "market_data": "true", "community_data": "false", "developer_data": "false"},
+            timeout=15,
+        )
+        detail_resp.raise_for_status()
+        detail = detail_resp.json()
+
+        # Extract contract addresses per chain
+        platforms = detail.get("platforms", {})
+        addresses = {}
+        for cg_chain, address in platforms.items():
+            if address and cg_chain in COINGECKO_TO_NANSEN_CHAIN:
+                nansen_chain = COINGECKO_TO_NANSEN_CHAIN[cg_chain]
+                addresses[nansen_chain] = address
+
+        # Get market data
+        market_data = detail.get("market_data", {})
+
+        return {
+            "id": coin_id,
+            "name": detail.get("name", matching_coin.get("name", "")),
+            "symbol": detail.get("symbol", matching_coin.get("symbol", "")).upper(),
+            "addresses": addresses,
+            "market_cap_usd": market_data.get("market_cap", {}).get("usd", 0),
+            "price_usd": market_data.get("current_price", {}).get("usd", 0),
+            "price_change_24h": market_data.get("price_change_percentage_24h", 0),
+            "image": detail.get("image", {}).get("small", ""),
+        }
+
+    except Exception as e:
+        print(f"CoinGecko lookup error for {symbol}: {e}")
+        return None
+
+
 # ============== API ENDPOINTS ==============
 
 @app.get("/api/flows")
@@ -413,6 +495,77 @@ def api_trades():
     return jsonify({
         "trades": trades[:50],
         "count": len(trades),
+        "generated_at": datetime.now().isoformat(),
+    })
+
+
+@app.get("/api/token/search/<symbol>")
+def api_token_search(symbol):
+    """Search for token by symbol and return smart money data across chains.
+
+    Uses CoinGecko to resolve symbol to contract addresses, then queries Nansen
+    for flow intelligence on each chain.
+    """
+    # Step 1: Look up token in CoinGecko
+    token_info = lookup_token_by_symbol(symbol)
+    if not token_info:
+        return jsonify({
+            "error": f"Token '{symbol}' not found",
+            "suggestion": "Try the exact symbol (e.g., ONDO, SYRUP, PEPE)"
+        }), 404
+
+    # Step 2: Query Nansen for each chain where token has a contract
+    chain_data = []
+    for chain, address in token_info.get("addresses", {}).items():
+        if not address:
+            continue
+
+        # Get flow intelligence from Nansen
+        flow_data = fetch_flow_intelligence(address, chain)
+        flow = flow_data.get("data", [{}])[0] if flow_data.get("data") else {}
+
+        if flow:
+            chain_data.append({
+                "chain": chain,
+                "address": address,
+                "smart_money_flow": {
+                    "whale_net_flow": flow.get("whale_net_flow_usd", 0) or 0,
+                    "smart_net_flow": flow.get("smart_trader_net_flow_usd", 0) or 0,
+                    "exchange_net_flow": flow.get("exchange_net_flow_usd", 0) or 0,
+                },
+                "holder_counts": {
+                    "whale": flow.get("whale_holder_count", 0) or 0,
+                    "smart": flow.get("smart_trader_holder_count", 0) or 0,
+                    "exchange": flow.get("exchange_holder_count", 0) or 0,
+                },
+            })
+        else:
+            # Still include chain even if no flow data
+            chain_data.append({
+                "chain": chain,
+                "address": address,
+                "smart_money_flow": None,
+                "holder_counts": None,
+            })
+
+    # Calculate totals across all chains
+    total_whale_flow = sum(c["smart_money_flow"]["whale_net_flow"] for c in chain_data if c.get("smart_money_flow"))
+    total_smart_flow = sum(c["smart_money_flow"]["smart_net_flow"] for c in chain_data if c.get("smart_money_flow"))
+
+    return jsonify({
+        "symbol": token_info["symbol"],
+        "name": token_info["name"],
+        "market_cap_usd": token_info.get("market_cap_usd", 0),
+        "price_usd": token_info.get("price_usd", 0),
+        "price_change_24h": token_info.get("price_change_24h", 0),
+        "image": token_info.get("image", ""),
+        "chains": chain_data,
+        "summary": {
+            "total_whale_flow_usd": total_whale_flow,
+            "total_smart_flow_usd": total_smart_flow,
+            "chains_with_data": len([c for c in chain_data if c.get("smart_money_flow")]),
+            "signal": "accumulation" if total_whale_flow + total_smart_flow > 0 else "distribution"
+        },
         "generated_at": datetime.now().isoformat(),
     })
 
