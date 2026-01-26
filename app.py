@@ -105,6 +105,8 @@ MARKET_MAKERS = {
 # In-memory cache
 cache = {
     "activity": None,
+    "swaps": None,
+    "entity_profiles": None,
     "last_updated": None,
     "is_refreshing": False,
 }
@@ -142,6 +144,84 @@ def fetch_fund_transfers(fund_id: str, limit: int = 50, min_usd: int = 10000) ->
         return []
 
 
+def fetch_fund_swaps(fund_id: str, limit: int = 50) -> list:
+    """Fetch recent DEX swaps for a fund - actual trading activity."""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/swaps",
+            params={
+                "base": fund_id,
+                "limit": limit,
+            },
+            headers={"API-Key": get_api_key()},
+            timeout=15,
+        )
+        r.raise_for_status()
+        return r.json().get("swaps", [])
+    except httpx.TimeoutException:
+        print(f"Timeout fetching swaps for {fund_id}")
+        return []
+    except Exception as e:
+        print(f"Error fetching swaps for {fund_id}: {e}")
+        return []
+
+
+def fetch_entity_intelligence(entity_id: str) -> dict:
+    """Fetch entity intelligence including whale/early holder/governance tags."""
+    try:
+        r = httpx.get(
+            f"{BASE_URL}/intelligence/entity/{entity_id}",
+            headers={"API-Key": get_api_key()},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            data = r.json()
+
+            # Parse populatedTags for whale status, early holder, governance
+            tags = data.get("populatedTags", [])
+
+            whale_tokens = []
+            early_tokens = []
+            governance_protocols = []
+
+            for tag in tags:
+                tag_type = tag.get("type", "")
+                tag_name = tag.get("name", "")
+
+                if tag_type == "whale" or "whale" in tag_name.lower():
+                    # Extract token from tag like "UNI Whale"
+                    token = tag_name.replace(" Whale", "").strip()
+                    if token:
+                        whale_tokens.append(token)
+
+                elif tag_type == "early-token-holder" or "early" in tag_name.lower():
+                    # Extract token from tag like "Early UNI Holder"
+                    token = tag_name.replace("Early ", "").replace(" Holder", "").strip()
+                    if token:
+                        early_tokens.append(token)
+
+                elif tag_type in ["governance-voter", "governance-delegatee"] or "governance" in tag_name.lower():
+                    # Extract protocol from governance tags
+                    protocol = tag_name.replace(" Governance Voter", "").replace(" Governance Delegatee", "").strip()
+                    if protocol:
+                        governance_protocols.append(protocol)
+
+            return {
+                "entity_id": entity_id,
+                "name": data.get("name", entity_id),
+                "type": data.get("type", ""),
+                "whale_tokens": whale_tokens,
+                "early_tokens": early_tokens,
+                "governance_protocols": governance_protocols,
+                "all_tags": [t.get("name", "") for t in tags],
+                "address_count": len(data.get("addresses", [])),
+            }
+    except Exception as e:
+        print(f"Error fetching intelligence for {entity_id}: {e}")
+
+    return {"entity_id": entity_id, "whale_tokens": [], "early_tokens": [], "governance_protocols": [], "all_tags": []}
+
+
 # Known exchanges for flow analysis
 EXCHANGES = {
     "binance", "coinbase", "kraken", "okx", "bybit", "bitfinex", "kucoin",
@@ -172,6 +252,89 @@ TOKEN_CATEGORIES = {
 
 # Max age for transactions (30 days in hours)
 MAX_TX_AGE_HOURS = 30 * 24  # 720 hours
+
+
+def parse_swap(swap: dict, fund_id: str, fund_name: str) -> dict | None:
+    """Parse a DEX swap into a clean activity item. Filters out swaps older than 30 days."""
+    usd = swap.get("historicalUSD", 0) or 0
+    if usd < 1000:
+        return None
+
+    ts = swap.get("blockTimestamp", "")
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        time_ago = datetime.now(dt.tzinfo) - dt
+        hours_ago = time_ago.total_seconds() / 3600
+        days_ago = time_ago.days
+
+        # FILTER: Skip swaps older than 30 days
+        if days_ago > 30:
+            return None
+
+        if time_ago.days > 0:
+            time_str = f"{time_ago.days}d ago"
+        elif time_ago.seconds > 3600:
+            time_str = f"{time_ago.seconds // 3600}h ago"
+        else:
+            time_str = f"{time_ago.seconds // 60}m ago"
+    except:
+        return None
+
+    # token0 = sold token, token1 = bought token (standard DEX convention)
+    token_sold = (swap.get("token0Symbol") or "???").upper()
+    token_bought = (swap.get("token1Symbol") or "???").upper()
+    amount_sold = swap.get("unitValue0", 0) or 0
+    amount_bought = swap.get("unitValue1", 0) or 0
+
+    # Get DEX info
+    dex_entity = swap.get("fromAddress", {}).get("arkhamEntity") or {}
+    dex_name = dex_entity.get("name", "Unknown DEX")
+
+    # Determine if this is a buy or sell of non-stable tokens
+    stables = {"USDT", "USDC", "DAI", "USDE", "BUSD", "TUSD", "FRAX"}
+
+    if token_bought in stables and token_sold not in stables:
+        # Selling crypto for stables = SELL signal
+        action = "Sold"
+        primary_token = token_sold
+        primary_amount = amount_sold
+        secondary_token = token_bought
+    elif token_sold in stables and token_bought not in stables:
+        # Buying crypto with stables = BUY signal
+        action = "Bought"
+        primary_token = token_bought
+        primary_amount = amount_bought
+        secondary_token = token_sold
+    elif token_sold in stables and token_bought in stables:
+        # Stable-to-stable swap, skip
+        return None
+    else:
+        # Crypto to crypto swap - consider it buying token1
+        action = "Swapped"
+        primary_token = token_bought
+        primary_amount = amount_bought
+        secondary_token = token_sold
+
+    return {
+        "type": "swap",
+        "timestamp": ts,
+        "time_ago": time_str,
+        "hours_ago": hours_ago,
+        "days_ago": days_ago,
+        "fund_id": fund_id,
+        "fund": fund_name,
+        "action": action,
+        "token": primary_token,
+        "token_sold": token_sold,
+        "token_bought": token_bought,
+        "amount_sold": amount_sold,
+        "amount_bought": amount_bought,
+        "usd": usd,
+        "dex": dex_name,
+        "chain": swap.get("chain", ""),
+        "tx_hash": swap.get("transactionHash", ""),
+        "category": TOKEN_CATEGORIES.get(primary_token, "other"),
+    }
 
 
 def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
@@ -258,6 +421,147 @@ def fetch_entity_activity(entity_id: str, entity_name: str, min_usd: int, limit:
     except Exception as e:
         print(f"Error processing {entity_id}: {e}")
     return results
+
+
+def fetch_entity_swaps(entity_id: str, entity_name: str, limit: int = 50) -> list:
+    """Fetch and parse swaps for a single entity."""
+    results = []
+    try:
+        swaps = fetch_fund_swaps(entity_id, limit=limit)
+        for swap in swaps:
+            item = parse_swap(swap, entity_id, entity_name)
+            if item:
+                results.append(item)
+    except Exception as e:
+        print(f"Error processing swaps for {entity_id}: {e}")
+    return results
+
+
+def build_swaps_data(limit_per_entity: int = 30) -> dict:
+    """Build DEX swaps data from all tracked entities."""
+    all_swaps = []
+
+    # Fetch swaps from all entities concurrently
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {
+            executor.submit(fetch_entity_swaps, eid, ename, limit_per_entity): eid
+            for eid, ename in ENTITIES.items()
+        }
+        for future in as_completed(futures):
+            entity_id = futures[future]
+            try:
+                results = future.result()
+                all_swaps.extend(results)
+                if results:
+                    print(f"  Fetched {len(results)} swaps from {entity_id}")
+            except Exception as e:
+                print(f"  Failed swaps {entity_id}: {e}")
+
+    all_swaps.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    # Group swaps by token (what they bought)
+    token_swaps = {}
+    for swap in all_swaps:
+        token = swap.get("token", "")
+        if not token:
+            continue
+
+        if token not in token_swaps:
+            token_swaps[token] = {"buys": [], "sells": [], "total_buy_usd": 0, "total_sell_usd": 0, "funds_buying": set(), "funds_selling": set()}
+
+        if swap["action"] in ["Bought", "Swapped"]:
+            token_swaps[token]["buys"].append(swap)
+            token_swaps[token]["total_buy_usd"] += swap["usd"]
+            token_swaps[token]["funds_buying"].add(swap["fund"])
+        elif swap["action"] == "Sold":
+            token_swaps[token]["sells"].append(swap)
+            token_swaps[token]["total_sell_usd"] += swap["usd"]
+            token_swaps[token]["funds_selling"].add(swap["fund"])
+
+    # Top tokens by swap activity
+    token_summary = []
+    for token, data in token_swaps.items():
+        net = data["total_buy_usd"] - data["total_sell_usd"]
+        token_summary.append({
+            "token": token,
+            "buy_usd": data["total_buy_usd"],
+            "sell_usd": data["total_sell_usd"],
+            "net_usd": net,
+            "buy_count": len(data["buys"]),
+            "sell_count": len(data["sells"]),
+            "funds_buying": list(data["funds_buying"]),
+            "funds_selling": list(data["funds_selling"]),
+            "buyer_count": len(data["funds_buying"]),
+            "seller_count": len(data["funds_selling"]),
+            "signal": "BUY" if net > 0 and len(data["funds_buying"]) > len(data["funds_selling"]) else "SELL" if net < 0 else "NEUTRAL",
+        })
+
+    token_summary.sort(key=lambda x: x["buy_usd"] + x["sell_usd"], reverse=True)
+
+    # Stats
+    total_buys = sum(s["usd"] for s in all_swaps if s["action"] in ["Bought", "Swapped"])
+    total_sells = sum(s["usd"] for s in all_swaps if s["action"] == "Sold")
+
+    return {
+        "swaps": all_swaps[:200],
+        "token_summary": token_summary[:20],
+        "stats": {
+            "total_swaps": len(all_swaps),
+            "total_buy_volume": total_buys,
+            "total_sell_volume": total_sells,
+            "net_flow": total_buys - total_sells,
+            "tokens_traded": len(token_swaps),
+            "active_funds": len(set(s["fund"] for s in all_swaps)),
+        },
+    }
+
+
+def build_entity_profiles() -> dict:
+    """Build entity intelligence profiles for all tracked funds."""
+    profiles = {}
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_entity_intelligence, eid): eid for eid in ENTITIES.keys()}
+        for future in as_completed(futures):
+            entity_id = futures[future]
+            try:
+                profile = future.result()
+                profiles[entity_id] = profile
+                if profile.get("whale_tokens") or profile.get("early_tokens"):
+                    print(f"  Got profile for {entity_id}: {len(profile.get('whale_tokens', []))} whale tokens, {len(profile.get('early_tokens', []))} early tokens")
+            except Exception as e:
+                print(f"  Failed profile {entity_id}: {e}")
+
+    # Aggregate by token: which funds are whales, which got early
+    token_intelligence = {}
+    for eid, profile in profiles.items():
+        fund_name = ENTITIES.get(eid, eid)
+
+        for token in profile.get("whale_tokens", []):
+            if token not in token_intelligence:
+                token_intelligence[token] = {"whale_funds": [], "early_funds": [], "governance_funds": []}
+            token_intelligence[token]["whale_funds"].append({"fund_id": eid, "name": fund_name})
+
+        for token in profile.get("early_tokens", []):
+            if token not in token_intelligence:
+                token_intelligence[token] = {"whale_funds": [], "early_funds": [], "governance_funds": []}
+            token_intelligence[token]["early_funds"].append({"fund_id": eid, "name": fund_name})
+
+        for protocol in profile.get("governance_protocols", []):
+            if protocol not in token_intelligence:
+                token_intelligence[protocol] = {"whale_funds": [], "early_funds": [], "governance_funds": []}
+            token_intelligence[protocol]["governance_funds"].append({"fund_id": eid, "name": fund_name})
+
+    return {
+        "profiles": profiles,
+        "token_intelligence": token_intelligence,
+        "stats": {
+            "total_profiles": len(profiles),
+            "funds_with_whale_status": len([p for p in profiles.values() if p.get("whale_tokens")]),
+            "funds_with_early_status": len([p for p in profiles.values() if p.get("early_tokens")]),
+            "funds_with_governance": len([p for p in profiles.values() if p.get("governance_protocols")]),
+        },
+    }
 
 
 def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dict:
@@ -467,7 +771,7 @@ def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dic
 
 
 def refresh_cache():
-    """Refresh the activity cache."""
+    """Refresh the activity cache including swaps and entity profiles."""
     global cache
     with cache_lock:
         if cache["is_refreshing"]:
@@ -477,10 +781,20 @@ def refresh_cache():
     try:
         print(f"[{datetime.now()}] Refreshing activity cache...")
         data = build_activity_data()
+
+        print(f"[{datetime.now()}] Fetching DEX swaps...")
+        swaps_data = build_swaps_data()
+
+        print(f"[{datetime.now()}] Fetching entity profiles...")
+        profiles_data = build_entity_profiles()
+
         with cache_lock:
             cache["activity"] = data
+            cache["swaps"] = swaps_data
+            cache["entity_profiles"] = profiles_data
             cache["last_updated"] = datetime.now()
-        print(f"[{datetime.now()}] Cache refreshed with {len(data['activity'])} transactions")
+
+        print(f"[{datetime.now()}] Cache refreshed: {len(data['activity'])} transfers, {len(swaps_data['swaps'])} swaps, {profiles_data['stats']['total_profiles']} profiles")
     except Exception as e:
         print(f"[{datetime.now()}] Cache refresh error: {e}")
     finally:
@@ -543,6 +857,237 @@ def force_refresh():
     thread = threading.Thread(target=refresh_cache, daemon=True)
     thread.start()
     return {"status": "refresh_started"}
+
+
+@app.get("/api/swaps")
+def get_swaps():
+    """Get DEX swap activity from all tracked funds - actual trading signals."""
+    with cache_lock:
+        if cache["swaps"] is not None:
+            data = cache["swaps"].copy()
+            data["cached"] = True
+            data["cache_age_seconds"] = (
+                (datetime.now() - cache["last_updated"]).total_seconds()
+                if cache["last_updated"]
+                else None
+            )
+            return data
+        is_refreshing = cache["is_refreshing"]
+
+    return {
+        "swaps": [],
+        "token_summary": [],
+        "stats": {"total_swaps": 0, "total_buy_volume": 0, "total_sell_volume": 0},
+        "loading": True,
+        "message": "Cache is building..." if is_refreshing else "Starting cache build...",
+    }
+
+
+@app.get("/api/fund/{fund_id}/profile")
+def get_fund_profile(fund_id: str):
+    """Get fund intelligence profile including whale status, early holder tags, and governance activity."""
+    with cache_lock:
+        profiles = cache.get("entity_profiles", {}).get("profiles", {})
+        if fund_id in profiles:
+            profile = profiles[fund_id].copy()
+
+            # Add recent swap activity
+            swaps = cache.get("swaps", {}).get("swaps", [])
+            fund_swaps = [s for s in swaps if s.get("fund_id") == fund_id][:20]
+            profile["recent_swaps"] = fund_swaps
+
+            # Add recent transfers
+            activity = cache.get("activity", {}).get("activity", [])
+            fund_transfers = [a for a in activity if a.get("fund_id") == fund_id][:20]
+            profile["recent_transfers"] = fund_transfers
+
+            return profile
+
+    # Not in cache - fetch fresh
+    profile = fetch_entity_intelligence(fund_id)
+    profile["name"] = ENTITIES.get(fund_id, NOTABLE_TRADERS.get(fund_id, fund_id))
+
+    # Fetch recent swaps
+    swaps = fetch_fund_swaps(fund_id, limit=20)
+    profile["recent_swaps"] = [parse_swap(s, fund_id, profile["name"]) for s in swaps if parse_swap(s, fund_id, profile["name"])]
+
+    return profile
+
+
+@app.get("/api/alpha")
+def get_alpha_signals():
+    """Get high-conviction alpha signals - early holders buying new tokens, whale convergence, etc."""
+    with cache_lock:
+        profiles_data = cache.get("entity_profiles", {})
+        swaps_data = cache.get("swaps", {})
+        activity_data = cache.get("activity", {})
+
+    if not profiles_data or not swaps_data:
+        return {"loading": True, "message": "Cache is building..."}
+
+    profiles = profiles_data.get("profiles", {})
+    token_intel = profiles_data.get("token_intelligence", {})
+    swaps = swaps_data.get("swaps", [])
+    activity = activity_data.get("activity", [])
+
+    signals = {
+        "early_holder_alpha": [],      # Early holders buying NEW tokens
+        "whale_convergence": [],       # Multiple whales accumulating same token
+        "governance_conviction": [],   # Funds with governance activity adding to positions
+        "new_whale_alert": [],         # Large accumulation by a single fund
+        "smart_money_exit": [],        # Early holders/whales selling
+    }
+
+    # Build fund -> early tokens mapping
+    fund_early_tokens = {}
+    fund_whale_tokens = {}
+    for fund_id, profile in profiles.items():
+        fund_early_tokens[fund_id] = set(profile.get("early_tokens", []))
+        fund_whale_tokens[fund_id] = set(profile.get("whale_tokens", []))
+
+    # Group recent swaps by token
+    token_recent_buys = {}
+    token_recent_sells = {}
+    for swap in swaps:
+        if swap.get("action") in ["Bought", "Swapped"]:
+            token = swap.get("token", "")
+            if token not in token_recent_buys:
+                token_recent_buys[token] = []
+            token_recent_buys[token].append(swap)
+        elif swap.get("action") == "Sold":
+            token = swap.get("token", "")
+            if token not in token_recent_sells:
+                token_recent_sells[token] = []
+            token_recent_sells[token].append(swap)
+
+    # 1. EARLY HOLDER ALPHA - Early holders buying NEW tokens they don't already hold
+    for swap in swaps:
+        if swap.get("action") not in ["Bought", "Swapped"]:
+            continue
+
+        fund_id = swap.get("fund_id", "")
+        token = swap.get("token", "")
+
+        early_tokens = fund_early_tokens.get(fund_id, set())
+        whale_tokens = fund_whale_tokens.get(fund_id, set())
+
+        # Check if fund has early holder track record AND this is a NEW token for them
+        if early_tokens and token not in early_tokens and token not in whale_tokens:
+            signals["early_holder_alpha"].append({
+                "fund": swap.get("fund"),
+                "fund_id": fund_id,
+                "token": token,
+                "usd": swap.get("usd", 0),
+                "time_ago": swap.get("time_ago"),
+                "early_track_record": list(early_tokens)[:5],
+                "signal_strength": "STRONG" if len(early_tokens) >= 3 else "MODERATE",
+            })
+
+    # Deduplicate and sort by USD
+    seen = set()
+    unique_alpha = []
+    for sig in signals["early_holder_alpha"]:
+        key = f"{sig['fund_id']}|{sig['token']}"
+        if key not in seen:
+            seen.add(key)
+            unique_alpha.append(sig)
+    signals["early_holder_alpha"] = sorted(unique_alpha, key=lambda x: x["usd"], reverse=True)[:20]
+
+    # 2. WHALE CONVERGENCE - Multiple whale-status funds buying same token
+    for token, buys in token_recent_buys.items():
+        whale_buyers = []
+        for buy in buys:
+            fund_id = buy.get("fund_id", "")
+            if fund_whale_tokens.get(fund_id):  # Fund has whale status in some tokens
+                whale_buyers.append({
+                    "fund": buy.get("fund"),
+                    "fund_id": fund_id,
+                    "usd": buy.get("usd", 0),
+                    "whale_tokens": list(fund_whale_tokens.get(fund_id, []))[:3],
+                })
+
+        if len(whale_buyers) >= 2:
+            total_usd = sum(b["usd"] for b in whale_buyers)
+            signals["whale_convergence"].append({
+                "token": token,
+                "whale_count": len(whale_buyers),
+                "total_usd": total_usd,
+                "whales": whale_buyers[:5],
+                "signal_strength": "STRONG" if len(whale_buyers) >= 3 else "MODERATE",
+            })
+
+    signals["whale_convergence"].sort(key=lambda x: x["whale_count"], reverse=True)
+
+    # 3. SMART MONEY EXIT - Early holders or whales selling
+    for swap in swaps:
+        if swap.get("action") != "Sold":
+            continue
+
+        fund_id = swap.get("fund_id", "")
+        token = swap.get("token", "")
+
+        early_tokens = fund_early_tokens.get(fund_id, set())
+        whale_tokens = fund_whale_tokens.get(fund_id, set())
+
+        # Check if fund is early holder or whale in the token they're selling
+        is_early = token in early_tokens
+        is_whale = token in whale_tokens
+
+        if is_early or is_whale:
+            signals["smart_money_exit"].append({
+                "fund": swap.get("fund"),
+                "fund_id": fund_id,
+                "token": token,
+                "usd": swap.get("usd", 0),
+                "time_ago": swap.get("time_ago"),
+                "is_early_holder": is_early,
+                "is_whale": is_whale,
+                "severity": "HIGH" if is_early else "MEDIUM",
+            })
+
+    signals["smart_money_exit"].sort(key=lambda x: x["usd"], reverse=True)
+    signals["smart_money_exit"] = signals["smart_money_exit"][:20]
+
+    # 4. NEW WHALE ALERT - Large single-fund accumulation
+    fund_token_totals = {}
+    for swap in swaps:
+        if swap.get("action") not in ["Bought", "Swapped"]:
+            continue
+
+        fund_id = swap.get("fund_id", "")
+        token = swap.get("token", "")
+        key = f"{fund_id}|{token}"
+
+        if key not in fund_token_totals:
+            fund_token_totals[key] = {"fund": swap.get("fund"), "fund_id": fund_id, "token": token, "total_usd": 0, "swap_count": 0}
+        fund_token_totals[key]["total_usd"] += swap.get("usd", 0)
+        fund_token_totals[key]["swap_count"] += 1
+
+    for key, data in fund_token_totals.items():
+        if data["total_usd"] >= 500000:  # $500k+ accumulation
+            signals["new_whale_alert"].append({
+                "fund": data["fund"],
+                "fund_id": data["fund_id"],
+                "token": data["token"],
+                "total_usd": data["total_usd"],
+                "swap_count": data["swap_count"],
+                "signal_strength": "STRONG" if data["total_usd"] >= 1000000 else "MODERATE",
+            })
+
+    signals["new_whale_alert"].sort(key=lambda x: x["total_usd"], reverse=True)
+    signals["new_whale_alert"] = signals["new_whale_alert"][:15]
+
+    return {
+        "signals": signals,
+        "generated_at": datetime.now().isoformat(),
+        "summary": {
+            "early_holder_alpha": len(signals["early_holder_alpha"]),
+            "whale_convergence": len(signals["whale_convergence"]),
+            "smart_money_exit": len(signals["smart_money_exit"]),
+            "new_whale_alert": len(signals["new_whale_alert"]),
+        },
+        "profiles_loaded": len(profiles),
+    }
 
 
 @app.get("/api/token/{token_symbol}")
@@ -1299,6 +1844,13 @@ def pnl_page():
 def signals_page():
     """Serve the Signals page."""
     html_path = BASE_DIR / "templates" / "signals.html"
+    return html_path.read_text()
+
+
+@app.get("/alpha", response_class=HTMLResponse)
+def alpha_page():
+    """Serve the Alpha Signals page."""
+    html_path = BASE_DIR / "templates" / "alpha.html"
     return html_path.read_text()
 
 

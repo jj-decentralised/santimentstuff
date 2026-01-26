@@ -264,6 +264,25 @@
         .whale-amount { font-family: 'SF Mono', monospace; font-weight: 600; color: #ff9500; }
         .whale-detail { color: #86868b; font-size: 0.65rem; margin-top: 0.15rem; }
 
+        /* DEX Trades */
+        .dex-trade {
+            display: grid;
+            grid-template-columns: 50px 90px 55px 65px 55px 80px 85px 1fr;
+            gap: 0.3rem;
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid #f5f5f5;
+            align-items: center;
+            font-size: 0.7rem;
+        }
+        .dex-trade:hover { background: #fafafa; }
+        .dex-trade.buy { background: rgba(52, 199, 89, 0.05); }
+        .dex-trade.sell { background: rgba(255, 59, 48, 0.05); }
+        .dex-action { font-weight: 600; font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 3px; }
+        .dex-action.bought { background: #d1f2d9; color: #1d7a3a; }
+        .dex-action.sold { background: #ffd9d6; color: #c41e3a; }
+        .dex-action.swapped { background: #fff0d6; color: #996300; }
+        .dex-dex { font-size: 0.55rem; color: #86868b; }
+
         .loading { text-align: center; padding: 1.5rem; color: #86868b; font-size: 0.75rem; }
         .error { color: #ff3b30; padding: 0.75rem; background: #fff5f5; margin: 0.5rem; border-radius: 6px; font-size: 0.75rem; }
 
@@ -370,6 +389,7 @@
         <h1>Fund Activity Tracker</h1>
         <div class="header-right">
             <span class="cache-info" id="cacheInfo"></span>
+            <a href="/alpha" style="padding:0.35rem 0.6rem;border-radius:6px;font-size:0.75rem;background:#ff9500;color:#fff;text-decoration:none;font-weight:600">Alpha</a>
             <a href="/signals" style="padding:0.35rem 0.6rem;border-radius:6px;font-size:0.75rem;background:#34c759;color:#fff;text-decoration:none;font-weight:600">Signals</a>
             <a href="/pnl" style="padding:0.35rem 0.6rem;border-radius:6px;font-size:0.75rem;background:#e8e8ed;color:#1d1d1f;text-decoration:none">Fund P/L</a>
             <select id="minUsd">
@@ -447,6 +467,17 @@
                 <div class="signal-body" id="emergingBody">
                     <div class="loading">Loading...</div>
                 </div>
+            </div>
+        </section>
+
+        <!-- DEX Trades - Real Trading Activity -->
+        <section class="card" style="margin-bottom: 0.75rem;">
+            <div class="card-header">
+                DEX Trades (Actual Trading)
+                <span class="badge" style="background:#ff9500;color:#fff">Swaps from funds</span>
+            </div>
+            <div class="dex-scroll" id="dexTradesList" style="max-height: 250px; overflow-y: auto; padding: 0.5rem;">
+                <div class="loading">Loading swaps...</div>
             </div>
         </section>
 
@@ -943,7 +974,42 @@
         document.getElementById('tokenModal').addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(); });
         document.getElementById('fundModal').addEventListener('click', e => { if (e.target.classList.contains('modal')) closeFundModal(); });
 
-        document.addEventListener('DOMContentLoaded', loadActivity);
+        async function loadSwaps() {
+            const list = document.getElementById('dexTradesList');
+            try {
+                const res = await fetch('/api/swaps');
+                const data = await res.json();
+
+                if (data.loading) {
+                    list.innerHTML = `<div class="loading">${data.message || 'Loading swaps...'}</div>`;
+                    return;
+                }
+
+                const swaps = data.swaps || [];
+                if (!swaps.length) {
+                    list.innerHTML = '<div class="loading">No DEX trades found</div>';
+                    return;
+                }
+
+                list.innerHTML = swaps.slice(0, 30).map(s => `
+                    <div class="dex-trade ${s.action.toLowerCase() === 'sold' ? 'sell' : 'buy'}">
+                        <span class="time">${s.time_ago}</span>
+                        <span class="fund" onclick="showFundDetail('${s.fund_id}')">${s.fund}</span>
+                        <span class="dex-action ${s.action.toLowerCase()}">${s.action}</span>
+                        <span class="token" onclick="showTokenDetail('${s.token}')">${s.token}</span>
+                        <span class="amount" style="font-size:0.6rem">${fmt.num(s.action === 'Sold' ? s.amount_sold : s.amount_bought)}</span>
+                        <span class="usd ${s.usd >= 500000 ? 'whale' : ''}">${fmt.usd(s.usd)}</span>
+                        <span class="dex-dex">${s.dex?.slice(0, 12) || 'DEX'}</span>
+                        <span class="chain">${s.chain}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Swaps error:', e);
+                list.innerHTML = '<div class="loading">Swaps loading...</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { loadActivity(); loadSwaps(); });
         document.getElementById('minUsd').addEventListener('change', loadActivity);
     </script>
 </body>
