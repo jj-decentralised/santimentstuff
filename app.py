@@ -45,8 +45,13 @@ def time_ago(timestamp_str):
 
 # ============== NANSEN API FUNCTIONS ==============
 
-def fetch_smart_money_netflow(chains=None, timeframe="24h"):
-    """Fetch smart money net flows - pre-aggregated by token."""
+def fetch_smart_money_netflow(chains=None, direction="DESC"):
+    """Fetch smart money net flows - pre-aggregated by token.
+
+    Args:
+        chains: List of chains to query
+        direction: "DESC" for inflows (highest first), "ASC" for outflows (lowest first)
+    """
     chains = chains or DEFAULT_CHAINS
 
     try:
@@ -61,7 +66,7 @@ def fetch_smart_money_netflow(chains=None, timeframe="24h"):
                     "include_smart_money_labels": ["Fund", "Smart Trader", "30D Smart Trader"],
                 },
                 "pagination": {"page": 1, "per_page": 100},
-                "order_by": [{"field": "net_flow_24h_usd", "direction": "DESC"}],
+                "order_by": [{"field": "net_flow_24h_usd", "direction": direction}],
             },
             timeout=30,
         )
@@ -209,33 +214,33 @@ def api_flows():
     """Get smart money flows - inflows and outflows."""
     chains = request.args.getlist("chain") or DEFAULT_CHAINS
 
-    data = fetch_smart_money_netflow(chains)
-    netflow_data = data.get("data", [])
+    # Fetch inflows (highest positive flows first)
+    inflow_data = fetch_smart_money_netflow(chains, direction="DESC")
+    inflow_items = inflow_data.get("data", [])
 
-    inflows = []
-    outflows = []
+    # Fetch outflows separately (most negative flows first)
+    outflow_data = fetch_smart_money_netflow(chains, direction="ASC")
+    outflow_items = outflow_data.get("data", [])
 
-    for item in netflow_data:
-        flow_24h = item.get("net_flow_24h_usd", 0) or 0
-        entry = {
+    def parse_flow(item):
+        return {
             "token": item.get("token_symbol", "???"),
             "token_address": item.get("token_address", ""),
             "chain": item.get("chain", ""),
             "flow_1h": item.get("net_flow_1h_usd", 0) or 0,
-            "flow_24h": flow_24h,
+            "flow_24h": item.get("net_flow_24h_usd", 0) or 0,
             "flow_7d": item.get("net_flow_7d_usd", 0) or 0,
             "flow_30d": item.get("net_flow_30d_usd", 0) or 0,
             "market_cap": item.get("market_cap_usd", 0) or 0,
             "trader_count": item.get("trader_count", 0),
             "token_age_days": item.get("token_age_days", 0),
         }
-        if flow_24h > 0:
-            inflows.append(entry)
-        elif flow_24h < 0:
-            outflows.append(entry)
 
-    inflows.sort(key=lambda x: x["flow_24h"], reverse=True)
-    outflows.sort(key=lambda x: x["flow_24h"])
+    # Filter inflows (positive 24h flow)
+    inflows = [parse_flow(item) for item in inflow_items if (item.get("net_flow_24h_usd", 0) or 0) > 0]
+
+    # Filter outflows (negative 24h flow)
+    outflows = [parse_flow(item) for item in outflow_items if (item.get("net_flow_24h_usd", 0) or 0) < 0]
 
     return jsonify({
         "inflows": inflows[:25],
@@ -414,9 +419,9 @@ def api_trader_profile(chain, address):
 
 @app.get("/api/signals")
 def api_signals():
-    """Generate actionable trading signals from the data."""
-    # Get flows
-    flows_data = fetch_smart_money_netflow()
+    """Generate actionable trading signals from the data (48h lookback)."""
+    # Get flows - sorted by highest inflows
+    flows_data = fetch_smart_money_netflow(direction="DESC")
     netflow = flows_data.get("data", [])
 
     # Get trades
@@ -430,14 +435,26 @@ def api_signals():
         "large_trades": [],
     }
 
-    # 1. Whale Accumulation - strong inflows across timeframes
-    for item in netflow[:50]:
+    # 1. Whale Accumulation - using 7d flow to capture 48h+ activity
+    # Lower thresholds to show more data
+    for item in netflow[:100]:
         flow_1h = item.get("net_flow_1h_usd", 0) or 0
         flow_24h = item.get("net_flow_24h_usd", 0) or 0
         flow_7d = item.get("net_flow_7d_usd", 0) or 0
 
-        # Strong if positive across multiple timeframes
-        if flow_1h > 10000 and flow_24h > 50000:
+        # Include if any significant positive flow in last 7 days
+        # This captures 48h+ of activity
+        if flow_24h > 10000 or flow_7d > 25000:
+            strength = "STRONG"
+            if flow_1h > 25000:
+                strength = "STRONG"
+            elif flow_24h > 50000:
+                strength = "STRONG"
+            elif flow_24h > 10000:
+                strength = "MODERATE"
+            else:
+                strength = "BUILDING"
+
             signals["whale_accumulation"].append({
                 "token": item.get("token_symbol", "???"),
                 "token_address": item.get("token_address", ""),
@@ -446,30 +463,33 @@ def api_signals():
                 "flow_24h": flow_24h,
                 "flow_7d": flow_7d,
                 "market_cap": item.get("market_cap_usd", 0) or 0,
-                "strength": "STRONG" if flow_1h > 25000 else "MODERATE",
+                "strength": strength,
             })
 
-    # 2. New Token Alpha - tokens < 14 days old with smart money interest
-    for item in netflow[:50]:
+    # 2. New Token Alpha - tokens < 30 days old (expanded from 14)
+    for item in netflow[:100]:
         age = item.get("token_age_days", 999)
         flow_24h = item.get("net_flow_24h_usd", 0) or 0
+        flow_7d = item.get("net_flow_7d_usd", 0) or 0
         traders = item.get("trader_count", 0)
 
-        if age <= 14 and flow_24h > 20000 and traders >= 5:
+        # Lower threshold and expanded age window
+        if age <= 30 and (flow_24h > 5000 or flow_7d > 10000) and traders >= 2:
             signals["new_token_alpha"].append({
                 "token": item.get("token_symbol", "???"),
                 "token_address": item.get("token_address", ""),
                 "chain": item.get("chain", ""),
                 "age_days": age,
                 "flow_24h": flow_24h,
+                "flow_7d": flow_7d,
                 "trader_count": traders,
                 "market_cap": item.get("market_cap_usd", 0) or 0,
             })
 
-    # 3. Large Trades - whale-sized individual trades
-    for t in trades[:30]:
+    # 3. Large Trades - lower threshold to $10K
+    for t in trades[:100]:
         value = t.get("trade_value_usd", 0) or 0
-        if value >= 50000:
+        if value >= 10000:
             signals["large_trades"].append({
                 "trader": t.get("trader_address_label", ""),
                 "trader_address": t.get("trader_address", ""),
@@ -487,9 +507,9 @@ def api_signals():
 
     return jsonify({
         "signals": {
-            "whale_accumulation": signals["whale_accumulation"][:10],
-            "new_token_alpha": signals["new_token_alpha"][:10],
-            "large_trades": signals["large_trades"][:15],
+            "whale_accumulation": signals["whale_accumulation"][:15],
+            "new_token_alpha": signals["new_token_alpha"][:15],
+            "large_trades": signals["large_trades"][:20],
         },
         "summary": {
             "whale_accumulation": len(signals["whale_accumulation"]),

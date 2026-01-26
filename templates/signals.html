@@ -285,7 +285,7 @@
             <div class="card">
                 <div class="card-header new-token">
                     New Token Alpha
-                    <span class="badge">< 14 days old</span>
+                    <span class="badge">< 30 days old</span>
                 </div>
                 <div class="card-body" id="newTokenSignals">
                     <div class="loading">Loading...</div>
@@ -295,8 +295,8 @@
 
         <div class="card">
             <div class="card-header large-trade">
-                Large Trades ($50K+)
-                <span class="badge">Whale swaps</span>
+                Large Trades ($10K+)
+                <span class="badge">Smart money swaps</span>
             </div>
             <div class="card-body" id="largeTradeSignals">
                 <div class="loading">Loading...</div>
@@ -413,8 +413,12 @@
                             </div>
                             <div class="signal-flows">
                                 <div class="signal-flow">
-                                    <span class="signal-flow-label">24h flow:</span>
+                                    <span class="signal-flow-label">24h:</span>
                                     <span class="signal-flow-value positive">${fmt.usd(s.flow_24h)}</span>
+                                </div>
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">7d:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_7d)}</span>
                                 </div>
                                 <div class="signal-flow">
                                     <span class="signal-flow-label">Traders:</span>
