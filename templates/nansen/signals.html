@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Signals</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            background: #0a0a0f;
+            color: #e5e5e7;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2a2a4a;
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav a {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .nav-active { background: #f59e0b; color: #000; }
+        .nav-default { background: rgba(255,255,255,0.1); color: #a0a0b0; }
+        .nav-default:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
+
+        /* Summary bar */
+        .summary-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .summary-item {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            padding: 1rem 1.5rem;
+            min-width: 150px;
+        }
+        .summary-label {
+            font-size: 0.65rem;
+            color: #6b6b80;
+            text-transform: uppercase;
+        }
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .summary-value.orange { color: #f59e0b; }
+        .summary-value.green { color: #10b981; }
+        .summary-value.purple { color: #a78bfa; }
+
+        /* Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Cards */
+        .card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header.whale { border-left: 3px solid #00d4ff; }
+        .card-header.new-token { border-left: 3px solid #10b981; }
+        .card-header.large-trade { border-left: 3px solid #f59e0b; }
+
+        .badge {
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge-cyan { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        .card-body {
+            max-height: 450px;
+            overflow-y: auto;
+        }
+
+        /* Signal items */
+        .signal-item {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .signal-item:hover { background: rgba(255,255,255,0.03); }
+        .signal-item:last-child { border-bottom: none; }
+
+        .signal-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.4rem;
+        }
+        .signal-token {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #fff;
+        }
+        .signal-chain {
+            font-size: 0.6rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            margin-left: 0.5rem;
+        }
+        .signal-chain.solana { color: #14f195; }
+        .signal-chain.ethereum { color: #627eea; }
+        .signal-chain.base { color: #0052ff; }
+
+        .signal-strength {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+        .signal-strength.strong { background: #f59e0b; color: #000; }
+        .signal-strength.moderate { background: rgba(255,255,255,0.1); color: #a0a0b0; }
+
+        .signal-flows {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.75rem;
+            margin-bottom: 0.3rem;
+        }
+        .signal-flow {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .signal-flow-label { color: #6b6b80; }
+        .signal-flow-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+        }
+        .signal-flow-value.positive { color: #10b981; }
+
+        .signal-meta {
+            font-size: 0.7rem;
+            color: #6b6b80;
+        }
+
+        /* Large trade items */
+        .trade-signal {
+            display: grid;
+            grid-template-columns: 1fr 80px 70px;
+            gap: 0.5rem;
+            padding: 0.7rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+        }
+        .trade-signal:hover { background: rgba(255,255,255,0.03); }
+        .trade-trader {
+            font-size: 0.75rem;
+            color: #a78bfa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .trade-pair {
+            font-size: 0.8rem;
+            margin-top: 0.2rem;
+        }
+        .trade-pair .sold { color: #ef4444; }
+        .trade-pair .bought { color: #10b981; font-weight: 600; }
+        .trade-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 700;
+            color: #f59e0b;
+            font-size: 0.9rem;
+        }
+        .trade-time {
+            font-size: 0.65rem;
+            color: #6b6b80;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
+        }
+        .empty-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
+
+        @media (max-width: 1000px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .summary-bar { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Alpha Signals</h1>
+        <nav class="header-nav">
+            <a href="/" class="nav-default">Dashboard</a>
+            <a href="/signals" class="nav-active">Signals</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Summary -->
+        <div class="summary-bar">
+            <div class="summary-item">
+                <div class="summary-label">Whale Accumulation</div>
+                <div class="summary-value orange" id="whaleCount">-</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">New Token Alpha</div>
+                <div class="summary-value green" id="newTokenCount">-</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-label">Large Trades</div>
+                <div class="summary-value purple" id="largeTradeCount">-</div>
+            </div>
+        </div>
+
+        <!-- Signals -->
+        <div class="grid-2">
+            <!-- Whale Accumulation -->
+            <div class="card">
+                <div class="card-header whale">
+                    Whale Accumulation
+                    <span class="badge badge-cyan">Strong inflows across timeframes</span>
+                </div>
+                <div class="card-body" id="whaleSignals">
+                    <div class="loading">Loading signals...</div>
+                </div>
+            </div>
+
+            <!-- New Token Alpha -->
+            <div class="card">
+                <div class="card-header new-token">
+                    New Token Alpha
+                    <span class="badge badge-green">Tokens < 14 days with SM interest</span>
+                </div>
+                <div class="card-body" id="newTokenSignals">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Large Trades -->
+        <div class="card">
+            <div class="card-header large-trade">
+                Large Trades ($50K+)
+                <span class="badge badge-orange">Whale-sized individual swaps</span>
+            </div>
+            <div class="card-body" id="largeTradeSignals">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const fmt = {
+            usd: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                const sign = v < 0 ? '-' : '+';
+                if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
+                return sign + '$' + abs.toFixed(0);
+            },
+            usdAbs: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                if (abs >= 1e6) return '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return '$' + (abs/1e3).toFixed(0) + 'K';
+                return '$' + abs.toFixed(0);
+            },
+            mcap: (v) => {
+                if (!v) return '';
+                if (v >= 1e9) return 'MCap $' + (v/1e9).toFixed(1) + 'B';
+                if (v >= 1e6) return 'MCap $' + (v/1e6).toFixed(0) + 'M';
+                return 'MCap $' + (v/1e3).toFixed(0) + 'K';
+            }
+        };
+
+        function goToToken(chain, address) {
+            if (address) window.location.href = `/token/${chain}/${address}`;
+        }
+
+        function goToTrader(chain, address) {
+            if (address) window.location.href = `/trader/${chain}/${address}`;
+        }
+
+        async function loadSignals() {
+            try {
+                const res = await fetch('/api/signals');
+                const data = await res.json();
+
+                const signals = data.signals || {};
+                const summary = data.summary || {};
+
+                // Update counts
+                document.getElementById('whaleCount').textContent = summary.whale_accumulation || 0;
+                document.getElementById('newTokenCount').textContent = summary.new_token_alpha || 0;
+                document.getElementById('largeTradeCount').textContent = summary.large_trades || 0;
+
+                // Whale Accumulation
+                const whaleSignals = document.getElementById('whaleSignals');
+                const whales = signals.whale_accumulation || [];
+                if (whales.length) {
+                    whaleSignals.innerHTML = whales.map(s => `
+                        <div class="signal-item" onclick="goToToken('${s.chain}', '${s.token_address}')">
+                            <div class="signal-top">
+                                <div>
+                                    <span class="signal-token">${s.token}</span>
+                                    <span class="signal-chain ${s.chain}">${s.chain}</span>
+                                </div>
+                                <span class="signal-strength ${s.strength.toLowerCase()}">${s.strength}</span>
+                            </div>
+                            <div class="signal-flows">
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">1h:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_1h)}</span>
+                                </div>
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">24h:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_24h)}</span>
+                                </div>
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">7d:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_7d)}</span>
+                                </div>
+                            </div>
+                            <div class="signal-meta">${fmt.mcap(s.market_cap)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    whaleSignals.innerHTML = '<div class="empty-state"><div class="empty-icon">-</div>No whale accumulation signals</div>';
+                }
+
+                // New Token Alpha
+                const newTokenSignals = document.getElementById('newTokenSignals');
+                const newTokens = signals.new_token_alpha || [];
+                if (newTokens.length) {
+                    newTokenSignals.innerHTML = newTokens.map(s => `
+                        <div class="signal-item" onclick="goToToken('${s.chain}', '${s.token_address}')">
+                            <div class="signal-top">
+                                <div>
+                                    <span class="signal-token">${s.token}</span>
+                                    <span class="signal-chain ${s.chain}">${s.chain}</span>
+                                </div>
+                                <span class="signal-strength strong">${s.age_days}d old</span>
+                            </div>
+                            <div class="signal-flows">
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">24h flow:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_24h)}</span>
+                                </div>
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">Traders:</span>
+                                    <span class="signal-flow-value">${s.trader_count}</span>
+                                </div>
+                            </div>
+                            <div class="signal-meta">${fmt.mcap(s.market_cap)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    newTokenSignals.innerHTML = '<div class="empty-state"><div class="empty-icon">-</div>No new token signals</div>';
+                }
+
+                // Large Trades
+                const largeTradeSignals = document.getElementById('largeTradeSignals');
+                const largeTrades = signals.large_trades || [];
+                if (largeTrades.length) {
+                    largeTradeSignals.innerHTML = largeTrades.map(t => `
+                        <div class="trade-signal" onclick="goToTrader('${t.chain}', '${t.trader_address}')">
+                            <div>
+                                <div class="trade-trader">${t.trader || 'Unknown'}</div>
+                                <div class="trade-pair">
+                                    <span class="sold">${t.token_sold}</span>
+                                    →
+                                    <span class="bought">${t.token_bought}</span>
+                                </div>
+                            </div>
+                            <span class="trade-value">${fmt.usdAbs(t.value_usd)}</span>
+                            <span class="trade-time">${t.time_ago}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    largeTradeSignals.innerHTML = '<div class="empty-state"><div class="empty-icon">-</div>No large trades</div>';
+                }
+
+            } catch (e) {
+                console.error('Signals error:', e);
+                document.getElementById('whaleSignals').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadSignals);
+
+        // Auto-refresh every 60s
+        setInterval(loadSignals, 60000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Money Intelligence</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            background: #0a0a0f;
+            color: #e5e5e7;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2a2a4a;
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav a {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .nav-active { background: #7c3aed; color: #fff; }
+        .nav-default { background: rgba(255,255,255,0.1); color: #a0a0b0; }
+        .nav-default:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 1rem; }
+
+        /* Timeframe selector */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+        .timeframe-btns {
+            display: flex;
+            gap: 0.25rem;
+            background: rgba(255,255,255,0.05);
+            padding: 0.25rem;
+            border-radius: 8px;
+        }
+        .timeframe-btn {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            background: transparent;
+            color: #a0a0b0;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .timeframe-btn.active { background: #7c3aed; color: #fff; }
+        .timeframe-btn:hover:not(.active) { background: rgba(255,255,255,0.1); }
+
+        .chain-filter {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .chain-chip {
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .chain-chip.active { border-color: #7c3aed; background: rgba(124, 58, 237, 0.2); }
+        .chain-chip.sol { color: #14f195; }
+        .chain-chip.eth { color: #627eea; }
+        .chain-chip.base { color: #0052ff; }
+        .chain-chip.arb { color: #28a0f0; }
+
+        /* Grid layout */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Cards */
+        .card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header.inflow { border-left: 3px solid #10b981; }
+        .card-header.outflow { border-left: 3px solid #ef4444; }
+        .card-header.holdings { border-left: 3px solid #7c3aed; }
+        .card-header.trades { border-left: 3px solid #f59e0b; }
+
+        .badge {
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .badge-purple { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        .card-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* Flow items */
+        .flow-item {
+            display: grid;
+            grid-template-columns: 80px 1fr 100px;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .flow-item:hover { background: rgba(255,255,255,0.03); }
+        .flow-token {
+            font-weight: 700;
+            color: #fff;
+        }
+        .flow-chain {
+            font-size: 0.6rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+        }
+        .flow-chain.solana { color: #14f195; }
+        .flow-chain.ethereum { color: #627eea; }
+        .flow-chain.base { color: #0052ff; }
+        .flow-meta {
+            font-size: 0.65rem;
+            color: #6b6b80;
+        }
+        .flow-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            text-align: right;
+        }
+        .flow-value.positive { color: #10b981; }
+        .flow-value.negative { color: #ef4444; }
+
+        /* Holdings items */
+        .holding-item {
+            display: grid;
+            grid-template-columns: 80px 1fr 90px 70px;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+        }
+        .holding-item:hover { background: rgba(255,255,255,0.03); }
+        .holding-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            color: #a78bfa;
+        }
+        .holding-change {
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .holding-change.up { color: #10b981; }
+        .holding-change.down { color: #ef4444; }
+
+        /* Trade items */
+        .trade-item {
+            display: grid;
+            grid-template-columns: 55px 1fr 70px 85px 50px;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .trade-item:hover { background: rgba(255,255,255,0.03); }
+        .trade-time { color: #6b6b80; font-size: 0.65rem; }
+        .trade-trader {
+            color: #a78bfa;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .trade-pair {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .trade-arrow { color: #6b6b80; }
+        .trade-token { font-weight: 600; }
+        .trade-token.bought { color: #10b981; }
+        .trade-token.sold { color: #ef4444; }
+        .trade-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            color: #f59e0b;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
+        }
+        .error {
+            color: #ef4444;
+            padding: 1rem;
+            background: rgba(239, 68, 68, 0.1);
+            margin: 0.5rem;
+            border-radius: 6px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
+
+        @media (max-width: 1200px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Smart Money Intelligence</h1>
+        <nav class="header-nav">
+            <a href="/" class="nav-active">Dashboard</a>
+            <a href="/signals" class="nav-default">Signals</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Controls -->
+        <div class="controls">
+            <div class="timeframe-btns">
+                <button class="timeframe-btn active" data-tf="24h">24H</button>
+                <button class="timeframe-btn" data-tf="7d">7D</button>
+                <button class="timeframe-btn" data-tf="30d">30D</button>
+            </div>
+            <div class="chain-filter">
+                <span class="chain-chip active sol" data-chain="solana">SOL</span>
+                <span class="chain-chip active eth" data-chain="ethereum">ETH</span>
+                <span class="chain-chip active base" data-chain="base">BASE</span>
+                <span class="chain-chip arb" data-chain="arbitrum">ARB</span>
+            </div>
+        </div>
+
+        <!-- Flows -->
+        <section class="grid-2">
+            <div class="card">
+                <div class="card-header inflow">
+                    Smart Money Inflows
+                    <span class="badge badge-green">Accumulation</span>
+                </div>
+                <div class="card-body" id="inflowsList">
+                    <div class="loading">Loading flows...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header outflow">
+                    Smart Money Outflows
+                    <span class="badge badge-red">Distribution</span>
+                </div>
+                <div class="card-body" id="outflowsList">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Trades -->
+        <section class="card" style="margin-bottom: 1rem;">
+            <div class="card-header trades">
+                Live DEX Activity
+                <span class="badge badge-orange">Real-time swaps</span>
+            </div>
+            <div class="card-body" id="tradesList" style="max-height: 350px;">
+                <div class="loading">Loading trades...</div>
+            </div>
+        </section>
+
+        <!-- Holdings -->
+        <section class="card">
+            <div class="card-header holdings">
+                Smart Money Top Holdings
+                <span class="badge badge-purple">Highest conviction</span>
+            </div>
+            <div class="card-body" id="holdingsList">
+                <div class="loading">Loading holdings...</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const fmt = {
+            usd: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                const sign = v < 0 ? '-' : '+';
+                if (abs >= 1e9) return sign + '$' + (abs/1e9).toFixed(2) + 'B';
+                if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
+                return sign + '$' + abs.toFixed(0);
+            },
+            usdAbs: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                if (abs >= 1e9) return '$' + (abs/1e9).toFixed(2) + 'B';
+                if (abs >= 1e6) return '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return '$' + (abs/1e3).toFixed(0) + 'K';
+                return '$' + abs.toFixed(0);
+            },
+            pct: (v) => {
+                if (!v && v !== 0) return '-';
+                const sign = v > 0 ? '+' : '';
+                return sign + v.toFixed(1) + '%';
+            },
+            mcap: (v) => {
+                if (!v) return '';
+                if (v >= 1e9) return 'MCap $' + (v/1e9).toFixed(1) + 'B';
+                if (v >= 1e6) return 'MCap $' + (v/1e6).toFixed(0) + 'M';
+                return 'MCap $' + (v/1e3).toFixed(0) + 'K';
+            }
+        };
+
+        let currentTimeframe = '24h';
+
+        function goToToken(chain, address) {
+            if (address) window.location.href = `/token/${chain}/${address}`;
+        }
+
+        function goToTrader(chain, address) {
+            if (address) window.location.href = `/trader/${chain}/${address}`;
+        }
+
+        async function loadFlows() {
+            try {
+                const res = await fetch('/api/flows');
+                const data = await res.json();
+
+                // Inflows
+                const inflowsList = document.getElementById('inflowsList');
+                if (data.inflows?.length) {
+                    inflowsList.innerHTML = data.inflows.map(f => `
+                        <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
+                            <div>
+                                <div class="flow-token">${f.token}</div>
+                                <span class="flow-chain ${f.chain}">${f.chain}</span>
+                            </div>
+                            <div class="flow-meta">
+                                ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
+                            </div>
+                            <div class="flow-value positive">${fmt.usd(f.flow_24h)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    inflowsList.innerHTML = '<div class="loading">No inflow data</div>';
+                }
+
+                // Outflows
+                const outflowsList = document.getElementById('outflowsList');
+                if (data.outflows?.length) {
+                    outflowsList.innerHTML = data.outflows.map(f => `
+                        <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
+                            <div>
+                                <div class="flow-token">${f.token}</div>
+                                <span class="flow-chain ${f.chain}">${f.chain}</span>
+                            </div>
+                            <div class="flow-meta">
+                                ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
+                            </div>
+                            <div class="flow-value negative">${fmt.usd(f.flow_24h)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    outflowsList.innerHTML = '<div class="loading">No outflow data</div>';
+                }
+            } catch (e) {
+                console.error('Flows error:', e);
+                document.getElementById('inflowsList').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        async function loadTrades() {
+            try {
+                const res = await fetch('/api/trades?min_usd=1000');
+                const data = await res.json();
+
+                const tradesList = document.getElementById('tradesList');
+                if (data.trades?.length) {
+                    tradesList.innerHTML = data.trades.map(t => `
+                        <div class="trade-item" onclick="goToTrader('${t.chain}', '${t.trader_address}')">
+                            <span class="trade-time">${t.time_ago}</span>
+                            <span class="trade-trader">${t.trader}</span>
+                            <div class="trade-pair">
+                                <span class="trade-token sold">${t.token_sold}</span>
+                                <span class="trade-arrow">→</span>
+                                <span class="trade-token bought">${t.token_bought}</span>
+                            </div>
+                            <span class="trade-value">${fmt.usdAbs(t.value_usd)}</span>
+                            <span class="flow-chain ${t.chain}">${t.chain}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    tradesList.innerHTML = '<div class="loading">No recent trades</div>';
+                }
+            } catch (e) {
+                console.error('Trades error:', e);
+                tradesList.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        async function loadHoldings() {
+            try {
+                const res = await fetch('/api/holdings');
+                const data = await res.json();
+
+                const holdingsList = document.getElementById('holdingsList');
+                if (data.holdings?.length) {
+                    holdingsList.innerHTML = data.holdings.map(h => `
+                        <div class="holding-item" onclick="goToToken('${h.chain}', '${h.token_address}')">
+                            <div>
+                                <div class="flow-token">${h.token}</div>
+                                <span class="flow-chain ${h.chain}">${h.chain}</span>
+                            </div>
+                            <div class="flow-meta">
+                                ${h.holders_count} holders | ${h.share_percent.toFixed(1)}% of supply
+                            </div>
+                            <span class="holding-value">${fmt.usdAbs(h.value_usd)}</span>
+                            <span class="holding-change ${h.change_24h >= 0 ? 'up' : 'down'}">${fmt.pct(h.change_24h)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    holdingsList.innerHTML = '<div class="loading">No holdings data</div>';
+                }
+            } catch (e) {
+                console.error('Holdings error:', e);
+                holdingsList.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFlows();
+            loadTrades();
+            loadHoldings();
+
+            // Auto-refresh trades every 30s
+            setInterval(loadTrades, 30000);
+        });
+
+        // Timeframe buttons
+        document.querySelectorAll('.timeframe-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTimeframe = btn.dataset.tf;
+                loadFlows();
+            });
+        });
+    </script>
+</body>
+</html>

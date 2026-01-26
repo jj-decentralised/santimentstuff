@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trader Profile</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            background: #0a0a0f;
+            color: #e5e5e7;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2a2a4a;
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav a {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-decoration: none;
+            font-weight: 500;
+            background: rgba(255,255,255,0.1);
+            color: #a0a0b0;
+        }
+        .header-nav a:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+
+        /* Trader header */
+        .trader-header {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .trader-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .trader-icon {
+            font-size: 2rem;
+        }
+        .trader-label {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #a78bfa;
+        }
+        .trader-chain {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(124, 58, 237, 0.2);
+            color: #a78bfa;
+        }
+        .trader-address {
+            font-family: 'SF Mono', monospace;
+            font-size: 0.75rem;
+            color: #6b6b80;
+            word-break: break-all;
+        }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .stat-card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 0.65rem;
+            color: #6b6b80;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+        .stat-value {
+            font-family: 'SF Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+        .stat-value.positive { color: #10b981; }
+        .stat-value.negative { color: #ef4444; }
+        .stat-value.neutral { color: #a78bfa; }
+
+        /* Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        /* Cards */
+        .card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header.tokens { border-left: 3px solid #f59e0b; }
+        .card-header.history { border-left: 3px solid #7c3aed; }
+
+        .badge {
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .badge-purple { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
+
+        .card-body {
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* Top tokens */
+        .token-item {
+            display: grid;
+            grid-template-columns: 80px 1fr 80px;
+            gap: 0.5rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+        }
+        .token-item:hover { background: rgba(255,255,255,0.03); margin: 0 -1rem; padding-left: 1rem; padding-right: 1rem; }
+        .token-item:last-child { border-bottom: none; }
+        .token-symbol {
+            font-weight: 700;
+            color: #fff;
+        }
+        .token-chain {
+            font-size: 0.6rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            color: #6b6b80;
+        }
+        .token-pnl {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+        }
+        .token-pnl.positive { color: #10b981; }
+        .token-pnl.negative { color: #ef4444; }
+        .token-roi {
+            font-size: 0.7rem;
+            color: #6b6b80;
+        }
+
+        /* Transaction history */
+        .tx-item {
+            display: grid;
+            grid-template-columns: 70px 1fr 90px;
+            gap: 0.5rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            font-size: 0.75rem;
+        }
+        .tx-item:last-child { border-bottom: none; }
+        .tx-time {
+            font-size: 0.65rem;
+            color: #6b6b80;
+        }
+        .tx-method {
+            font-weight: 500;
+            color: #a78bfa;
+        }
+        .tx-tokens {
+            font-size: 0.7rem;
+        }
+        .tx-tokens .sent { color: #ef4444; }
+        .tx-tokens .received { color: #10b981; }
+        .tx-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            color: #f59e0b;
+            text-align: right;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
+        }
+        .error {
+            color: #ef4444;
+            padding: 1rem;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 6px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
+
+        @media (max-width: 900px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Trader Profile</h1>
+        <nav class="header-nav">
+            <a href="/">Dashboard</a>
+            <a href="/signals">Signals</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Trader Header -->
+        <div class="trader-header">
+            <div class="trader-title">
+                <span class="trader-icon">🤓</span>
+                <span class="trader-label" id="traderLabel">Smart Trader</span>
+                <span class="trader-chain">{{ chain }}</span>
+            </div>
+            <div class="trader-address">{{ address }}</div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-label">Realized P/L</div>
+                <div class="stat-value neutral" id="realizedPnl">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Win Rate</div>
+                <div class="stat-value neutral" id="winRate">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Tokens Traded</div>
+                <div class="stat-value neutral" id="tokensTraded">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Trades</div>
+                <div class="stat-value neutral" id="totalTrades">-</div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="grid-2">
+            <!-- Top Tokens -->
+            <section class="card">
+                <div class="card-header tokens">
+                    Top Profitable Tokens
+                    <span class="badge badge-orange">Best performers</span>
+                </div>
+                <div class="card-body" id="topTokens">
+                    <div class="loading">Loading tokens...</div>
+                </div>
+            </section>
+
+            <!-- Transaction History -->
+            <section class="card">
+                <div class="card-header history">
+                    Recent Transactions
+                    <span class="badge badge-purple">Last 30 days</span>
+                </div>
+                <div class="card-body" id="txHistory">
+                    <div class="loading">Loading transactions...</div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const chain = '{{ chain }}';
+        const address = '{{ address }}';
+
+        const fmt = {
+            usd: (v) => {
+                if (!v && v !== 0) return '-';
+                const abs = Math.abs(v);
+                const sign = v < 0 ? '-' : '+';
+                if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(1) + 'K';
+                return sign + '$' + abs.toFixed(0);
+            },
+            usdAbs: (v) => {
+                if (!v && v !== 0) return '-';
+                const abs = Math.abs(v);
+                if (abs >= 1e6) return '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return '$' + (abs/1e3).toFixed(1) + 'K';
+                return '$' + abs.toFixed(0);
+            },
+            pct: (v) => {
+                if (!v && v !== 0) return '-';
+                return (v * 100).toFixed(0) + '%';
+            },
+            roi: (v) => {
+                if (!v && v !== 0) return '';
+                const sign = v > 0 ? '+' : '';
+                return sign + v.toFixed(0) + '% ROI';
+            }
+        };
+
+        function goToToken(tokenAddress) {
+            if (tokenAddress) window.location.href = `/token/${chain}/${tokenAddress}`;
+        }
+
+        async function loadTraderData() {
+            try {
+                const res = await fetch(`/api/trader/${chain}/${address}`);
+                const data = await res.json();
+
+                // Stats
+                const pnl = data.pnl_summary || {};
+                const realizedPnl = pnl.realized_pnl || 0;
+                document.getElementById('realizedPnl').textContent = fmt.usd(realizedPnl);
+                document.getElementById('realizedPnl').className = `stat-value ${realizedPnl >= 0 ? 'positive' : 'negative'}`;
+
+                const winRate = pnl.win_rate || 0;
+                document.getElementById('winRate').textContent = fmt.pct(winRate);
+                document.getElementById('winRate').className = `stat-value ${winRate >= 0.5 ? 'positive' : 'negative'}`;
+
+                document.getElementById('tokensTraded').textContent = pnl.traded_tokens || 0;
+                document.getElementById('totalTrades').textContent = pnl.total_trades || 0;
+
+                // Top Tokens
+                const topTokens = document.getElementById('topTokens');
+                const tokens = data.top_tokens || [];
+
+                if (tokens.length) {
+                    topTokens.innerHTML = tokens.map(t => {
+                        const pnlClass = t.pnl >= 0 ? 'positive' : 'negative';
+                        return `
+                            <div class="token-item" onclick="goToToken('${t.address}')">
+                                <div>
+                                    <div class="token-symbol">${t.symbol}</div>
+                                    <span class="token-chain">${t.chain}</span>
+                                </div>
+                                <div class="token-roi">${fmt.roi(t.roi)}</div>
+                                <div class="token-pnl ${pnlClass}">${fmt.usd(t.pnl)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    topTokens.innerHTML = '<div class="loading">No token data</div>';
+                }
+
+                // Transaction History
+                const txHistory = document.getElementById('txHistory');
+                const txs = data.transactions || [];
+
+                if (txs.length) {
+                    txHistory.innerHTML = txs.map(tx => {
+                        const sent = tx.tokens_sent?.map(t => t.token_symbol || '?').join(', ') || '';
+                        const received = tx.tokens_received?.map(t => t.token_symbol || '?').join(', ') || '';
+                        return `
+                            <div class="tx-item">
+                                <span class="tx-time">${tx.time_ago}</span>
+                                <div class="tx-tokens">
+                                    ${sent ? `<span class="sent">-${sent}</span>` : ''}
+                                    ${sent && received ? ' → ' : ''}
+                                    ${received ? `<span class="received">+${received}</span>` : ''}
+                                </div>
+                                <span class="tx-value">${fmt.usdAbs(tx.volume_usd)}</span>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    txHistory.innerHTML = '<div class="loading">No transaction history</div>';
+                }
+
+            } catch (e) {
+                console.error('Error loading trader data:', e);
+                document.getElementById('topTokens').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadTraderData);
+    </script>
+</body>
+</html>

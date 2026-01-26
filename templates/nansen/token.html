@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Intelligence</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            background: #0a0a0f;
+            color: #e5e5e7;
+            line-height: 1.4;
+            font-size: 13px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2a2a4a;
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav a {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-decoration: none;
+            font-weight: 500;
+            background: rgba(255,255,255,0.1);
+            color: #a0a0b0;
+        }
+        .header-nav a:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+
+        /* Token header */
+        .token-header {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .token-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .token-symbol {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+        }
+        .token-chain {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(124, 58, 237, 0.2);
+            color: #a78bfa;
+        }
+        .token-address {
+            font-family: 'SF Mono', monospace;
+            font-size: 0.75rem;
+            color: #6b6b80;
+            word-break: break-all;
+        }
+
+        /* Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Cards */
+        .card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header.flow { border-left: 3px solid #00d4ff; }
+        .card-header.pnl { border-left: 3px solid #10b981; }
+
+        .badge {
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge-cyan { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+
+        .card-body { padding: 1rem; }
+
+        /* Flow intelligence */
+        .flow-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        .flow-segment {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .flow-segment-title {
+            font-size: 0.7rem;
+            color: #6b6b80;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .flow-segment-icon {
+            font-size: 1rem;
+        }
+        .flow-segment-value {
+            font-family: 'SF Mono', monospace;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+        .flow-segment-value.positive { color: #10b981; }
+        .flow-segment-value.negative { color: #ef4444; }
+        .flow-segment-value.neutral { color: #6b6b80; }
+        .flow-segment-meta {
+            font-size: 0.65rem;
+            color: #6b6b80;
+            margin-top: 0.25rem;
+        }
+
+        /* P/L Leaderboard */
+        .pnl-item {
+            display: grid;
+            grid-template-columns: 30px 1fr 100px 80px 60px;
+            gap: 0.5rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+        }
+        .pnl-item:hover { background: rgba(255,255,255,0.03); margin: 0 -1rem; padding-left: 1rem; padding-right: 1rem; }
+        .pnl-item:last-child { border-bottom: none; }
+        .pnl-rank {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #6b6b80;
+        }
+        .pnl-rank.top { color: #f59e0b; }
+        .pnl-trader {
+            font-size: 0.75rem;
+            color: #a78bfa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pnl-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .pnl-value.positive { color: #10b981; }
+        .pnl-value.negative { color: #ef4444; }
+        .pnl-roi {
+            font-size: 0.7rem;
+        }
+        .pnl-roi.positive { color: #10b981; }
+        .pnl-roi.negative { color: #ef4444; }
+        .pnl-trades {
+            font-size: 0.65rem;
+            color: #6b6b80;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
+        }
+        .error {
+            color: #ef4444;
+            padding: 1rem;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 6px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
+
+        @media (max-width: 900px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .flow-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Token Intelligence</h1>
+        <nav class="header-nav">
+            <a href="/">Dashboard</a>
+            <a href="/signals">Signals</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Token Header -->
+        <div class="token-header">
+            <div class="token-title">
+                <span class="token-symbol" id="tokenSymbol">Loading...</span>
+                <span class="token-chain" id="tokenChain">{{ chain }}</span>
+            </div>
+            <div class="token-address" id="tokenAddress">{{ token_address }}</div>
+        </div>
+
+        <!-- Flow Intelligence -->
+        <section class="card" style="margin-bottom: 1rem;">
+            <div class="card-header flow">
+                Flow Intelligence (24h)
+                <span class="badge badge-cyan">Who's moving this token?</span>
+            </div>
+            <div class="card-body">
+                <div class="flow-grid" id="flowGrid">
+                    <div class="loading">Loading flow data...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- P/L Leaderboard -->
+        <section class="card">
+            <div class="card-header pnl">
+                P/L Leaderboard (30d)
+                <span class="badge badge-green">Top performers on this token</span>
+            </div>
+            <div class="card-body" id="pnlList">
+                <div class="loading">Loading P/L data...</div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const chain = '{{ chain }}';
+        const tokenAddress = '{{ token_address }}';
+
+        const fmt = {
+            usd: (v) => {
+                if (!v && v !== 0) return '-';
+                const abs = Math.abs(v);
+                const sign = v < 0 ? '-' : '+';
+                if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
+                return sign + '$' + abs.toFixed(0);
+            },
+            pct: (v) => {
+                if (!v && v !== 0) return '-';
+                const sign = v > 0 ? '+' : '';
+                return sign + (v * 100).toFixed(0) + '%';
+            }
+        };
+
+        function goToTrader(address) {
+            if (address) window.location.href = `/trader/${chain}/${address}`;
+        }
+
+        async function loadTokenData() {
+            try {
+                const res = await fetch(`/api/token/${chain}/${tokenAddress}`);
+                const data = await res.json();
+
+                // Flow Intelligence
+                const flowGrid = document.getElementById('flowGrid');
+                const flow = data.flow_intelligence;
+
+                const segments = [
+                    { key: 'whale', icon: '🐋', label: 'Whales' },
+                    { key: 'smart_trader', icon: '🤓', label: 'Smart Traders' },
+                    { key: 'top_pnl', icon: '🏆', label: 'Top P/L Traders' },
+                    { key: 'exchange', icon: '🏦', label: 'Exchanges' },
+                ];
+
+                flowGrid.innerHTML = segments.map(s => {
+                    const seg = flow[s.key] || {};
+                    const netFlow = seg.net_flow || 0;
+                    const valueClass = netFlow > 0 ? 'positive' : netFlow < 0 ? 'negative' : 'neutral';
+                    return `
+                        <div class="flow-segment">
+                            <div class="flow-segment-title">
+                                <span class="flow-segment-icon">${s.icon}</span>
+                                ${s.label}
+                            </div>
+                            <div class="flow-segment-value ${valueClass}">${fmt.usd(netFlow)}</div>
+                            <div class="flow-segment-meta">
+                                ${seg.wallet_count || 0} wallets | Avg: ${fmt.usd(seg.avg_flow || 0)}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // P/L Leaderboard
+                const pnlList = document.getElementById('pnlList');
+                const leaders = data.pnl_leaderboard || [];
+
+                if (leaders.length) {
+                    pnlList.innerHTML = leaders.map((t, i) => {
+                        const pnlClass = t.pnl_total >= 0 ? 'positive' : 'negative';
+                        const roiClass = t.roi_percent >= 0 ? 'positive' : 'negative';
+                        return `
+                            <div class="pnl-item" onclick="goToTrader('${t.address}')">
+                                <span class="pnl-rank ${i < 3 ? 'top' : ''}">#${i + 1}</span>
+                                <span class="pnl-trader">${t.label || t.address.slice(0, 12) + '...'}</span>
+                                <span class="pnl-value ${pnlClass}">${fmt.usd(t.pnl_total)}</span>
+                                <span class="pnl-roi ${roiClass}">${fmt.pct(t.roi_percent)}</span>
+                                <span class="pnl-trades">${t.trades} trades</span>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    pnlList.innerHTML = '<div class="loading">No P/L data available</div>';
+                }
+
+            } catch (e) {
+                console.error('Error loading token data:', e);
+                document.getElementById('flowGrid').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadTokenData);
+    </script>
+</body>
+</html>
