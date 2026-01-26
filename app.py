@@ -170,10 +170,39 @@ TOKEN_CATEGORIES = {
 }
 
 
+# Max age for transactions (30 days in hours)
+MAX_TX_AGE_HOURS = 30 * 24  # 720 hours
+
+
 def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
-    """Parse a transfer into a clean activity item."""
+    """Parse a transfer into a clean activity item. Filters out transactions older than 30 days."""
     usd = tx.get("historicalUSD", 0) or 0
     if usd < 1000:
+        return None
+
+    # Parse timestamp first to filter old transactions
+    ts = tx.get("blockTimestamp", "")
+    hours_ago = 0
+    days_ago = 0
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        time_ago = datetime.now(dt.tzinfo) - dt
+        hours_ago = time_ago.total_seconds() / 3600
+        days_ago = time_ago.days
+
+        # FILTER: Skip transactions older than 30 days
+        if days_ago > 30:
+            return None
+
+        if time_ago.days > 0:
+            time_str = f"{time_ago.days}d ago"
+        elif time_ago.seconds > 3600:
+            time_str = f"{time_ago.seconds // 3600}h ago"
+        else:
+            time_str = f"{time_ago.seconds // 60}m ago"
+    except:
+        time_str = "?"
+        # Skip if we can't parse the timestamp
         return None
 
     to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
@@ -194,21 +223,6 @@ def parse_transfer(tx: dict, fund_id: str, fund_name: str) -> dict | None:
 
     # Detect exchange involvement
     is_exchange = counterparty_type == "cex" or counterparty_id in EXCHANGES
-
-    ts = tx.get("blockTimestamp", "")
-    hours_ago = 0
-    try:
-        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-        time_ago = datetime.now(dt.tzinfo) - dt
-        hours_ago = time_ago.total_seconds() / 3600
-        if time_ago.days > 0:
-            time_str = f"{time_ago.days}d ago"
-        elif time_ago.seconds > 3600:
-            time_str = f"{time_ago.seconds // 3600}h ago"
-        else:
-            time_str = f"{time_ago.seconds // 60}m ago"
-    except:
-        time_str = "?"
 
     token = (tx.get("tokenSymbol") or "???").upper()
 
@@ -575,9 +589,12 @@ def get_token_activity(token_symbol: str):
                         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                         days_ago = (datetime.now(dt.tzinfo) - dt).days
                         time_ago = f"{days_ago}d ago" if days_ago > 0 else "today"
+
+                        # FILTER: Skip transactions older than 30 days
+                        if days_ago > 30:
+                            continue
                     except:
-                        days_ago = 999
-                        time_ago = "?"
+                        continue  # Skip unparseable timestamps
 
                     to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
                     from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}
@@ -601,7 +618,6 @@ def get_token_activity(token_symbol: str):
                             "is_market_maker": is_mm,
                             "7d": {"received": 0, "sent": 0, "txs": []},
                             "30d": {"received": 0, "sent": 0, "txs": []},
-                            "90d": {"received": 0, "sent": 0, "txs": []},
                             "all_txs": [],
                         }
 
@@ -628,12 +644,9 @@ def get_token_activity(token_symbol: str):
                     if days_ago <= 7:
                         entity_activity[eid]["7d"][direction] += usd
                         entity_activity[eid]["7d"]["txs"].append(tx_record)
-                    if days_ago <= 30:
-                        entity_activity[eid]["30d"][direction] += usd
-                        entity_activity[eid]["30d"]["txs"].append(tx_record)
-                    if days_ago <= 90:
-                        entity_activity[eid]["90d"][direction] += usd
-                        entity_activity[eid]["90d"]["txs"].append(tx_record)
+                    # All transactions are already filtered to 30d max
+                    entity_activity[eid]["30d"][direction] += usd
+                    entity_activity[eid]["30d"]["txs"].append(tx_record)
 
             except Exception as e:
                 print(f"Error checking {entity_id}: {e}")
@@ -643,10 +656,9 @@ def get_token_activity(token_symbol: str):
     for entity_id, data in entity_activity.items():
         net_7d = data["7d"]["received"] - data["7d"]["sent"]
         net_30d = data["30d"]["received"] - data["30d"]["sent"]
-        net_90d = data["90d"]["received"] - data["90d"]["sent"]
 
         # Only include entities with meaningful activity
-        if abs(net_30d) < 1000 and abs(net_90d) < 1000:
+        if abs(net_30d) < 1000:
             continue
 
         # Sort transactions by timestamp
@@ -660,16 +672,13 @@ def get_token_activity(token_symbol: str):
             "is_market_maker": data["is_market_maker"],
             "net_7d": net_7d,
             "net_30d": net_30d,
-            "net_90d": net_90d,
             "received_7d": data["7d"]["received"],
             "sent_7d": data["7d"]["sent"],
             "received_30d": data["30d"]["received"],
             "sent_30d": data["30d"]["sent"],
-            "received_90d": data["90d"]["received"],
-            "sent_90d": data["90d"]["sent"],
             "tx_count_7d": len(data["7d"]["txs"]),
             "tx_count_30d": len(data["30d"]["txs"]),
-            "recent_txs": all_txs[:10],  # Last 10 transactions
+            "recent_txs": all_txs[:10],
         })
 
     # Sort by 30d net flow
@@ -753,9 +762,12 @@ def get_fund_activity(fund_id: str):
             dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             days_ago = (datetime.now(dt.tzinfo) - dt).days
             time_ago = f"{days_ago}d ago" if days_ago > 0 else "today"
+
+            # FILTER: Skip transactions older than 30 days
+            if days_ago > 30:
+                continue
         except:
-            days_ago = 999
-            time_ago = "?"
+            continue  # Skip unparseable timestamps
 
         to_entity = (tx.get("toAddress") or {}).get("arkhamEntity") or {}
         from_entity = (tx.get("fromAddress") or {}).get("arkhamEntity") or {}

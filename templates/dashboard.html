@@ -765,7 +765,6 @@
                         </td>
                         <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
                         <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
-                        <td class="${e.net_90d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_90d)}</td>
                         <td style="font-size:0.6rem;color:#86868b">${e.tx_count_30d || 0} txs</td>
                     </tr>`;
 
@@ -822,14 +821,14 @@
 
                     if (smartAccum.length) {
                         html += `<div style="font-size:0.65rem;color:#34c759;font-weight:600;margin:0.5rem 0 0.3rem">ACCUMULATING</div>
-                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>90D</th><th>Activity</th></tr></thead><tbody>
+                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>Activity</th></tr></thead><tbody>
                             ${smartAccum.map(e => entityRow(e)).join('')}
                             </tbody></table>`;
                     }
 
                     if (smartSell.length) {
                         html += `<div style="font-size:0.65rem;color:#ff3b30;font-weight:600;margin:0.5rem 0 0.3rem">DISTRIBUTING</div>
-                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>90D</th><th>Activity</th></tr></thead><tbody>
+                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>Activity</th></tr></thead><tbody>
                             ${smartSell.map(e => entityRow(e)).join('')}
                             </tbody></table>`;
                     }
@@ -841,7 +840,7 @@
 
                 if (mmAccum.length || mmSell.length) {
                     html += `<div class="section-title" style="color:#86868b;margin-top:1rem">Market Makers (for context)</div>
-                        <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>90D</th><th>Activity</th></tr></thead><tbody>
+                        <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>Activity</th></tr></thead><tbody>
                         ${[...mmAccum, ...mmSell].map(e => entityRow(e, false)).join('')}
                         </tbody></table>`;
                 }
