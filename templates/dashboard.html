@@ -302,6 +302,17 @@
             </div>
         </section>
 
+        <!-- Top Inflows Summary -->
+        <section class="card" style="margin-bottom: 16px;">
+            <div class="card-header inflow">
+                Top Inflows
+                <span class="badge badge-green">Being Accumulated</span>
+            </div>
+            <div class="card-body" id="topInflowsSummary" style="padding: 12px; max-height: none;">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+
         <!-- Holdings -->
         <section class="card">
             <div class="card-header holdings">
@@ -493,16 +504,46 @@
             }
         }
 
+        async function loadTopInflowsSummary() {
+            try {
+                const res = await fetch('/api/flows');
+                const data = await res.json();
+
+                const container = document.getElementById('topInflowsSummary');
+                if (data.inflows?.length) {
+                    const top5 = data.inflows.slice(0, 5);
+                    container.innerHTML = `
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            ${top5.map(f => `
+                                <div onclick="goToToken('${f.chain}', '${f.token_address}')"
+                                     style="flex: 1; min-width: 120px; padding: 10px; background: #f9f9f9; border: 1px solid #eee; cursor: pointer;">
+                                    <div style="font-weight: 700; font-size: 13px;">${f.token}</div>
+                                    <div style="color: #16a34a; font-weight: 600; font-size: 14px;">${fmt.usd(f.flow_24h)}</div>
+                                    <div style="font-size: 9px; color: #888; text-transform: uppercase;">${f.chain}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = '<div class="loading">No inflow data</div>';
+                }
+            } catch (e) {
+                console.error('Top inflows error:', e);
+            }
+        }
+
         // Initialize and set up real-time polling
         document.addEventListener('DOMContentLoaded', () => {
             loadFlows();
             loadTrades();
             loadHoldings();
+            loadTopInflowsSummary();
 
             // Real-time updates every 5 seconds
             setInterval(loadFlows, 5000);
             setInterval(loadTrades, 5000);
             setInterval(loadHoldings, 10000);
+            setInterval(loadTopInflowsSummary, 5000);
         });
     </script>
 </body>
