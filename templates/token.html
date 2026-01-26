@@ -301,6 +301,16 @@
 
         <section class="card">
             <div class="card-header holders">
+                Holder Breakdown
+                <span class="badge">By category</span>
+            </div>
+            <div class="card-body" id="holderBreakdown" style="padding: 12px;">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-header holders">
                 Top Holders
                 <span class="badge">Who owns this token</span>
             </div>
@@ -420,6 +430,33 @@
                     `;
                 }).join('');
 
+                // Render holder breakdown by category
+                const breakdownEl = document.getElementById('holderBreakdown');
+                const breakdown = data.holder_breakdown || {};
+                const breakdownKeys = Object.keys(breakdown).sort((a, b) =>
+                    (breakdown[b].value_usd || 0) - (breakdown[a].value_usd || 0)
+                );
+
+                if (breakdownKeys.length) {
+                    breakdownEl.innerHTML = `
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                            ${breakdownKeys.map(key => {
+                                const cat = breakdown[key];
+                                return `
+                                    <div style="flex: 1; min-width: 120px; padding: 10px; background: #f9f9f9; border: 1px solid #eee;">
+                                        <div style="font-size: 16px; margin-bottom: 4px;">${cat.emoji || '❓'}</div>
+                                        <div style="font-weight: 600; font-size: 12px;">${cat.name || key}</div>
+                                        <div style="font-size: 11px; color: #666;">${cat.count} holders</div>
+                                        <div style="font-weight: 600; color: #16a34a;">${fmt.usdAbs(cat.value_usd)}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                } else {
+                    breakdownEl.innerHTML = '<div class="loading">No breakdown data</div>';
+                }
+
                 // Render holders
                 const holdersList = document.getElementById('holdersList');
                 const holders = data.holders || [];
@@ -432,9 +469,10 @@
                         const c24Class = c24 > 0 ? 'up' : c24 < 0 ? 'down' : 'neutral';
                         const c7dClass = c7d > 0 ? 'up' : c7d < 0 ? 'down' : 'neutral';
                         const c30dClass = c30d > 0 ? 'up' : c30d < 0 ? 'down' : 'neutral';
+                        const emoji = h.category_emoji || '';
                         return `
                             <div class="holder-item" onclick="goToTrader('${h.address}')">
-                                <span class="holder-label">${h.label || h.address.slice(0, 12) + '...'}</span>
+                                <span class="holder-label">${emoji} ${h.label || h.address.slice(0, 12) + '...'}</span>
                                 <span class="holder-value">${fmt.usdAbs(h.value_usd)}</span>
                                 <span class="holder-pct">${fmt.pctSmall(h.ownership_percent * 100)}</span>
                                 <span class="holder-change ${c24Class}">${fmt.change(c24)}</span>

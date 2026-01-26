@@ -43,6 +43,66 @@ def time_ago(timestamp_str):
         return "?"
 
 
+def categorize_trader(label):
+    """Categorize a trader/holder based on their Nansen label.
+
+    Returns: (category, emoji, description)
+    """
+    if not label:
+        return ("unknown", "❓", "Unknown Wallet")
+
+    label_lower = label.lower()
+
+    # Exchange detection
+    exchanges = ["binance", "okx", "coinbase", "kraken", "robinhood", "bybit",
+                 "bitget", "bithumb", "upbit", "btcturk", "gate", "revolut",
+                 "crypto.com", "kucoin", "huobi", "ftx"]
+    if "🏦" in label or any(ex in label_lower for ex in exchanges):
+        return ("exchange", "🏦", "Exchange")
+
+    # Whale/Millionaire detection
+    if "millionaire" in label_lower:
+        if "token millionaire" in label_lower:
+            return ("token_whale", "🐋", "Token Whale")
+        elif "eth millionaire" in label_lower:
+            return ("eth_whale", "💎", "ETH Whale")
+        elif "nft millionaire" in label_lower:
+            return ("nft_whale", "🖼️", "NFT Whale")
+        return ("whale", "🐋", "Whale")
+
+    # High balance
+    if "high balance" in label_lower:
+        return ("high_balance", "💰", "High Balance")
+
+    # Smart trader detection
+    if "smart" in label_lower:
+        return ("smart_trader", "🧠", "Smart Trader")
+
+    # DeFi/Protocol detection
+    if "🤖" in label or "uniswap" in label_lower or "aave" in label_lower or \
+       "compound" in label_lower or "liquidity pool" in label_lower:
+        return ("defi_protocol", "🤖", "DeFi Protocol")
+
+    # Fund detection
+    if "fund" in label_lower or "capital" in label_lower or "ventures" in label_lower:
+        return ("fund", "🏛️", "Fund/VC")
+
+    # Burn address
+    if "burn" in label_lower or "dead" in label_lower:
+        return ("burn", "🔥", "Burn Address")
+
+    # Public figure
+    if "public figure" in label_lower:
+        return ("public_figure", "👤", "Public Figure")
+
+    # Fresh wallet
+    if "fresh" in label_lower:
+        return ("fresh_wallet", "🆕", "Fresh Wallet")
+
+    # Default - has a label but uncategorized
+    return ("labeled", "🏷️", "Labeled Wallet")
+
+
 # ============== NANSEN API FUNCTIONS ==============
 
 def fetch_smart_money_netflow(chains=None, direction="DESC"):
@@ -364,10 +424,24 @@ def api_token_detail(chain, token_address):
     # Token holders - who holds this token
     holders_data = fetch_token_holders(token_address, chain)
     holders = []
-    for holder in holders_data.get("data", [])[:20]:
+    holder_breakdown = {}  # Count by category
+
+    for holder in holders_data.get("data", [])[:30]:
+        label = holder.get("address_label", "")
+        category, emoji, category_name = categorize_trader(label)
+
+        # Count for breakdown
+        if category not in holder_breakdown:
+            holder_breakdown[category] = {"count": 0, "value_usd": 0, "name": category_name, "emoji": emoji}
+        holder_breakdown[category]["count"] += 1
+        holder_breakdown[category]["value_usd"] += holder.get("value_usd", 0) or 0
+
         holders.append({
             "address": holder.get("address", ""),
-            "label": holder.get("address_label", ""),
+            "label": label,
+            "category": category,
+            "category_emoji": emoji,
+            "category_name": category_name,
             "token_amount": holder.get("token_amount", 0) or 0,
             "value_usd": holder.get("value_usd", 0) or 0,
             "ownership_percent": holder.get("ownership_percentage", 0) or 0,
@@ -377,6 +451,13 @@ def api_token_detail(chain, token_address):
             "change_7d": holder.get("balance_change_7d", 0) or 0,
             "change_30d": holder.get("balance_change_30d", 0) or 0,
         })
+
+    # Also categorize P/L leaders
+    for leader in pnl_leaders:
+        category, emoji, category_name = categorize_trader(leader.get("label", ""))
+        leader["category"] = category
+        leader["category_emoji"] = emoji
+        leader["category_name"] = category_name
 
     return jsonify({
         "token_address": token_address,
@@ -403,7 +484,8 @@ def api_token_detail(chain, token_address):
                 "wallet_count": flow.get("top_pnl_wallet_count", 0),
             },
         },
-        "holders": holders,
+        "holder_breakdown": holder_breakdown,
+        "holders": holders[:20],
         "pnl_leaderboard": pnl_leaders,
         "generated_at": datetime.now().isoformat(),
     })
@@ -412,8 +494,9 @@ def api_token_detail(chain, token_address):
 @app.get("/api/trader/<chain>/<address>")
 def api_trader_profile(chain, address):
     """Get detailed profile for a specific trader."""
-    # P/L summary
-    pnl = fetch_trader_pnl(address, chain)
+    # P/L summary (30 days and 90 days for comparison)
+    pnl_30d = fetch_trader_pnl(address, chain, days=30)
+    pnl_90d = fetch_trader_pnl(address, chain, days=90)
 
     # Transaction history
     txs_data = fetch_trader_transactions(address, chain)
@@ -429,26 +512,74 @@ def api_trader_profile(chain, address):
             "tx_hash": tx.get("transaction_hash", ""),
         })
 
-    # Top tokens from P/L
+    # Top tokens from P/L (use 90d for better picture)
     top_tokens = []
-    for token in pnl.get("top5_tokens", []):
+    for token in pnl_90d.get("top5_tokens", []):
         top_tokens.append({
             "symbol": token.get("token_symbol", "???"),
             "address": token.get("token_address", ""),
-            "chain": token.get("chain", ""),
+            "chain": token.get("chain", chain),
             "pnl": token.get("realized_pnl", 0) or 0,
             "roi": token.get("realized_roi", 0) or 0,
         })
 
+    # Calculate trader persona/tier based on performance
+    win_rate = pnl_90d.get("win_rate", 0) or 0
+    realized_pnl = pnl_90d.get("realized_pnl_usd", 0) or 0
+    total_trades = pnl_90d.get("traded_times", 0) or 0
+
+    # Determine performance tier
+    if win_rate >= 0.7 and realized_pnl > 100000:
+        performance_tier = "elite"
+        tier_emoji = "🏆"
+        tier_name = "Elite Trader"
+    elif win_rate >= 0.6 and realized_pnl > 50000:
+        performance_tier = "pro"
+        tier_emoji = "⭐"
+        tier_name = "Pro Trader"
+    elif win_rate >= 0.5 and realized_pnl > 10000:
+        performance_tier = "skilled"
+        tier_emoji = "📈"
+        tier_name = "Skilled Trader"
+    elif win_rate >= 0.4:
+        performance_tier = "active"
+        tier_emoji = "🔄"
+        tier_name = "Active Trader"
+    else:
+        performance_tier = "retail"
+        tier_emoji = "👤"
+        tier_name = "Retail Trader"
+
+    # Determine trading style based on patterns
+    trading_styles = []
+    if total_trades > 100:
+        trading_styles.append("High Frequency")
+    if len(top_tokens) == 1:
+        trading_styles.append("Token Specialist")
+    elif len(top_tokens) >= 4:
+        trading_styles.append("Diversified")
+    if realized_pnl > 0 and win_rate >= 0.6:
+        trading_styles.append("Consistent Winner")
+
     return jsonify({
         "address": address,
         "chain": chain,
+        "persona": {
+            "tier": performance_tier,
+            "tier_emoji": tier_emoji,
+            "tier_name": tier_name,
+            "trading_styles": trading_styles,
+        },
         "pnl_summary": {
-            "realized_pnl": pnl.get("realized_pnl_usd", 0) or 0,
-            "realized_pnl_percent": pnl.get("realized_pnl_percent", 0) or 0,
-            "win_rate": pnl.get("win_rate", 0) or 0,
-            "traded_tokens": pnl.get("traded_token_count", 0),
-            "total_trades": pnl.get("traded_times", 0),
+            "realized_pnl": pnl_30d.get("realized_pnl_usd", 0) or 0,
+            "realized_pnl_90d": realized_pnl,
+            "realized_pnl_percent": pnl_30d.get("realized_pnl_percent", 0) or 0,
+            "win_rate": pnl_30d.get("win_rate", 0) or 0,
+            "win_rate_90d": win_rate,
+            "traded_tokens": pnl_30d.get("traded_token_count", 0),
+            "traded_tokens_90d": pnl_90d.get("traded_token_count", 0),
+            "total_trades": pnl_30d.get("traded_times", 0),
+            "total_trades_90d": total_trades,
         },
         "top_tokens": top_tokens,
         "transactions": transactions,
