@@ -436,7 +436,7 @@ def fetch_entity_swaps(entity_id: str, entity_name: str, limit: int = 50) -> lis
     return results
 
 
-def build_swaps_data(limit_per_entity: int = 30) -> dict:
+def build_swaps_data(limit_per_entity: int = 100) -> dict:
     """Build DEX swaps data from all tracked entities."""
     all_swaps = []
 
@@ -563,7 +563,7 @@ def build_entity_profiles() -> dict:
     }
 
 
-def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 30) -> dict:
+def build_activity_data(min_usd: int = 10000, limit_per_entity: int = 200) -> dict:
     """Build full activity data from all entities using concurrent requests."""
     all_activity = []
 
@@ -820,7 +820,7 @@ def startup_event():
 @app.get("/api/activity")
 def get_activity(
     min_usd: int = Query(10000, description="Minimum USD value"),
-    limit_per_entity: int = Query(30, description="Max transfers per entity"),
+    limit_per_entity: int = Query(200, description="Max transfers per entity"),
 ):
     """Get recent activity across all entities (from cache)."""
     with cache_lock:
