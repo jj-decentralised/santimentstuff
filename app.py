@@ -145,6 +145,26 @@ def fetch_flow_intelligence(token_address, chain="solana"):
         return {"data": [], "error": str(e)}
 
 
+def fetch_token_holders(token_address, chain="solana", page=1, per_page=30):
+    """Fetch token holders - who holds this token and how much."""
+    try:
+        r = httpx.post(
+            f"{NANSEN_BASE_URL}/tgm/holders",
+            headers=nansen_headers(),
+            json={
+                "chain": chain,
+                "token_address": token_address,
+                "pagination": {"page": page, "per_page": per_page},
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"Token holders error: {e}")
+        return {"data": [], "error": str(e)}
+
+
 def fetch_pnl_leaderboard(token_address, chain="solana", days=30):
     """Fetch P/L leaderboard for a token - top traders by profit."""
     try:
@@ -325,10 +345,10 @@ def api_token_detail(chain, token_address):
     flow_data = fetch_flow_intelligence(token_address, chain)
     flow = flow_data.get("data", [{}])[0] if flow_data.get("data") else {}
 
-    # P/L leaderboard
+    # P/L leaderboard - top traders by profit
     pnl_data = fetch_pnl_leaderboard(token_address, chain)
     pnl_leaders = []
-    for trader in pnl_data.get("data", [])[:10]:
+    for trader in pnl_data.get("data", [])[:15]:
         pnl_leaders.append({
             "address": trader.get("trader_address", ""),
             "label": trader.get("trader_address_label", ""),
@@ -338,6 +358,24 @@ def api_token_detail(chain, token_address):
             "roi_percent": trader.get("roi_percent_total", 0) or 0,
             "trades": trader.get("nof_trades", 0),
             "holding_usd": trader.get("holding_usd", 0) or 0,
+            "max_holding_usd": trader.get("max_balance_held_usd", 0) or 0,
+        })
+
+    # Token holders - who holds this token
+    holders_data = fetch_token_holders(token_address, chain)
+    holders = []
+    for holder in holders_data.get("data", [])[:20]:
+        holders.append({
+            "address": holder.get("address", ""),
+            "label": holder.get("address_label", ""),
+            "token_amount": holder.get("token_amount", 0) or 0,
+            "value_usd": holder.get("value_usd", 0) or 0,
+            "ownership_percent": holder.get("ownership_percentage", 0) or 0,
+            "total_inflow": holder.get("total_inflow", 0) or 0,
+            "total_outflow": holder.get("total_outflow", 0) or 0,
+            "change_24h": holder.get("balance_change_24h", 0) or 0,
+            "change_7d": holder.get("balance_change_7d", 0) or 0,
+            "change_30d": holder.get("balance_change_30d", 0) or 0,
         })
 
     return jsonify({
@@ -365,6 +403,7 @@ def api_token_detail(chain, token_address):
                 "wallet_count": flow.get("top_pnl_wallet_count", 0),
             },
         },
+        "holders": holders,
         "pnl_leaderboard": pnl_leaders,
         "generated_at": datetime.now().isoformat(),
     })

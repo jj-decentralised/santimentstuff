@@ -116,6 +116,7 @@
         }
         .card-header.flow { border-left: 4px solid #111; }
         .card-header.pnl { border-left: 4px solid #16a34a; }
+        .card-header.holders { border-left: 4px solid #6366f1; }
 
         .badge {
             font-size: 9px;
@@ -210,6 +211,40 @@
             color: #888;
         }
 
+        /* Holders styles */
+        .holder-row-header {
+            display: grid;
+            grid-template-columns: 1fr 100px 80px 80px 80px 80px;
+            padding: 8px 12px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #666;
+            background: #f9f9f9;
+            border-bottom: 1px solid #eee;
+        }
+        .holder-item {
+            display: grid;
+            grid-template-columns: 1fr 100px 80px 80px 80px 80px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            align-items: center;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .holder-item:hover { background: #f9f9f9; }
+        .holder-label {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .holder-value { font-weight: 600; text-align: right; }
+        .holder-pct { text-align: right; color: #666; }
+        .holder-change { text-align: right; font-size: 10px; }
+        .holder-change.up { color: #16a34a; }
+        .holder-change.down { color: #dc2626; }
+        .holder-change.neutral { color: #888; }
+
         .loading {
             text-align: center;
             padding: 32px;
@@ -265,6 +300,24 @@
         </section>
 
         <section class="card">
+            <div class="card-header holders">
+                Top Holders
+                <span class="badge">Who owns this token</span>
+            </div>
+            <div class="holder-row-header">
+                <span>Holder</span>
+                <span style="text-align:right">Value</span>
+                <span style="text-align:right">Own %</span>
+                <span style="text-align:right">24h</span>
+                <span style="text-align:right">7d</span>
+                <span style="text-align:right">30d</span>
+            </div>
+            <div class="card-body" id="holdersList" style="padding:0; max-height: 400px; overflow-y: auto;">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+
+        <section class="card">
             <div class="card-header pnl">
                 P/L Leaderboard (30d)
                 <span class="badge">Top performers</span>
@@ -296,10 +349,33 @@
                 if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
                 return sign + '$' + abs.toFixed(0);
             },
+            usdAbs: (v) => {
+                if (!v && v !== 0) return '-';
+                const abs = Math.abs(v);
+                if (abs >= 1e9) return '$' + (abs/1e9).toFixed(2) + 'B';
+                if (abs >= 1e6) return '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return '$' + (abs/1e3).toFixed(0) + 'K';
+                return '$' + abs.toFixed(0);
+            },
             pct: (v) => {
                 if (!v && v !== 0) return '-';
                 const sign = v > 0 ? '+' : '';
                 return sign + (v * 100).toFixed(0) + '%';
+            },
+            pctSmall: (v) => {
+                if (!v && v !== 0) return '-';
+                if (v < 0.01) return '<0.01%';
+                return v.toFixed(2) + '%';
+            },
+            change: (v) => {
+                if (!v && v !== 0) return '-';
+                if (v === 0) return '0';
+                const sign = v > 0 ? '+' : '';
+                const abs = Math.abs(v);
+                if (abs >= 1e9) return sign + (v/1e9).toFixed(1) + 'B';
+                if (abs >= 1e6) return sign + (v/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + (v/1e3).toFixed(0) + 'K';
+                return sign + v.toFixed(0);
             }
         };
 
@@ -344,6 +420,34 @@
                     `;
                 }).join('');
 
+                // Render holders
+                const holdersList = document.getElementById('holdersList');
+                const holders = data.holders || [];
+
+                if (holders.length) {
+                    holdersList.innerHTML = holders.map(h => {
+                        const c24 = h.change_24h || 0;
+                        const c7d = h.change_7d || 0;
+                        const c30d = h.change_30d || 0;
+                        const c24Class = c24 > 0 ? 'up' : c24 < 0 ? 'down' : 'neutral';
+                        const c7dClass = c7d > 0 ? 'up' : c7d < 0 ? 'down' : 'neutral';
+                        const c30dClass = c30d > 0 ? 'up' : c30d < 0 ? 'down' : 'neutral';
+                        return `
+                            <div class="holder-item" onclick="goToTrader('${h.address}')">
+                                <span class="holder-label">${h.label || h.address.slice(0, 12) + '...'}</span>
+                                <span class="holder-value">${fmt.usdAbs(h.value_usd)}</span>
+                                <span class="holder-pct">${fmt.pctSmall(h.ownership_percent * 100)}</span>
+                                <span class="holder-change ${c24Class}">${fmt.change(c24)}</span>
+                                <span class="holder-change ${c7dClass}">${fmt.change(c7d)}</span>
+                                <span class="holder-change ${c30dClass}">${fmt.change(c30d)}</span>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    holdersList.innerHTML = '<div class="loading">No holder data</div>';
+                }
+
+                // Render P/L leaderboard
                 const pnlList = document.getElementById('pnlList');
                 const leaders = data.pnl_leaderboard || [];
 
