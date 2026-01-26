@@ -202,9 +202,11 @@
             border-radius: 4px;
         }
         .entry-quality.early { background: #dcfce7; border: 1px solid #22c55e; }
+        .entry-quality.early_mid { background: #d1fae5; border: 1px solid #10b981; }
         .entry-quality.mid { background: #fef3c7; border: 1px solid #f59e0b; }
         .entry-quality.late { background: #fee2e2; border: 1px solid #dc2626; }
         .entry-quality.very_late { background: #fecaca; border: 1px solid #991b1b; }
+        .entry-quality.unknown { background: #f3f4f6; border: 1px solid #9ca3af; }
         .entry-icon { font-size: 24px; }
         .entry-details { flex: 1; }
         .entry-label {
@@ -741,21 +743,25 @@
                 // Render Entry Quality
                 const entryEl = document.getElementById('entryQuality');
                 const entry = data.entry_quality || {};
+                const entryMetrics = entry.metrics || {};
                 const entryClass = entry.quality || 'mid';
                 const entryIcons = {
                     early: '🎯',
+                    early_mid: '🎯',
                     mid: '⚡',
                     late: '⚠️',
                     very_late: '🚨'
                 };
                 const entryLabels = {
                     early: 'Early Entry',
+                    early_mid: 'Early-Mid Entry',
                     mid: 'Mid Entry',
                     late: 'Late Entry',
                     very_late: 'Very Late Entry'
                 };
                 const entryDescs = {
                     early: 'Most smart money still accumulating - good entry point',
+                    early_mid: 'Smart money building positions - acceptable entry',
                     mid: 'Moderate smart money profit - acceptable entry',
                     late: 'High smart money profit - proceed with caution',
                     very_late: 'Smart money in heavy profit - risk of distribution'
@@ -768,29 +774,29 @@
                     <div class="entry-quality ${entryClass}">
                         <span class="entry-icon">${entryIcons[entryClass] || '❓'}</span>
                         <div class="entry-details">
-                            <div class="entry-label">${entryLabels[entryClass] || 'Unknown'}</div>
-                            <div class="entry-desc">${entryDescs[entryClass] || ''}</div>
+                            <div class="entry-label">${entry.label || entryLabels[entryClass] || 'Unknown'}</div>
+                            <div class="entry-desc">${entry.description || entryDescs[entryClass] || ''}</div>
                             <div class="entry-stats">
                                 <span class="entry-stat">
                                     <span class="entry-stat-label">In Profit:</span>
-                                    <span class="entry-stat-value">${((entry.pct_in_profit || 0) * 100).toFixed(0)}%</span>
+                                    <span class="entry-stat-value">${((entryMetrics.profit_ratio || 0) * 100).toFixed(0)}%</span>
                                 </span>
                                 <span class="entry-stat">
-                                    <span class="entry-stat-label">Avg ROI:</span>
-                                    <span class="entry-stat-value">${((entry.avg_roi || 0) * 100).toFixed(0)}%</span>
+                                    <span class="entry-stat-label">Traders:</span>
+                                    <span class="entry-stat-value">${entryMetrics.profitable_traders || 0}/${entryMetrics.total_traders || 0}</span>
                                 </span>
                                 <span class="entry-stat">
                                     <span class="entry-stat-label">Realized:</span>
-                                    <span class="entry-stat-value">${((entry.profit_realized_pct || 0) * 100).toFixed(0)}%</span>
+                                    <span class="entry-stat-value">${((entryMetrics.profit_taken_ratio || 0) * 100).toFixed(0)}%</span>
                                 </span>
                             </div>
                         </div>
                     </div>
                 `;
 
-                // Render Conviction Analysis
+                // Render Conviction Analysis (API returns conviction_analysis, not conviction)
                 const convEl = document.getElementById('convictionAnalysis');
-                const conv = data.conviction || {};
+                const conv = data.conviction_analysis || {};
                 const segments = conv.segments || {};
                 const segmentConfig = {
                     diamond_hands: { icon: '💎', name: 'Diamond Hands' },
@@ -811,7 +817,8 @@
                     `;
                 }).join('');
 
-                const stabilityScore = conv.stability_score || 0;
+                // Use conviction_value_ratio for stability score
+                const stabilityScore = conv.conviction_value_ratio || conv.conviction_ratio || 0;
                 const stabilityClass = stabilityScore >= 0.7 ? 'high' : stabilityScore >= 0.4 ? 'medium' : 'low';
 
                 convEl.innerHTML = `
@@ -820,23 +827,33 @@
                         <span style="font-weight: 700; font-size: 14px; margin-left: 8px;" class="score-value ${stabilityClass}">
                             ${(stabilityScore * 100).toFixed(0)}%
                         </span>
+                        <span style="font-size: 10px; color: #888; margin-left: 8px;">${conv.stability_label || ''}</span>
                     </div>
                     <div class="conviction-segments">${segmentHtml}</div>
                 `;
 
-                // Render Related Tokens
+                // Render Related Tokens (API returns holder patterns, not direct token list)
                 const relatedEl = document.getElementById('relatedTokens');
-                const related = data.related_tokens || [];
+                const relatedData = data.related_tokens || {};
+                const patterns = relatedData.holder_patterns || [];
 
-                if (related.length) {
-                    relatedEl.innerHTML = related.map(t => `
-                        <div class="related-token" onclick="window.location.href='/token/${t.chain}/${t.address}'">
-                            <span class="related-symbol">${t.symbol}</span>
-                            <span class="related-overlap">${t.shared_holders} shared holders (${(t.correlation * 100).toFixed(0)}% overlap)</span>
+                if (patterns.length) {
+                    relatedEl.innerHTML = `
+                        <div style="padding: 12px; font-size: 10px; color: #666; border-bottom: 1px solid #f0f0f0;">
+                            ${relatedData.shared_holder_count || 0} labeled holders analyzed
                         </div>
-                    `).join('');
+                        ${patterns.map(p => `
+                            <div class="related-token">
+                                <span class="related-symbol">${p.pattern.toUpperCase()}</span>
+                                <span class="related-overlap">${p.count} holders with this pattern</span>
+                            </div>
+                        `).join('')}
+                        <div style="padding: 8px 12px; font-size: 9px; color: #888; background: #f9f9f9;">
+                            ${relatedData.note || ''}
+                        </div>
+                    `;
                 } else {
-                    relatedEl.innerHTML = '<div style="padding: 16px; color: #888; text-align: center;">No related tokens found</div>';
+                    relatedEl.innerHTML = '<div style="padding: 16px; color: #888; text-align: center;">No related holder patterns found</div>';
                 }
 
             } catch (e) {
