@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fund Activity Tracker</title>
+    <title>Smart Money Intelligence</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-            background: #f5f5f7;
-            color: #1d1d1f;
+            background: #0a0a0f;
+            color: #e5e5e7;
             line-height: 1.4;
             font-size: 13px;
         }
 
         .header {
-            background: #fff;
-            border-bottom: 1px solid #d2d2d7;
-            padding: 0.6rem 1.5rem;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2a2a4a;
+            padding: 0.8rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -25,993 +25,481 @@
             top: 0;
             z-index: 100;
         }
-        .header h1 { font-size: 1rem; font-weight: 600; }
-        .header-right { display: flex; gap: 0.5rem; align-items: center; }
-        .header-right select, .header-right button {
-            padding: 0.35rem 0.6rem;
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav a {
+            padding: 0.4rem 0.8rem;
             border-radius: 6px;
             font-size: 0.75rem;
-        }
-        .header-right select { border: 1px solid #d2d2d7; background: #fff; }
-        .header-right button { background: #0071e3; color: #fff; border: none; cursor: pointer; }
-        .cache-info { font-size: 0.65rem; color: #86868b; }
-
-        .container { max-width: 1800px; margin: 0 auto; padding: 0.75rem; }
-
-        /* Key metrics bar */
-        .metrics-bar {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
-            flex-wrap: wrap;
-        }
-        .metric {
-            background: #fff;
-            border-radius: 8px;
-            padding: 0.5rem 0.75rem;
-            min-width: 120px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-        }
-        .metric-label { font-size: 0.6rem; color: #86868b; text-transform: uppercase; letter-spacing: 0.3px; }
-        .metric-value { font-size: 1.1rem; font-weight: 600; font-family: 'SF Mono', monospace; }
-        .metric-value.green { color: #34c759; }
-        .metric-value.red { color: #ff3b30; }
-        .metric-sub { font-size: 0.6rem; color: #86868b; }
-
-        /* Signal cards */
-        .signals-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 0.75rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .signal-card {
-            background: #fff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        }
-        .signal-header {
-            padding: 0.5rem 0.75rem;
-            font-weight: 600;
-            font-size: 0.7rem;
-            background: #fafafa;
-            border-bottom: 1px solid #f0f0f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .signal-badge {
-            font-size: 0.6rem;
-            padding: 0.15rem 0.4rem;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-        .signal-badge.bullish { background: #d1f2d9; color: #1d7a3a; }
-        .signal-badge.bearish { background: #ffd9d6; color: #c41e3a; }
-        .signal-badge.neutral { background: #e8e8ed; color: #666; }
-        .signal-body { padding: 0.5rem 0.75rem; max-height: 200px; overflow-y: auto; }
-
-        /* Exchange flow card */
-        .exchange-stat {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.4rem 0;
-            border-bottom: 1px solid #f5f5f5;
-            font-size: 0.75rem;
-        }
-        .exchange-stat:last-child { border-bottom: none; }
-        .exchange-label { color: #666; }
-        .exchange-value { font-family: 'SF Mono', monospace; font-weight: 500; }
-
-        /* Category breakdown */
-        .category-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.35rem 0;
-            border-bottom: 1px solid #f5f5f5;
-            font-size: 0.75rem;
-        }
-        .category-name {
+            text-decoration: none;
             font-weight: 500;
-            text-transform: uppercase;
-            font-size: 0.65rem;
-            padding: 0.15rem 0.4rem;
-            border-radius: 3px;
+            transition: all 0.2s;
         }
-        .category-name.stable { background: #e8f5e9; color: #2e7d32; }
-        .category-name.l1 { background: #e3f2fd; color: #1565c0; }
-        .category-name.l2 { background: #f3e5f5; color: #7b1fa2; }
-        .category-name.defi { background: #fff3e0; color: #e65100; }
-        .category-name.meme { background: #fce4ec; color: #c2185b; }
-        .category-name.ai { background: #e0f7fa; color: #00838f; }
-        .category-name.other { background: #f5f5f5; color: #666; }
-        .category-flow { font-family: 'SF Mono', monospace; }
+        .nav-active { background: #7c3aed; color: #fff; }
+        .nav-default { background: rgba(255,255,255,0.1); color: #a0a0b0; }
+        .nav-default:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
-        /* Emerging tokens */
-        .emerging-item {
+        .container { max-width: 1600px; margin: 0 auto; padding: 1rem; }
+
+        /* Timeframe selector */
+        .controls {
             display: flex;
-            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
             align-items: center;
-            padding: 0.4rem 0;
-            border-bottom: 1px solid #f5f5f5;
-            font-size: 0.75rem;
-            cursor: pointer;
         }
-        .emerging-item:hover { background: #fafafa; margin: 0 -0.5rem; padding-left: 0.5rem; padding-right: 0.5rem; }
-        .emerging-token { font-weight: 600; color: #af7e00; }
-        .emerging-funds { font-size: 0.65rem; color: #5856d6; }
-        .emerging-action { font-size: 0.6rem; font-weight: 600; padding: 0.1rem 0.3rem; border-radius: 3px; }
-        .emerging-action.accumulating { background: #d1f2d9; color: #1d7a3a; }
-        .emerging-action.distributing { background: #ffd9d6; color: #c41e3a; }
-
-        /* Consensus cards */
-        .consensus-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 0.4rem;
-            padding: 0.5rem;
-        }
-        .consensus-card {
-            border: 1px solid #e8e8ed;
+        .timeframe-btns {
+            display: flex;
+            gap: 0.25rem;
+            background: rgba(255,255,255,0.05);
+            padding: 0.25rem;
             border-radius: 8px;
-            padding: 0.6rem;
-            cursor: pointer;
-            transition: all 0.15s;
         }
-        .consensus-card:hover { border-color: #0071e3; background: #f8f8fa; }
-        .consensus-card.bullish { border-left: 3px solid #34c759; }
-        .consensus-card.bearish { border-left: 3px solid #ff3b30; }
-        .consensus-card.mixed { border-left: 3px solid #ff9500; }
-        .consensus-top { display: flex; justify-content: space-between; align-items: center; }
-        .consensus-token { font-weight: 600; font-size: 0.85rem; }
-        .consensus-signal { font-size: 0.55rem; font-weight: 600; padding: 0.1rem 0.3rem; border-radius: 3px; }
-        .consensus-signal.bullish { background: #d1f2d9; color: #1d7a3a; }
-        .consensus-signal.bearish { background: #ffd9d6; color: #c41e3a; }
-        .consensus-signal.mixed { background: #fff0d6; color: #996300; }
-        .consensus-flow { font-family: 'SF Mono', monospace; font-size: 0.7rem; margin-top: 0.2rem; }
-        .consensus-meta { font-size: 0.6rem; color: #86868b; margin-top: 0.2rem; }
-
-        /* Main grid */
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 300px;
-            gap: 0.75rem;
-        }
-
-        .card {
-            background: #fff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        }
-        .card-header {
-            padding: 0.5rem 0.75rem;
-            font-weight: 600;
-            font-size: 0.75rem;
-            background: #fafafa;
-            border-bottom: 1px solid #f0f0f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .badge {
-            background: #e8e8ed;
-            padding: 0.15rem 0.4rem;
-            border-radius: 4px;
-            font-size: 0.6rem;
-            font-weight: 500;
-        }
-
-        /* Activity list */
-        .activity-scroll { max-height: 450px; overflow-y: auto; }
-        .activity-item {
-            display: grid;
-            grid-template-columns: 50px 90px 50px 65px 70px 75px 1fr 50px;
-            gap: 0.3rem;
-            padding: 0.4rem 0.6rem;
-            border-bottom: 1px solid #f5f5f5;
-            align-items: center;
-            font-size: 0.7rem;
-        }
-        .activity-item:hover { background: #fafafa; }
-        .activity-item.whale { background: #fffbeb; }
-        .activity-item.exchange { background: #f0f7ff; }
-
-        .time { color: #86868b; font-family: 'SF Mono', monospace; font-size: 0.65rem; }
-        .fund { color: #5856d6; font-weight: 500; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .fund:hover { text-decoration: underline; }
-        .action { font-weight: 600; font-size: 0.65rem; }
-        .action.received { color: #34c759; }
-        .action.sent { color: #ff3b30; }
-        .token { color: #af7e00; font-weight: 600; cursor: pointer; }
-        .token:hover { text-decoration: underline; }
-        .amount { font-family: 'SF Mono', monospace; color: #86868b; font-size: 0.65rem; }
-        .usd { font-family: 'SF Mono', monospace; font-weight: 500; }
-        .usd.whale { color: #ff9500; font-weight: 700; }
-        .counterparty { color: #86868b; font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .counterparty.exchange { color: #0071e3; font-weight: 500; }
-        .chain { font-size: 0.55rem; background: #e8e8ed; padding: 0.1rem 0.25rem; border-radius: 3px; text-transform: uppercase; }
-
-        /* Sidebar */
-        .sidebar { display: flex; flex-direction: column; gap: 0.75rem; }
-        .sidebar-scroll { max-height: 220px; overflow-y: auto; }
-
-        .fund-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.4rem 0.6rem;
-            border-bottom: 1px solid #f5f5f5;
-            cursor: pointer;
-            font-size: 0.7rem;
-        }
-        .fund-item:hover { background: #fafafa; }
-        .fund-name { font-weight: 500; color: #5856d6; }
-        .fund-meta { font-size: 0.6rem; color: #86868b; }
-        .fund-net { font-family: 'SF Mono', monospace; font-weight: 500; font-size: 0.75rem; }
-        .fund-net.positive { color: #34c759; }
-        .fund-net.negative { color: #ff3b30; }
-
-        .whale-item {
-            padding: 0.4rem 0.6rem;
-            border-bottom: 1px solid #f5f5f5;
-            font-size: 0.7rem;
-        }
-        .whale-header { display: flex; justify-content: space-between; align-items: center; }
-        .whale-amount { font-family: 'SF Mono', monospace; font-weight: 600; color: #ff9500; }
-        .whale-detail { color: #86868b; font-size: 0.65rem; margin-top: 0.15rem; }
-
-        /* DEX Trades */
-        .dex-trade {
-            display: grid;
-            grid-template-columns: 50px 90px 55px 65px 55px 80px 85px 1fr;
-            gap: 0.3rem;
-            padding: 0.4rem 0.5rem;
-            border-bottom: 1px solid #f5f5f5;
-            align-items: center;
-            font-size: 0.7rem;
-        }
-        .dex-trade:hover { background: #fafafa; }
-        .dex-trade.buy { background: rgba(52, 199, 89, 0.05); }
-        .dex-trade.sell { background: rgba(255, 59, 48, 0.05); }
-        .dex-action { font-weight: 600; font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 3px; }
-        .dex-action.bought { background: #d1f2d9; color: #1d7a3a; }
-        .dex-action.sold { background: #ffd9d6; color: #c41e3a; }
-        .dex-action.swapped { background: #fff0d6; color: #996300; }
-        .dex-dex { font-size: 0.55rem; color: #86868b; }
-
-        .loading { text-align: center; padding: 1.5rem; color: #86868b; font-size: 0.75rem; }
-        .error { color: #ff3b30; padding: 0.75rem; background: #fff5f5; margin: 0.5rem; border-radius: 6px; font-size: 0.75rem; }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-        .modal.active { display: flex; }
-        .modal-content {
-            background: #fff;
-            border-radius: 12px;
-            width: 95%;
-            max-width: 1000px;
-            max-height: 85vh;
-            overflow-y: auto;
-        }
-        .modal-header {
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid #e8e8ed;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #fafafa;
-            border-radius: 12px 12px 0 0;
-            position: sticky;
-            top: 0;
-        }
-        .modal-header h2 { font-size: 0.9rem; }
-        .modal-close {
-            background: none;
+        .timeframe-btn {
+            padding: 0.4rem 0.8rem;
             border: none;
-            font-size: 1.1rem;
+            background: transparent;
+            color: #a0a0b0;
+            font-size: 0.75rem;
+            border-radius: 6px;
             cursor: pointer;
-            color: #86868b;
+            transition: all 0.2s;
         }
-        .modal-body { padding: 1rem; }
+        .timeframe-btn.active { background: #7c3aed; color: #fff; }
+        .timeframe-btn:hover:not(.active) { background: rgba(255,255,255,0.1); }
 
-        .summary-grid {
+        .chain-filter {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .chain-chip {
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .chain-chip.active { border-color: #7c3aed; background: rgba(124, 58, 237, 0.2); }
+        .chain-chip.sol { color: #14f195; }
+        .chain-chip.eth { color: #627eea; }
+        .chain-chip.base { color: #0052ff; }
+        .chain-chip.arb { color: #28a0f0; }
+
+        /* Grid layout */
+        .grid-2 {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.5rem;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
             margin-bottom: 1rem;
         }
-        .summary-item {
-            background: #f5f5f7;
-            padding: 0.6rem;
-            border-radius: 8px;
-            text-align: center;
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
-        .summary-label { font-size: 0.6rem; color: #86868b; text-transform: uppercase; }
-        .summary-value { font-size: 1rem; font-weight: 600; font-family: 'SF Mono', monospace; }
 
-        .section-title {
+        /* Cards */
+        .card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .card-header {
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header.inflow { border-left: 3px solid #10b981; }
+        .card-header.outflow { border-left: 3px solid #ef4444; }
+        .card-header.holdings { border-left: 3px solid #7c3aed; }
+        .card-header.trades { border-left: 3px solid #f59e0b; }
+
+        .badge {
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .badge-purple { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        .card-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* Flow items */
+        .flow-item {
+            display: grid;
+            grid-template-columns: 80px 1fr 100px;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .flow-item:hover { background: rgba(255,255,255,0.03); }
+        .flow-token {
+            font-weight: 700;
+            color: #fff;
+        }
+        .flow-chain {
+            font-size: 0.6rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+        }
+        .flow-chain.solana { color: #14f195; }
+        .flow-chain.ethereum { color: #627eea; }
+        .flow-chain.base { color: #0052ff; }
+        .flow-meta {
+            font-size: 0.65rem;
+            color: #6b6b80;
+        }
+        .flow-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            text-align: right;
+        }
+        .flow-value.positive { color: #10b981; }
+        .flow-value.negative { color: #ef4444; }
+
+        /* Holdings items */
+        .holding-item {
+            display: grid;
+            grid-template-columns: 80px 1fr 90px 70px;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+        }
+        .holding-item:hover { background: rgba(255,255,255,0.03); }
+        .holding-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            color: #a78bfa;
+        }
+        .holding-change {
             font-size: 0.75rem;
             font-weight: 600;
-            margin: 1rem 0 0.4rem;
-            padding-bottom: 0.3rem;
-            border-bottom: 1px solid #e8e8ed;
         }
-        .section-title.green { color: #34c759; }
-        .section-title.red { color: #ff3b30; }
+        .holding-change.up { color: #10b981; }
+        .holding-change.down { color: #ef4444; }
 
-        .data-table { width: 100%; font-size: 0.7rem; border-collapse: collapse; }
-        .data-table th {
-            text-align: left;
-            padding: 0.3rem 0.4rem;
-            color: #86868b;
+        /* Trade items */
+        .trade-item {
+            display: grid;
+            grid-template-columns: 55px 1fr 70px 85px 50px;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .trade-item:hover { background: rgba(255,255,255,0.03); }
+        .trade-time { color: #6b6b80; font-size: 0.65rem; }
+        .trade-trader {
+            color: #a78bfa;
             font-weight: 500;
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            border-bottom: 1px solid #e8e8ed;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .data-table td {
-            padding: 0.3rem 0.4rem;
-            border-bottom: 1px solid #f5f5f5;
+        .trade-pair {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .trade-arrow { color: #6b6b80; }
+        .trade-token { font-weight: 600; }
+        .trade-token.bought { color: #10b981; }
+        .trade-token.sold { color: #ef4444; }
+        .trade-value {
             font-family: 'SF Mono', monospace;
+            font-weight: 600;
+            color: #f59e0b;
         }
-        .data-table td:first-child { font-family: inherit; font-weight: 500; color: #5856d6; }
-        .data-table .positive { color: #34c759; }
-        .data-table .negative { color: #ff3b30; }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
+        }
+        .error {
+            color: #ef4444;
+            padding: 1rem;
+            background: rgba(239, 68, 68, 0.1);
+            margin: 0.5rem;
+            border-radius: 6px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
 
         @media (max-width: 1200px) {
-            .signals-row { grid-template-columns: 1fr 1fr; }
-            .main-grid { grid-template-columns: 1fr; }
-        }
-        @media (max-width: 768px) {
-            .signals-row { grid-template-columns: 1fr; }
-            .metrics-bar { gap: 0.3rem; }
-            .metric { min-width: 100px; padding: 0.4rem 0.5rem; }
-            .activity-item { grid-template-columns: 45px 75px 45px 55px 65px 1fr; }
-            .activity-item .counterparty, .activity-item .chain { display: none; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <header class="header">
-        <h1>Fund Activity Tracker</h1>
-        <div class="header-right">
-            <span class="cache-info" id="cacheInfo"></span>
-            <a href="/smart-money" style="padding:0.35rem 0.6rem;border-radius:6px;font-size:0.75rem;background:#5856d6;color:#fff;text-decoration:none;font-weight:600">Smart Money</a>
-            <a href="/alpha" style="padding:0.35rem 0.6rem;border-radius:6px;font-size:0.75rem;background:#ff9500;color:#fff;text-decoration:none;font-weight:600">Alpha</a>
-            <a href="/signals" style="padding:0.35rem 0.6rem;border-radius:6px;font-size:0.75rem;background:#34c759;color:#fff;text-decoration:none;font-weight:600">Signals</a>
-            <a href="/pnl" style="padding:0.35rem 0.6rem;border-radius:6px;font-size:0.75rem;background:#e8e8ed;color:#1d1d1f;text-decoration:none">Fund P/L</a>
-            <select id="minUsd">
-                <option value="10000">Min $10K</option>
-                <option value="50000">Min $50K</option>
-                <option value="100000" selected>Min $100K</option>
-                <option value="500000">Min $500K</option>
-            </select>
-            <button id="refreshBtn" onclick="loadActivity()">Refresh</button>
-        </div>
+        <h1>Smart Money Intelligence</h1>
+        <nav class="header-nav">
+            <a href="/" class="nav-active">Dashboard</a>
+            <a href="/signals" class="nav-default">Signals</a>
+        </nav>
     </header>
 
     <main class="container">
-        <!-- Key Metrics -->
-        <section class="metrics-bar">
-            <div class="metric">
-                <div class="metric-label">Net Flow</div>
-                <div class="metric-value" id="netFlow">-</div>
+        <!-- Controls -->
+        <div class="controls">
+            <div class="timeframe-btns">
+                <button class="timeframe-btn active" data-tf="24h">24H</button>
+                <button class="timeframe-btn" data-tf="7d">7D</button>
+                <button class="timeframe-btn" data-tf="30d">30D</button>
             </div>
-            <div class="metric">
-                <div class="metric-label">Last 4h</div>
-                <div class="metric-value" id="recentNet">-</div>
-                <div class="metric-sub" id="recentCount">-</div>
+            <div class="chain-filter">
+                <span class="chain-chip active sol" data-chain="solana">SOL</span>
+                <span class="chain-chip active eth" data-chain="ethereum">ETH</span>
+                <span class="chain-chip active base" data-chain="base">BASE</span>
+                <span class="chain-chip arb" data-chain="arbitrum">ARB</span>
             </div>
-            <div class="metric">
-                <div class="metric-label">Exchange Flow</div>
-                <div class="metric-value" id="exchangeNet">-</div>
-                <div class="metric-sub" id="exchangeSignal">-</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Inflows</div>
-                <div class="metric-value green" id="totalReceived">-</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Outflows</div>
-                <div class="metric-value red" id="totalSent">-</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Active</div>
-                <div class="metric-value" id="activeFunds">-</div>
-                <div class="metric-sub">funds</div>
-            </div>
-        </section>
+        </div>
 
-        <!-- Signal Cards Row -->
-        <section class="signals-row">
-            <!-- Exchange Flows -->
-            <div class="signal-card">
-                <div class="signal-header">
-                    Exchange Flows
-                    <span class="signal-badge" id="exchangeBadge">-</span>
-                </div>
-                <div class="signal-body" id="exchangeBody">
-                    <div class="loading">Loading...</div>
-                </div>
-            </div>
-
-            <!-- Category Breakdown -->
-            <div class="signal-card">
-                <div class="signal-header">
-                    Category Breakdown
-                    <span class="badge">Where money is moving</span>
-                </div>
-                <div class="signal-body" id="categoryBody">
-                    <div class="loading">Loading...</div>
-                </div>
-            </div>
-
-            <!-- Emerging/New Positions -->
-            <div class="signal-card">
-                <div class="signal-header">
-                    Early Signals
-                    <span class="badge">1-3 funds only</span>
-                </div>
-                <div class="signal-body" id="emergingBody">
-                    <div class="loading">Loading...</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- DEX Trades - Real Trading Activity -->
-        <section class="card" style="margin-bottom: 0.75rem;">
-            <div class="card-header">
-                DEX Trades (Actual Trading)
-                <span class="badge" style="background:#ff9500;color:#fff">Swaps from funds</span>
-            </div>
-            <div class="dex-scroll" id="dexTradesList" style="max-height: 250px; overflow-y: auto; padding: 0.5rem;">
-                <div class="loading">Loading swaps...</div>
-            </div>
-        </section>
-
-        <!-- Smart Money Consensus -->
-        <section class="card" style="margin-bottom: 0.75rem;">
-            <div class="card-header">
-                Smart Money Consensus
-                <span class="badge">Multiple funds = stronger signal</span>
-            </div>
-            <div class="consensus-grid" id="consensusGrid">
-                <div class="loading">Loading...</div>
-            </div>
-        </section>
-
-        <!-- Main content -->
-        <section class="main-grid">
+        <!-- Flows -->
+        <section class="grid-2">
             <div class="card">
-                <div class="card-header">
-                    Activity Feed
-                    <span class="badge" id="activityCount">0</span>
+                <div class="card-header inflow">
+                    Smart Money Inflows
+                    <span class="badge badge-green">Accumulation</span>
                 </div>
-                <div class="activity-scroll" id="activityList">
-                    <div class="loading">Loading...</div>
+                <div class="card-body" id="inflowsList">
+                    <div class="loading">Loading flows...</div>
                 </div>
             </div>
 
-            <div class="sidebar">
-                <div class="card">
-                    <div class="card-header">Most Active Funds</div>
-                    <div class="sidebar-scroll" id="fundList">
-                        <div class="loading">Loading...</div>
-                    </div>
+            <div class="card">
+                <div class="card-header outflow">
+                    Smart Money Outflows
+                    <span class="badge badge-red">Distribution</span>
                 </div>
+                <div class="card-body" id="outflowsList">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </section>
 
-                <div class="card">
-                    <div class="card-header">
-                        Whale Alerts
-                        <span class="badge">$500K+</span>
-                    </div>
-                    <div class="sidebar-scroll" id="whaleList">
-                        <div class="loading">Loading...</div>
-                    </div>
-                </div>
+        <!-- Live Trades -->
+        <section class="card" style="margin-bottom: 1rem;">
+            <div class="card-header trades">
+                Live DEX Activity
+                <span class="badge badge-orange">Real-time swaps</span>
+            </div>
+            <div class="card-body" id="tradesList" style="max-height: 350px;">
+                <div class="loading">Loading trades...</div>
+            </div>
+        </section>
+
+        <!-- Holdings -->
+        <section class="card">
+            <div class="card-header holdings">
+                Smart Money Top Holdings
+                <span class="badge badge-purple">Highest conviction</span>
+            </div>
+            <div class="card-body" id="holdingsList">
+                <div class="loading">Loading holdings...</div>
             </div>
         </section>
     </main>
 
-    <!-- Token Modal -->
-    <div class="modal" id="tokenModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Token Details</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body" id="modalBody"></div>
-        </div>
-    </div>
-
-    <!-- Fund Modal -->
-    <div class="modal" id="fundModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="fundModalTitle">Fund Activity</h2>
-                <button class="modal-close" onclick="closeFundModal()">&times;</button>
-            </div>
-            <div class="modal-body" id="fundModalBody"></div>
-        </div>
-    </div>
-
     <script>
-        let cachedData = null;
-
         const fmt = {
             usd: (v) => {
-                if (v === null || v === undefined) return '-';
+                if (!v) return '-';
                 const abs = Math.abs(v);
-                if (abs >= 1e9) return '$' + (v/1e9).toFixed(2) + 'B';
-                if (abs >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
-                if (abs >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
-                return '$' + v.toFixed(0);
+                const sign = v < 0 ? '-' : '+';
+                if (abs >= 1e9) return sign + '$' + (abs/1e9).toFixed(2) + 'B';
+                if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
+                return sign + '$' + abs.toFixed(0);
             },
-            signed: (v) => {
-                if (v === null || v === undefined) return '-';
-                const sign = v >= 0 ? '+' : '';
-                return sign + fmt.usd(v);
+            usdAbs: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                if (abs >= 1e9) return '$' + (abs/1e9).toFixed(2) + 'B';
+                if (abs >= 1e6) return '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return '$' + (abs/1e3).toFixed(0) + 'K';
+                return '$' + abs.toFixed(0);
             },
-            num: (v) => {
-                if (!v) return '0';
-                if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1) + 'M';
-                if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1) + 'K';
-                return v.toFixed(1);
+            pct: (v) => {
+                if (!v && v !== 0) return '-';
+                const sign = v > 0 ? '+' : '';
+                return sign + v.toFixed(1) + '%';
+            },
+            mcap: (v) => {
+                if (!v) return '';
+                if (v >= 1e9) return 'MCap $' + (v/1e9).toFixed(1) + 'B';
+                if (v >= 1e6) return 'MCap $' + (v/1e6).toFixed(0) + 'M';
+                return 'MCap $' + (v/1e3).toFixed(0) + 'K';
             }
         };
 
-        async function loadActivity() {
-            const btn = document.getElementById('refreshBtn');
-            btn.disabled = true;
-            btn.textContent = '...';
+        let currentTimeframe = '24h';
 
+        function goToToken(chain, address) {
+            if (address) window.location.href = `/token/${chain}/${address}`;
+        }
+
+        function goToTrader(chain, address) {
+            if (address) window.location.href = `/trader/${chain}/${address}`;
+        }
+
+        async function loadFlows() {
             try {
-                const res = await fetch(`/api/activity?min_usd=${document.getElementById('minUsd').value}`);
-                const data = await res.json();
-                cachedData = data;
-
-                if (data.loading) {
-                    ['activityList', 'consensusGrid', 'fundList', 'whaleList', 'exchangeBody', 'categoryBody', 'emergingBody']
-                        .forEach(id => document.getElementById(id).innerHTML = `<div class="loading">${data.message || 'Loading...'}</div>`);
-                    setTimeout(loadActivity, 8000);
-                    return;
-                }
-
-                if (data.cache_age_seconds) {
-                    const mins = Math.floor(data.cache_age_seconds / 60);
-                    document.getElementById('cacheInfo').textContent = `${mins}m ago`;
-                }
-
-                // Metrics
-                const s = data.stats;
-                document.getElementById('totalReceived').textContent = fmt.usd(s.total_received);
-                document.getElementById('totalSent').textContent = fmt.usd(s.total_sent);
-                const netEl = document.getElementById('netFlow');
-                netEl.textContent = fmt.signed(s.net_flow);
-                netEl.className = 'metric-value ' + (s.net_flow >= 0 ? 'green' : 'red');
-
-                const recentEl = document.getElementById('recentNet');
-                recentEl.textContent = fmt.signed(s.recent_net);
-                recentEl.className = 'metric-value ' + (s.recent_net >= 0 ? 'green' : 'red');
-                document.getElementById('recentCount').textContent = `${s.recent_count} txs`;
-
-                document.getElementById('activeFunds').textContent = s.active_funds;
-
-                // Exchange flows
-                const ex = data.exchange_flows || {};
-                const exNetEl = document.getElementById('exchangeNet');
-                exNetEl.textContent = fmt.signed(ex.net || 0);
-                exNetEl.className = 'metric-value ' + (ex.net >= 0 ? 'green' : 'red');
-                const exSig = document.getElementById('exchangeSignal');
-                exSig.textContent = ex.net > 0 ? 'buying' : ex.net < 0 ? 'selling' : '-';
-
-                renderExchangeFlows(data.exchange_flows);
-                renderCategories(data.categories);
-                renderEmerging(data.emerging_tokens);
-                renderConsensus(data.consensus);
-                renderActivity(data.activity);
-                renderFundLeaderboard(data.fund_leaderboard);
-                renderWhales(data.whales);
-
-            } catch (e) {
-                console.error(e);
-                document.getElementById('activityList').innerHTML = `<div class="error">Error: ${e.message}</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Refresh';
-            }
-        }
-
-        function renderExchangeFlows(ex) {
-            const body = document.getElementById('exchangeBody');
-            const badge = document.getElementById('exchangeBadge');
-
-            if (!ex) {
-                body.innerHTML = '<div class="loading">No data</div>';
-                return;
-            }
-
-            badge.textContent = ex.signal;
-            badge.className = 'signal-badge ' + ex.signal.toLowerCase();
-
-            body.innerHTML = `
-                <div class="exchange-stat">
-                    <span class="exchange-label">From exchanges (buying)</span>
-                    <span class="exchange-value" style="color:#34c759">${fmt.usd(ex.from_exchange)}</span>
-                </div>
-                <div class="exchange-stat">
-                    <span class="exchange-label">To exchanges (selling)</span>
-                    <span class="exchange-value" style="color:#ff3b30">${fmt.usd(ex.to_exchange)}</span>
-                </div>
-                <div class="exchange-stat">
-                    <span class="exchange-label"><strong>Net (buy - sell)</strong></span>
-                    <span class="exchange-value" style="color:${ex.net >= 0 ? '#34c759' : '#ff3b30'};font-weight:600">${fmt.signed(ex.net)}</span>
-                </div>
-            `;
-        }
-
-        function renderCategories(cats) {
-            const body = document.getElementById('categoryBody');
-            if (!cats || !cats.length) {
-                body.innerHTML = '<div class="loading">No data</div>';
-                return;
-            }
-            body.innerHTML = cats.filter(c => c.volume > 10000).map(c => `
-                <div class="category-item">
-                    <span class="category-name ${c.category}">${c.category}</span>
-                    <span class="category-flow ${c.net >= 0 ? 'positive' : 'negative'}" style="color:${c.net >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(c.net)}</span>
-                </div>
-            `).join('');
-        }
-
-        function renderEmerging(tokens) {
-            const body = document.getElementById('emergingBody');
-            if (!tokens || !tokens.length) {
-                body.innerHTML = '<div class="loading">No early signals</div>';
-                return;
-            }
-            body.innerHTML = tokens.map(t => `
-                <div class="emerging-item" onclick="showTokenDetail('${t.token}')">
-                    <div>
-                        <span class="emerging-token">${t.token}</span>
-                        <span class="emerging-action ${t.action}">${t.action}</span>
-                        <div class="emerging-funds">${t.funds.slice(0,2).join(', ')}</div>
-                    </div>
-                    <span style="font-family:'SF Mono',monospace;color:${t.net >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(t.net)}</span>
-                </div>
-            `).join('');
-        }
-
-        function renderConsensus(consensus) {
-            const grid = document.getElementById('consensusGrid');
-            if (!consensus || !consensus.length) {
-                grid.innerHTML = '<div class="loading">No consensus signals</div>';
-                return;
-            }
-            grid.innerHTML = consensus.map(c => `
-                <div class="consensus-card ${c.signal.toLowerCase()}" onclick="showTokenDetail('${c.token}')">
-                    <div class="consensus-top">
-                        <span class="consensus-token">${c.token}</span>
-                        <span class="consensus-signal ${c.signal.toLowerCase()}">${c.signal}</span>
-                    </div>
-                    <div class="consensus-flow" style="color:${c.net >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(c.net)}</div>
-                    <div class="consensus-meta">${c.buyer_count} buying, ${c.seller_count} selling</div>
-                </div>
-            `).join('');
-        }
-
-        function renderActivity(activity) {
-            const list = document.getElementById('activityList');
-            document.getElementById('activityCount').textContent = `${activity.length} txs`;
-
-            if (!activity.length) {
-                list.innerHTML = '<div class="loading">No activity</div>';
-                return;
-            }
-
-            list.innerHTML = activity.map(a => `
-                <div class="activity-item ${a.usd >= 500000 ? 'whale' : ''} ${a.is_exchange ? 'exchange' : ''}">
-                    <span class="time">${a.time_ago}</span>
-                    <span class="fund" onclick="showFundDetail('${a.fund_id}')">${a.fund}</span>
-                    <span class="action ${a.action.toLowerCase()}">${a.action}</span>
-                    <span class="token" onclick="showTokenDetail('${a.token}')">${a.token}</span>
-                    <span class="amount">${fmt.num(a.amount)}</span>
-                    <span class="usd ${a.usd >= 500000 ? 'whale' : ''}">${fmt.usd(a.usd)}</span>
-                    <span class="counterparty ${a.is_exchange ? 'exchange' : ''}">${a.counterparty}</span>
-                    <span class="chain">${a.chain}</span>
-                </div>
-            `).join('');
-        }
-
-        function renderFundLeaderboard(funds) {
-            const list = document.getElementById('fundList');
-            if (!funds.length) {
-                list.innerHTML = '<div class="loading">No data</div>';
-                return;
-            }
-            list.innerHTML = funds.map(f => `
-                <div class="fund-item" onclick="showFundDetail('${f.fund_id}')">
-                    <div>
-                        <div class="fund-name">${f.name}</div>
-                        <div class="fund-meta">${f.tx_count} txs${f.exchange_sells > 0 ? ' · ' + fmt.usd(f.exchange_sells) + ' to CEX' : ''}</div>
-                    </div>
-                    <div class="fund-net ${f.net >= 0 ? 'positive' : 'negative'}">${fmt.signed(f.net)}</div>
-                </div>
-            `).join('');
-        }
-
-        function renderWhales(whales) {
-            const list = document.getElementById('whaleList');
-            if (!whales.length) {
-                list.innerHTML = '<div class="loading">No whales</div>';
-                return;
-            }
-            list.innerHTML = whales.slice(0, 10).map(w => `
-                <div class="whale-item">
-                    <div class="whale-header">
-                        <span class="fund" onclick="showFundDetail('${w.fund_id}')">${w.fund}</span>
-                        <span class="whale-amount">${fmt.usd(w.usd)}</span>
-                    </div>
-                    <div class="whale-detail">
-                        <span class="action ${w.action.toLowerCase()}">${w.action}</span>
-                        <span class="token" onclick="showTokenDetail('${w.token}')">${w.token}</span> · ${w.time_ago}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function showTokenDetail(token) {
-            const modal = document.getElementById('tokenModal');
-            const body = document.getElementById('modalBody');
-            document.getElementById('modalTitle').textContent = `${token} - Who's Touching It`;
-            body.innerHTML = '<div class="loading">Loading comprehensive data...</div>';
-            modal.classList.add('active');
-
-            try {
-                const res = await fetch(`/api/token/${token}`);
+                const res = await fetch('/api/flows');
                 const data = await res.json();
 
-                const typeLabel = (type) => {
-                    const labels = { fund: 'Fund', individual: 'Trader', '': 'Unknown' };
-                    return labels[type] || type;
-                };
-
-                const entityRow = (e, showType = true) => `
-                    <tr class="${e.is_market_maker ? 'mm-row' : ''}" style="${e.is_market_maker ? 'opacity:0.7' : ''}">
-                        <td>
-                            <span>${e.name}</span>
-                            ${showType ? `<span class="entity-type-badge ${e.type}">${typeLabel(e.type)}${e.is_market_maker ? ' (MM)' : ''}</span>` : ''}
-                        </td>
-                        <td class="${e.net_7d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_7d)}</td>
-                        <td class="${e.net_30d >= 0 ? 'positive' : 'negative'}">${fmt.signed(e.net_30d)}</td>
-                        <td style="font-size:0.6rem;color:#86868b">${e.tx_count_30d || 0} txs</td>
-                    </tr>`;
-
-                let html = `
-                    <style>
-                        .entity-type-badge { font-size:0.55rem; padding:0.1rem 0.3rem; border-radius:3px; margin-left:0.3rem; }
-                        .entity-type-badge.fund { background:#e3f2fd; color:#1565c0; }
-                        .entity-type-badge.individual { background:#fff3e0; color:#e65100; }
-                        .tx-timeline { max-height:200px; overflow-y:auto; font-size:0.7rem; }
-                        .tx-row { display:grid; grid-template-columns:60px 100px 60px 70px 80px 1fr; gap:0.3rem; padding:0.3rem 0.5rem; border-bottom:1px solid #f5f5f5; align-items:center; }
-                        .tx-row:hover { background:#fafafa; }
-                        .tx-entity { color:#5856d6; font-weight:500; }
-                        .tx-dir { font-size:0.6rem; font-weight:600; }
-                        .tx-dir.received { color:#34c759; }
-                        .tx-dir.sent { color:#ff3b30; }
-                        .section-tabs { display:flex; gap:0.5rem; margin-bottom:0.5rem; }
-                        .section-tab { padding:0.3rem 0.6rem; border-radius:4px; font-size:0.7rem; cursor:pointer; border:1px solid #e8e8ed; }
-                        .section-tab.active { background:#0071e3; color:white; border-color:#0071e3; }
-                    </style>
-                    <div class="summary-grid" style="grid-template-columns:repeat(6,1fr)">
-                        <div class="summary-item">
-                            <div class="summary-label">Net (30d)</div>
-                            <div class="summary-value" style="color:${data.summary.total_accumulated_30d - data.summary.total_sold_30d >= 0 ? '#34c759' : '#ff3b30'}">${fmt.signed(data.summary.total_accumulated_30d - data.summary.total_sold_30d)}</div>
+                // Inflows
+                const inflowsList = document.getElementById('inflowsList');
+                if (data.inflows?.length) {
+                    inflowsList.innerHTML = data.inflows.map(f => `
+                        <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
+                            <div>
+                                <div class="flow-token">${f.token}</div>
+                                <span class="flow-chain ${f.chain}">${f.chain}</span>
+                            </div>
+                            <div class="flow-meta">
+                                ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
+                            </div>
+                            <div class="flow-value positive">${fmt.usd(f.flow_24h)}</div>
                         </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Accumulated</div>
-                            <div class="summary-value" style="color:#34c759">${fmt.usd(data.summary.total_accumulated_30d)}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Sold</div>
-                            <div class="summary-value" style="color:#ff3b30">${fmt.usd(data.summary.total_sold_30d)}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Total Entities</div>
-                            <div class="summary-value">${data.summary.total_entities}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Smart $ Buying</div>
-                            <div class="summary-value" style="color:#34c759">${data.summary.smart_money_accumulating}</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-label">Smart $ Selling</div>
-                            <div class="summary-value" style="color:#ff3b30">${data.summary.smart_money_selling}</div>
-                        </div>
-                    </div>
-                `;
-
-                // Smart Money section (non-market makers)
-                const smartAccum = data.smart_money?.accumulators || [];
-                const smartSell = data.smart_money?.sellers || [];
-
-                if (smartAccum.length || smartSell.length) {
-                    html += `<div class="section-title" style="color:#5856d6">Smart Money (Funds & Traders)</div>`;
-
-                    if (smartAccum.length) {
-                        html += `<div style="font-size:0.65rem;color:#34c759;font-weight:600;margin:0.5rem 0 0.3rem">ACCUMULATING</div>
-                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>Activity</th></tr></thead><tbody>
-                            ${smartAccum.map(e => entityRow(e)).join('')}
-                            </tbody></table>`;
-                    }
-
-                    if (smartSell.length) {
-                        html += `<div style="font-size:0.65rem;color:#ff3b30;font-weight:600;margin:0.5rem 0 0.3rem">DISTRIBUTING</div>
-                            <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>Activity</th></tr></thead><tbody>
-                            ${smartSell.map(e => entityRow(e)).join('')}
-                            </tbody></table>`;
-                    }
+                    `).join('');
+                } else {
+                    inflowsList.innerHTML = '<div class="loading">No inflow data</div>';
                 }
 
-                // Market Makers section
-                const mmAccum = data.market_makers?.accumulators || [];
-                const mmSell = data.market_makers?.sellers || [];
-
-                if (mmAccum.length || mmSell.length) {
-                    html += `<div class="section-title" style="color:#86868b;margin-top:1rem">Market Makers (for context)</div>
-                        <table class="data-table"><thead><tr><th>Entity</th><th>7D</th><th>30D</th><th>Activity</th></tr></thead><tbody>
-                        ${[...mmAccum, ...mmSell].map(e => entityRow(e, false)).join('')}
-                        </tbody></table>`;
+                // Outflows
+                const outflowsList = document.getElementById('outflowsList');
+                if (data.outflows?.length) {
+                    outflowsList.innerHTML = data.outflows.map(f => `
+                        <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
+                            <div>
+                                <div class="flow-token">${f.token}</div>
+                                <span class="flow-chain ${f.chain}">${f.chain}</span>
+                            </div>
+                            <div class="flow-meta">
+                                ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
+                            </div>
+                            <div class="flow-value negative">${fmt.usd(f.flow_24h)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    outflowsList.innerHTML = '<div class="loading">No outflow data</div>';
                 }
-
-                // Recent transactions timeline
-                const txs = data.recent_transactions || [];
-                if (txs.length) {
-                    html += `<div class="section-title" style="margin-top:1rem">Recent Transactions</div>
-                        <div class="tx-timeline">
-                            ${txs.slice(0, 30).map(tx => `
-                                <div class="tx-row">
-                                    <span style="font-size:0.6rem;color:#86868b">${tx.time_ago}</span>
-                                    <span class="tx-entity">${tx.entity}</span>
-                                    <span class="tx-dir ${tx.direction}">${tx.direction === 'received' ? 'IN' : 'OUT'}</span>
-                                    <span style="font-family:'SF Mono',monospace">${fmt.usd(tx.usd)}</span>
-                                    <span style="font-size:0.6rem;color:#86868b">${tx.counterparty || '-'}</span>
-                                    <span style="font-size:0.55rem;background:#e8e8ed;padding:0.1rem 0.2rem;border-radius:2px">${tx.chain}</span>
-                                </div>
-                            `).join('')}
-                        </div>`;
-                }
-
-                if (!data.accumulators.length && !data.sellers.length) {
-                    html += '<div class="loading" style="margin-top:1rem">No significant activity found for this token</div>';
-                }
-
-                body.innerHTML = html;
             } catch (e) {
-                body.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+                console.error('Flows error:', e);
+                document.getElementById('inflowsList').innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }
         }
 
-        async function showFundDetail(fundId) {
-            const modal = document.getElementById('fundModal');
-            const body = document.getElementById('fundModalBody');
-            document.getElementById('fundModalTitle').textContent = fundId;
-            body.innerHTML = '<div class="loading">Loading fund data...</div>';
-            modal.classList.add('active');
-
+        async function loadTrades() {
             try {
-                const res = await fetch(`/api/fund/${fundId}`);
+                const res = await fetch('/api/trades?min_usd=1000');
                 const data = await res.json();
 
-                document.getElementById('fundModalTitle').textContent = data.name || fundId;
-
-                const s = data.stats;
-                const tokens = data.tokens || [];
-                const txs = data.transactions || [];
-
-                let html = `
-                    <div class="summary-grid" style="grid-template-columns:repeat(5,1fr)">
-                        <div class="summary-item"><div class="summary-label">Received</div><div class="summary-value" style="color:#34c759">${fmt.usd(s.received)}</div></div>
-                        <div class="summary-item"><div class="summary-label">Sent</div><div class="summary-value" style="color:#ff3b30">${fmt.usd(s.sent)}</div></div>
-                        <div class="summary-item"><div class="summary-label">Net</div><div class="summary-value" style="color:${s.net>=0?'#34c759':'#ff3b30'}">${fmt.signed(s.net)}</div></div>
-                        <div class="summary-item"><div class="summary-label">To Exchanges</div><div class="summary-value" style="color:#ff9500">${fmt.usd(s.exchange_sent)}</div></div>
-                        <div class="summary-item"><div class="summary-label">Tokens</div><div class="summary-value">${s.unique_tokens}</div></div>
-                    </div>
-                `;
-
-                if (tokens.length) {
-                    html += `<div class="section-title">Token Activity</div>
-                        <table class="data-table"><thead><tr><th>Token</th><th>In</th><th>Out</th><th>Net</th></tr></thead><tbody>
-                        ${tokens.slice(0,15).map(t => `<tr>
-                            <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${t.token}')">${t.token}</td>
-                            <td class="positive">${fmt.usd(t.received)}</td>
-                            <td class="negative">${fmt.usd(t.sent)}</td>
-                            <td class="${t.net>=0?'positive':'negative'}">${fmt.signed(t.net)}</td>
-                        </tr>`).join('')}
-                        </tbody></table>`;
+                const tradesList = document.getElementById('tradesList');
+                if (data.trades?.length) {
+                    tradesList.innerHTML = data.trades.map(t => `
+                        <div class="trade-item" onclick="goToTrader('${t.chain}', '${t.trader_address}')">
+                            <span class="trade-time">${t.time_ago}</span>
+                            <span class="trade-trader">${t.trader}</span>
+                            <div class="trade-pair">
+                                <span class="trade-token sold">${t.token_sold}</span>
+                                <span class="trade-arrow">→</span>
+                                <span class="trade-token bought">${t.token_bought}</span>
+                            </div>
+                            <span class="trade-value">${fmt.usdAbs(t.value_usd)}</span>
+                            <span class="flow-chain ${t.chain}">${t.chain}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    tradesList.innerHTML = '<div class="loading">No recent trades</div>';
                 }
-
-                if (txs.length) {
-                    html += `<div class="section-title">Recent Transactions (${s.tx_count} total)</div>
-                        <div style="max-height:200px;overflow-y:auto">
-                        <table class="data-table"><thead><tr><th>Time</th><th>Action</th><th>Token</th><th>USD</th><th>Counterparty</th></tr></thead><tbody>
-                        ${txs.slice(0,25).map(tx => `<tr>
-                            <td style="font-family:'SF Mono',monospace;font-size:0.65rem">${tx.time_ago}</td>
-                            <td class="${tx.direction==='received'?'positive':'negative'}">${tx.direction === 'received' ? 'IN' : 'OUT'}</td>
-                            <td style="cursor:pointer" onclick="closeFundModal();showTokenDetail('${tx.token}')">${tx.token}</td>
-                            <td>${fmt.usd(tx.usd)}</td>
-                            <td style="font-size:0.65rem;color:${tx.is_exchange?'#0071e3':'#86868b'}">${tx.counterparty?.slice(0,20) || '-'}</td>
-                        </tr>`).join('')}
-                        </tbody></table></div>`;
-                }
-
-                if (!tokens.length && !txs.length) {
-                    html += '<div class="loading">No recent activity found for this entity</div>';
-                }
-
-                body.innerHTML = html;
             } catch (e) {
-                body.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+                console.error('Trades error:', e);
+                tradesList.innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }
         }
 
-        function closeModal() { document.getElementById('tokenModal').classList.remove('active'); }
-        function closeFundModal() { document.getElementById('fundModal').classList.remove('active'); }
-
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeFundModal(); } });
-        document.getElementById('tokenModal').addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(); });
-        document.getElementById('fundModal').addEventListener('click', e => { if (e.target.classList.contains('modal')) closeFundModal(); });
-
-        async function loadSwaps() {
-            const list = document.getElementById('dexTradesList');
+        async function loadHoldings() {
             try {
-                const res = await fetch('/api/swaps');
+                const res = await fetch('/api/holdings');
                 const data = await res.json();
 
-                if (data.loading) {
-                    list.innerHTML = `<div class="loading">${data.message || 'Loading swaps...'}</div>`;
-                    return;
+                const holdingsList = document.getElementById('holdingsList');
+                if (data.holdings?.length) {
+                    holdingsList.innerHTML = data.holdings.map(h => `
+                        <div class="holding-item" onclick="goToToken('${h.chain}', '${h.token_address}')">
+                            <div>
+                                <div class="flow-token">${h.token}</div>
+                                <span class="flow-chain ${h.chain}">${h.chain}</span>
+                            </div>
+                            <div class="flow-meta">
+                                ${h.holders_count} holders | ${h.share_percent.toFixed(1)}% of supply
+                            </div>
+                            <span class="holding-value">${fmt.usdAbs(h.value_usd)}</span>
+                            <span class="holding-change ${h.change_24h >= 0 ? 'up' : 'down'}">${fmt.pct(h.change_24h)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    holdingsList.innerHTML = '<div class="loading">No holdings data</div>';
                 }
-
-                const swaps = data.swaps || [];
-                if (!swaps.length) {
-                    list.innerHTML = '<div class="loading">No DEX trades found</div>';
-                    return;
-                }
-
-                list.innerHTML = swaps.slice(0, 30).map(s => `
-                    <div class="dex-trade ${s.action.toLowerCase() === 'sold' ? 'sell' : 'buy'}">
-                        <span class="time">${s.time_ago}</span>
-                        <span class="fund" onclick="showFundDetail('${s.fund_id}')">${s.fund}</span>
-                        <span class="dex-action ${s.action.toLowerCase()}">${s.action}</span>
-                        <span class="token" onclick="showTokenDetail('${s.token}')">${s.token}</span>
-                        <span class="amount" style="font-size:0.6rem">${fmt.num(s.action === 'Sold' ? s.amount_sold : s.amount_bought)}</span>
-                        <span class="usd ${s.usd >= 500000 ? 'whale' : ''}">${fmt.usd(s.usd)}</span>
-                        <span class="dex-dex">${s.dex?.slice(0, 12) || 'DEX'}</span>
-                        <span class="chain">${s.chain}</span>
-                    </div>
-                `).join('');
             } catch (e) {
-                console.error('Swaps error:', e);
-                list.innerHTML = '<div class="loading">Swaps loading...</div>';
+                console.error('Holdings error:', e);
+                holdingsList.innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => { loadActivity(); loadSwaps(); });
-        document.getElementById('minUsd').addEventListener('change', loadActivity);
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFlows();
+            loadTrades();
+            loadHoldings();
+
+            // Auto-refresh trades every 30s
+            setInterval(loadTrades, 30000);
+        });
+
+        // Timeframe buttons
+        document.querySelectorAll('.timeframe-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTimeframe = btn.dataset.tf;
+                loadFlows();
+            });
+        });
     </script>
 </body>
 </html>

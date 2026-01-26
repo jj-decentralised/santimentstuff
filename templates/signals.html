@@ -3,443 +3,447 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Signals</title>
+    <title>Alpha Signals</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-            background: #f5f5f7;
-            color: #1d1d1f;
+            background: #0a0a0f;
+            color: #e5e5e7;
             line-height: 1.4;
             font-size: 13px;
         }
 
         .header {
-            background: #fff;
-            border-bottom: 1px solid #d2d2d7;
-            padding: 0.6rem 1.5rem;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2a2a4a;
+            padding: 0.8rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
         }
-        .header h1 { font-size: 1rem; font-weight: 600; }
-        .header-right { display: flex; gap: 0.5rem; align-items: center; }
-        .header-right a, .header-right button {
-            padding: 0.35rem 0.6rem;
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav a {
+            padding: 0.4rem 0.8rem;
             border-radius: 6px;
             font-size: 0.75rem;
             text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
         }
-        .header-right a { background: #e8e8ed; color: #1d1d1f; }
-        .header-right button { background: #0071e3; color: #fff; border: none; cursor: pointer; }
+        .nav-active { background: #f59e0b; color: #000; }
+        .nav-default { background: rgba(255,255,255,0.1); color: #a0a0b0; }
+        .nav-default:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
-        .container { max-width: 1600px; margin: 0 auto; padding: 1rem; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1rem; }
 
-        /* Signal summary */
-        .signal-summary {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 0.75rem;
+        /* Summary bar */
+        .summary-bar {
+            display: flex;
+            gap: 1rem;
             margin-bottom: 1rem;
         }
-        .summary-card {
-            background: #fff;
+        .summary-item {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
             border-radius: 10px;
-            padding: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-            text-align: center;
+            padding: 1rem 1.5rem;
+            min-width: 150px;
         }
-        .summary-card.alert { border-left: 3px solid #ff9500; }
-        .summary-card.exit { border-left: 3px solid #ff3b30; }
-        .summary-card.conviction { border-left: 3px solid #5856d6; }
-        .summary-card.pump { border-left: 3px solid #34c759; }
-        .summary-card.smart { border-left: 3px solid #007aff; }
-        .summary-label { font-size: 0.6rem; color: #86868b; text-transform: uppercase; }
-        .summary-value { font-size: 1.5rem; font-weight: 700; margin-top: 0.2rem; }
+        .summary-label {
+            font-size: 0.65rem;
+            color: #6b6b80;
+            text-transform: uppercase;
+        }
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .summary-value.orange { color: #f59e0b; }
+        .summary-value.green { color: #10b981; }
+        .summary-value.purple { color: #a78bfa; }
 
-        /* Signal sections */
-        .signals-grid {
+        /* Grid */
+        .grid-2 {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 1fr 1fr;
             gap: 1rem;
+            margin-bottom: 1rem;
         }
-        .signal-section {
-            background: #fff;
+
+        /* Cards */
+        .card {
+            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
+            border: 1px solid #2a2a4a;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
-        .signal-section.full-width {
-            grid-column: span 2;
-        }
-        .section-header {
+        .card-header {
             padding: 0.75rem 1rem;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid #2a2a4a;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .section-header.accumulation { background: linear-gradient(135deg, #fff7ed, #fff); border-bottom: 2px solid #ff9500; }
-        .section-header.exit { background: linear-gradient(135deg, #fff5f5, #fff); border-bottom: 2px solid #ff3b30; }
-        .section-header.conviction { background: linear-gradient(135deg, #f5f3ff, #fff); border-bottom: 2px solid #5856d6; }
-        .section-header.pump { background: linear-gradient(135deg, #f0fff4, #fff); border-bottom: 2px solid #34c759; }
-        .section-header.smart { background: linear-gradient(135deg, #eff6ff, #fff); border-bottom: 2px solid #007aff; }
+        .card-header.whale { border-left: 3px solid #00d4ff; }
+        .card-header.new-token { border-left: 3px solid #10b981; }
+        .card-header.large-trade { border-left: 3px solid #f59e0b; }
 
-        .section-body {
-            padding: 0.5rem;
-            max-height: 350px;
+        .badge {
+            font-size: 0.6rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .badge-cyan { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+        .card-body {
+            max-height: 450px;
             overflow-y: auto;
         }
 
-        /* Signal cards */
-        .signal-card {
-            padding: 0.6rem 0.75rem;
-            border-radius: 8px;
-            margin-bottom: 0.4rem;
-            background: #fafafa;
-            border: 1px solid #f0f0f0;
+        /* Signal items */
+        .signal-item {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: background 0.1s;
         }
-        .signal-card:hover { background: #f5f5f5; }
+        .signal-item:hover { background: rgba(255,255,255,0.03); }
+        .signal-item:last-child { border-bottom: none; }
+
         .signal-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.4rem;
         }
         .signal-token {
             font-weight: 700;
-            font-size: 0.95rem;
-            color: #af7e00;
-            cursor: pointer;
+            font-size: 1rem;
+            color: #fff;
         }
-        .signal-token:hover { text-decoration: underline; }
-        .signal-badge {
-            font-size: 0.55rem;
+        .signal-chain {
+            font-size: 0.6rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            margin-left: 0.5rem;
+        }
+        .signal-chain.solana { color: #14f195; }
+        .signal-chain.ethereum { color: #627eea; }
+        .signal-chain.base { color: #0052ff; }
+
+        .signal-strength {
+            font-size: 0.6rem;
             font-weight: 700;
-            padding: 0.15rem 0.4rem;
+            padding: 0.2rem 0.5rem;
             border-radius: 4px;
-            text-transform: uppercase;
         }
-        .signal-badge.strong { background: #dcfce7; color: #166534; }
-        .signal-badge.moderate { background: #fef3c7; color: #92400e; }
-        .signal-badge.high { background: #fee2e2; color: #991b1b; }
-        .signal-badge.medium { background: #fef3c7; color: #92400e; }
-        .signal-meta {
-            font-size: 0.7rem;
-            color: #666;
+        .signal-strength.strong { background: #f59e0b; color: #000; }
+        .signal-strength.moderate { background: rgba(255,255,255,0.1); color: #a0a0b0; }
+
+        .signal-flows {
             display: flex;
             gap: 1rem;
-            flex-wrap: wrap;
+            font-size: 0.75rem;
+            margin-bottom: 0.3rem;
         }
-        .signal-meta span { display: flex; align-items: center; gap: 0.2rem; }
-        .signal-funds {
+        .signal-flow {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .signal-flow-label { color: #6b6b80; }
+        .signal-flow-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 600;
+        }
+        .signal-flow-value.positive { color: #10b981; }
+
+        .signal-meta {
+            font-size: 0.7rem;
+            color: #6b6b80;
+        }
+
+        /* Large trade items */
+        .trade-signal {
+            display: grid;
+            grid-template-columns: 1fr 80px 70px;
+            gap: 0.5rem;
+            padding: 0.7rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            align-items: center;
+            cursor: pointer;
+        }
+        .trade-signal:hover { background: rgba(255,255,255,0.03); }
+        .trade-trader {
+            font-size: 0.75rem;
+            color: #a78bfa;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .trade-pair {
+            font-size: 0.8rem;
+            margin-top: 0.2rem;
+        }
+        .trade-pair .sold { color: #ef4444; }
+        .trade-pair .bought { color: #10b981; font-weight: 600; }
+        .trade-value {
+            font-family: 'SF Mono', monospace;
+            font-weight: 700;
+            color: #f59e0b;
+            font-size: 0.9rem;
+        }
+        .trade-time {
             font-size: 0.65rem;
-            color: #5856d6;
-            margin-top: 0.3rem;
+            color: #6b6b80;
         }
-        .mono { font-family: 'SF Mono', monospace; }
-        .green { color: #34c759; }
-        .red { color: #ff3b30; }
-        .orange { color: #ff9500; }
 
-        /* Smart money table */
-        .smart-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-        .smart-table th {
-            text-align: left;
-            padding: 0.4rem 0.6rem;
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            color: #86868b;
-            border-bottom: 1px solid #e8e8ed;
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
         }
-        .smart-table td {
-            padding: 0.4rem 0.6rem;
-            border-bottom: 1px solid #f5f5f5;
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: #6b6b80;
         }
-        .smart-table tr:hover { background: #fafafa; }
-        .trader-name { color: #5856d6; font-weight: 500; }
-        .token-link { color: #af7e00; font-weight: 600; cursor: pointer; }
-        .token-link:hover { text-decoration: underline; }
+        .empty-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
 
-        .loading { text-align: center; padding: 2rem; color: #86868b; }
-        .empty { text-align: center; padding: 1.5rem; color: #86868b; font-size: 0.75rem; }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
 
         @media (max-width: 1000px) {
-            .signals-grid { grid-template-columns: 1fr; }
-            .signal-section.full-width { grid-column: span 1; }
-            .signal-summary { grid-template-columns: repeat(3, 1fr); }
-        }
-        @media (max-width: 600px) {
-            .signal-summary { grid-template-columns: repeat(2, 1fr); }
+            .grid-2 { grid-template-columns: 1fr; }
+            .summary-bar { flex-wrap: wrap; }
         }
     </style>
 </head>
 <body>
     <header class="header">
-        <h1>Trading Signals</h1>
-        <div class="header-right">
-            <a href="/">Activity</a>
-            <a href="/pnl">Fund P/L</a>
-            <button onclick="loadSignals()">Refresh</button>
-        </div>
+        <h1>Alpha Signals</h1>
+        <nav class="header-nav">
+            <a href="/" class="nav-default">Dashboard</a>
+            <a href="/signals" class="nav-active">Signals</a>
+        </nav>
     </header>
 
     <main class="container">
         <!-- Summary -->
-        <section class="signal-summary">
-            <div class="summary-card alert">
-                <div class="summary-label">Accumulation Alerts</div>
-                <div class="summary-value orange" id="accumCount">-</div>
+        <div class="summary-bar">
+            <div class="summary-item">
+                <div class="summary-label">Whale Accumulation</div>
+                <div class="summary-value orange" id="whaleCount">-</div>
             </div>
-            <div class="summary-card exit">
-                <div class="summary-label">Exit Signals</div>
-                <div class="summary-value red" id="exitCount">-</div>
+            <div class="summary-item">
+                <div class="summary-label">New Token Alpha</div>
+                <div class="summary-value green" id="newTokenCount">-</div>
             </div>
-            <div class="summary-card conviction">
-                <div class="summary-label">Conviction Plays</div>
-                <div class="summary-value" style="color:#5856d6" id="convictionCount">-</div>
+            <div class="summary-item">
+                <div class="summary-label">Large Trades</div>
+                <div class="summary-value purple" id="largeTradeCount">-</div>
             </div>
-            <div class="summary-card pump">
-                <div class="summary-label">Pre-Pump Signals</div>
-                <div class="summary-value green" id="pumpCount">-</div>
-            </div>
-            <div class="summary-card smart">
-                <div class="summary-label">Smart Money Buys</div>
-                <div class="summary-value" style="color:#007aff" id="smartCount">-</div>
-            </div>
-        </section>
+        </div>
 
-        <!-- Signal Sections -->
-        <section class="signals-grid">
-            <!-- Accumulation Alerts -->
-            <div class="signal-section">
-                <div class="section-header accumulation">
-                    <span>Accumulation Alerts</span>
-                    <span style="font-size:0.6rem;font-weight:400;color:#666">3+ funds buying same token</span>
+        <!-- Signals -->
+        <div class="grid-2">
+            <!-- Whale Accumulation -->
+            <div class="card">
+                <div class="card-header whale">
+                    Whale Accumulation
+                    <span class="badge badge-cyan">Strong inflows across timeframes</span>
                 </div>
-                <div class="section-body" id="accumBody">
-                    <div class="loading">Loading...</div>
+                <div class="card-body" id="whaleSignals">
+                    <div class="loading">Loading signals...</div>
                 </div>
             </div>
 
-            <!-- Exit Signals -->
-            <div class="signal-section">
-                <div class="section-header exit">
-                    <span>Exit Signals</span>
-                    <span style="font-size:0.6rem;font-weight:400;color:#666">Multiple funds to exchanges</span>
+            <!-- New Token Alpha -->
+            <div class="card">
+                <div class="card-header new-token">
+                    New Token Alpha
+                    <span class="badge badge-green">Tokens < 14 days with SM interest</span>
                 </div>
-                <div class="section-body" id="exitBody">
+                <div class="card-body" id="newTokenSignals">
                     <div class="loading">Loading...</div>
                 </div>
             </div>
+        </div>
 
-            <!-- Pre-Pump Detection -->
-            <div class="signal-section">
-                <div class="section-header pump">
-                    <span>Pre-Pump Detection</span>
-                    <span style="font-size:0.6rem;font-weight:400;color:#666">High buy/sell ratio</span>
-                </div>
-                <div class="section-body" id="pumpBody">
-                    <div class="loading">Loading...</div>
-                </div>
+        <!-- Large Trades -->
+        <div class="card">
+            <div class="card-header large-trade">
+                Large Trades ($50K+)
+                <span class="badge badge-orange">Whale-sized individual swaps</span>
             </div>
-
-            <!-- Conviction Plays -->
-            <div class="signal-section">
-                <div class="section-header conviction">
-                    <span>Conviction Plays</span>
-                    <span style="font-size:0.6rem;font-weight:400;color:#666">Funds adding to positions</span>
-                </div>
-                <div class="section-body" id="convictionBody">
-                    <div class="loading">Loading...</div>
-                </div>
+            <div class="card-body" id="largeTradeSignals">
+                <div class="loading">Loading...</div>
             </div>
-
-            <!-- Smart Money Buys -->
-            <div class="signal-section full-width">
-                <div class="section-header smart">
-                    <span>Smart Money Buys</span>
-                    <span style="font-size:0.6rem;font-weight:400;color:#666">What profitable traders are buying</span>
-                </div>
-                <div class="section-body" id="smartBody">
-                    <div class="loading">Loading...</div>
-                </div>
-            </div>
-        </section>
+        </div>
     </main>
 
     <script>
         const fmt = {
             usd: (v) => {
-                if (v === null || v === undefined) return '-';
+                if (!v) return '-';
                 const abs = Math.abs(v);
-                if (abs >= 1e9) return '$' + (v/1e9).toFixed(2) + 'B';
-                if (abs >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
-                if (abs >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
-                return '$' + v.toFixed(0);
+                const sign = v < 0 ? '-' : '+';
+                if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(0) + 'K';
+                return sign + '$' + abs.toFixed(0);
+            },
+            usdAbs: (v) => {
+                if (!v) return '-';
+                const abs = Math.abs(v);
+                if (abs >= 1e6) return '$' + (abs/1e6).toFixed(1) + 'M';
+                if (abs >= 1e3) return '$' + (abs/1e3).toFixed(0) + 'K';
+                return '$' + abs.toFixed(0);
+            },
+            mcap: (v) => {
+                if (!v) return '';
+                if (v >= 1e9) return 'MCap $' + (v/1e9).toFixed(1) + 'B';
+                if (v >= 1e6) return 'MCap $' + (v/1e6).toFixed(0) + 'M';
+                return 'MCap $' + (v/1e3).toFixed(0) + 'K';
             }
         };
+
+        function goToToken(chain, address) {
+            if (address) window.location.href = `/token/${chain}/${address}`;
+        }
+
+        function goToTrader(chain, address) {
+            if (address) window.location.href = `/trader/${chain}/${address}`;
+        }
 
         async function loadSignals() {
             try {
                 const res = await fetch('/api/signals');
                 const data = await res.json();
 
-                if (data.loading) {
-                    ['accumBody', 'exitBody', 'pumpBody', 'convictionBody', 'smartBody']
-                        .forEach(id => document.getElementById(id).innerHTML = `<div class="loading">${data.message}</div>`);
-                    setTimeout(loadSignals, 5000);
-                    return;
-                }
-
-                const s = data.signals;
-                const sum = data.summary;
+                const signals = data.signals || {};
+                const summary = data.summary || {};
 
                 // Update counts
-                document.getElementById('accumCount').textContent = sum.accumulation_alerts;
-                document.getElementById('exitCount').textContent = sum.exit_signals;
-                document.getElementById('convictionCount').textContent = sum.conviction_plays;
-                document.getElementById('pumpCount').textContent = sum.pre_pump;
-                document.getElementById('smartCount').textContent = sum.smart_money_buys;
+                document.getElementById('whaleCount').textContent = summary.whale_accumulation || 0;
+                document.getElementById('newTokenCount').textContent = summary.new_token_alpha || 0;
+                document.getElementById('largeTradeCount').textContent = summary.large_trades || 0;
 
-                // Render each section
-                renderAccumulation(s.accumulation_alerts);
-                renderExit(s.exit_signals);
-                renderPump(s.pre_pump);
-                renderConviction(s.conviction_plays);
-                renderSmartMoney(s.smart_money_buys);
+                // Whale Accumulation
+                const whaleSignals = document.getElementById('whaleSignals');
+                const whales = signals.whale_accumulation || [];
+                if (whales.length) {
+                    whaleSignals.innerHTML = whales.map(s => `
+                        <div class="signal-item" onclick="goToToken('${s.chain}', '${s.token_address}')">
+                            <div class="signal-top">
+                                <div>
+                                    <span class="signal-token">${s.token}</span>
+                                    <span class="signal-chain ${s.chain}">${s.chain}</span>
+                                </div>
+                                <span class="signal-strength ${s.strength.toLowerCase()}">${s.strength}</span>
+                            </div>
+                            <div class="signal-flows">
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">1h:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_1h)}</span>
+                                </div>
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">24h:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_24h)}</span>
+                                </div>
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">7d:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_7d)}</span>
+                                </div>
+                            </div>
+                            <div class="signal-meta">${fmt.mcap(s.market_cap)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    whaleSignals.innerHTML = '<div class="empty-state"><div class="empty-icon">-</div>No whale accumulation signals</div>';
+                }
+
+                // New Token Alpha
+                const newTokenSignals = document.getElementById('newTokenSignals');
+                const newTokens = signals.new_token_alpha || [];
+                if (newTokens.length) {
+                    newTokenSignals.innerHTML = newTokens.map(s => `
+                        <div class="signal-item" onclick="goToToken('${s.chain}', '${s.token_address}')">
+                            <div class="signal-top">
+                                <div>
+                                    <span class="signal-token">${s.token}</span>
+                                    <span class="signal-chain ${s.chain}">${s.chain}</span>
+                                </div>
+                                <span class="signal-strength strong">${s.age_days}d old</span>
+                            </div>
+                            <div class="signal-flows">
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">24h flow:</span>
+                                    <span class="signal-flow-value positive">${fmt.usd(s.flow_24h)}</span>
+                                </div>
+                                <div class="signal-flow">
+                                    <span class="signal-flow-label">Traders:</span>
+                                    <span class="signal-flow-value">${s.trader_count}</span>
+                                </div>
+                            </div>
+                            <div class="signal-meta">${fmt.mcap(s.market_cap)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    newTokenSignals.innerHTML = '<div class="empty-state"><div class="empty-icon">-</div>No new token signals</div>';
+                }
+
+                // Large Trades
+                const largeTradeSignals = document.getElementById('largeTradeSignals');
+                const largeTrades = signals.large_trades || [];
+                if (largeTrades.length) {
+                    largeTradeSignals.innerHTML = largeTrades.map(t => `
+                        <div class="trade-signal" onclick="goToTrader('${t.chain}', '${t.trader_address}')">
+                            <div>
+                                <div class="trade-trader">${t.trader || 'Unknown'}</div>
+                                <div class="trade-pair">
+                                    <span class="sold">${t.token_sold}</span>
+                                    →
+                                    <span class="bought">${t.token_bought}</span>
+                                </div>
+                            </div>
+                            <span class="trade-value">${fmt.usdAbs(t.value_usd)}</span>
+                            <span class="trade-time">${t.time_ago}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    largeTradeSignals.innerHTML = '<div class="empty-state"><div class="empty-icon">-</div>No large trades</div>';
+                }
 
             } catch (e) {
-                console.error(e);
+                console.error('Signals error:', e);
+                document.getElementById('whaleSignals').innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }
-        }
-
-        function renderAccumulation(alerts) {
-            const body = document.getElementById('accumBody');
-            if (!alerts?.length) {
-                body.innerHTML = '<div class="empty">No accumulation alerts right now</div>';
-                return;
-            }
-            body.innerHTML = alerts.map(a => `
-                <div class="signal-card">
-                    <div class="signal-top">
-                        <span class="signal-token" onclick="window.location='/?token=${a.token}'">${a.token}</span>
-                        <span class="signal-badge ${a.strength.toLowerCase()}">${a.strength}</span>
-                    </div>
-                    <div class="signal-meta">
-                        <span><strong>${a.fund_count}</strong> funds buying</span>
-                        <span class="mono green">${fmt.usd(a.total_usd)}</span>
-                        <span>${a.buys} buys</span>
-                    </div>
-                    <div class="signal-funds">${a.funds.join(', ')}</div>
-                </div>
-            `).join('');
-        }
-
-        function renderExit(signals) {
-            const body = document.getElementById('exitBody');
-            if (!signals?.length) {
-                body.innerHTML = '<div class="empty">No exit signals right now</div>';
-                return;
-            }
-            body.innerHTML = signals.map(s => `
-                <div class="signal-card">
-                    <div class="signal-top">
-                        <span class="signal-token" onclick="window.location='/?token=${s.token}'">${s.token}</span>
-                        <span class="signal-badge ${s.severity.toLowerCase()}">${s.severity} RISK</span>
-                    </div>
-                    <div class="signal-meta">
-                        <span><strong>${s.fund_count}</strong> funds exiting</span>
-                        <span class="mono red">${fmt.usd(s.total_usd)} to CEX</span>
-                    </div>
-                    <div class="signal-funds">${s.funds.join(', ')}</div>
-                </div>
-            `).join('');
-        }
-
-        function renderPump(signals) {
-            const body = document.getElementById('pumpBody');
-            if (!signals?.length) {
-                body.innerHTML = '<div class="empty">No pre-pump signals right now</div>';
-                return;
-            }
-            body.innerHTML = signals.map(s => `
-                <div class="signal-card">
-                    <div class="signal-top">
-                        <span class="signal-token" onclick="window.location='/?token=${s.token}'">${s.token}</span>
-                        <span class="signal-badge ${s.signal_strength.toLowerCase()}">${s.signal_strength}</span>
-                    </div>
-                    <div class="signal-meta">
-                        <span><strong>${s.ratio}x</strong> buy/sell ratio</span>
-                        <span><strong>${s.unique_buyers}</strong> buyers</span>
-                        <span class="mono green">${fmt.usd(s.buy_usd)} in</span>
-                    </div>
-                    <div class="signal-funds">${s.funds.join(', ')}</div>
-                </div>
-            `).join('');
-        }
-
-        function renderConviction(plays) {
-            const body = document.getElementById('convictionBody');
-            if (!plays?.length) {
-                body.innerHTML = '<div class="empty">No conviction plays right now</div>';
-                return;
-            }
-            body.innerHTML = plays.map(p => `
-                <div class="signal-card">
-                    <div class="signal-top">
-                        <span>
-                            <span style="color:#5856d6;font-weight:600">${p.fund}</span>
-                            <span style="color:#86868b;margin:0 0.3rem">&rarr;</span>
-                            <span class="signal-token" onclick="window.location='/?token=${p.token}'">${p.token}</span>
-                        </span>
-                        <span class="signal-badge ${p.conviction.toLowerCase()}">${p.conviction}</span>
-                    </div>
-                    <div class="signal-meta">
-                        <span><strong>${p.buy_count}</strong> separate buys</span>
-                        <span class="mono green">${fmt.usd(p.total_usd)} total</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderSmartMoney(buys) {
-            const body = document.getElementById('smartBody');
-            if (!buys?.length) {
-                body.innerHTML = '<div class="empty">No smart money activity right now</div>';
-                return;
-            }
-            body.innerHTML = `
-                <table class="smart-table">
-                    <thead>
-                        <tr>
-                            <th>Trader</th>
-                            <th>Token</th>
-                            <th>Amount</th>
-                            <th>When</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${buys.map(b => `
-                            <tr>
-                                <td class="trader-name">${b.trader}</td>
-                                <td class="token-link" onclick="window.location='/?token=${b.token}'">${b.token}</td>
-                                <td class="mono green">${fmt.usd(b.usd)}</td>
-                                <td style="color:#86868b">${b.time_ago}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
         }
 
         document.addEventListener('DOMContentLoaded', loadSignals);
-        // Auto-refresh every 2 minutes
-        setInterval(loadSignals, 120000);
+
+        // Auto-refresh every 60s
+        setInterval(loadSignals, 60000);
     </script>
 </body>
 </html>
