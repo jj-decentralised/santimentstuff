@@ -19,8 +19,52 @@ CACHE_REFRESH_SECONDS = 300  # 5 minutes
 
 # Verified fund entities from Arkham Intelligence (type: "fund")
 # EXCLUDES market makers - we only want real investment signals
+# Prioritized by on-chain activity (active traders first)
 ENTITIES = {
-    # Major VCs & Crypto Funds
+    # === HIGH ACTIVITY: ETF Providers & Asset Managers ===
+    # These have 100+ transactions in last 30 days - real trading signals
+    "grayscale": "Grayscale",
+    "blackrock": "BlackRock",
+    "fidelity": "Fidelity FBTC ETF",
+    "fidelity-ethereum-etf": "Fidelity FETH ETF",
+    "vaneck": "VanEck",
+    "wisdomtree": "WisdomTree",
+    "ark-invest": "ARK Invest",
+    "invesco": "Invesco",
+    "purpose-investments": "Purpose Investments",
+    "galaxy-digital": "Galaxy Digital",
+    "ci-global-asset-management": "CI Global Asset Mgmt",
+
+    # === MEDIUM ACTIVITY: Active Crypto Funds ===
+    # 20-100 transactions in last 30 days
+    "defiance-capital": "DeFiance Capital",
+    "nascent": "Nascent",
+    "mechanism-capital": "Mechanism Capital",
+    "hack-vc": "Hack VC",
+    "banklessvc": "Bankless VC",
+    "framework-ventures": "Framework Ventures",
+    "binance-labs": "YZi Labs (Binance Labs)",
+    "digital-currency-group": "DCG",
+    "animoca-brands": "Animoca Brands",
+    "delphi-digital": "Delphi Digital",
+    "mirana-ventures": "Mirana Ventures",
+    "winklevoss-capital": "Winklevoss Capital",
+    "cms-holdings": "CMS Holdings",
+    "big-brain-holdings": "Big Brain Holdings",
+    "abraxas-capital-heka-funds": "Abraxas Capital",
+    "ngc-ventures": "NGC Ventures",
+
+    # === SPECIALIZED: On-chain Active Funds ===
+    "sigil-fund": "Sigil Fund",
+    "pharos": "Pharos Fund",
+    "polder-fund": "Polder Fund",
+    "apollo-capital": "Apollo Crypto",
+    "astelek-crypto-fund": "Astelek Crypto Fund",
+    "silveridge-holdings": "Silveridge Holdings",
+    "three-arrows-capital": "3AC",
+
+    # === LOW/NO ACTIVITY: VCs (mostly OTC trading) ===
+    # Keeping for entity intelligence even if no recent on-chain trades
     "a16z": "a16z",
     "paradigm-capital": "Paradigm",
     "pantera-capital": "Pantera Capital",
@@ -29,44 +73,13 @@ ENTITIES = {
     "blockchain-capital": "Blockchain Capital",
     "electric-capital": "Electric Capital",
     "variant-fund": "Variant Fund",
-    "nascent": "Nascent",
-    "mechanism-capital": "Mechanism Capital",
     "placeholder-vc": "Placeholder VC",
-    "hack-vc": "Hack VC",
-    "banklessvc": "Bankless VC",
     "1confirmation": "1confirmation",
     "spartan-group": "Spartan Group",
-    "framework-ventures": "Framework Ventures",
-    "binance-labs": "YZi Labs (Binance Labs)",
-    # Asset Managers & Institutional
-    "grayscale": "Grayscale",
-    "galaxy-digital": "Galaxy Digital",
-    "digital-currency-group": "DCG",
     "sequoia-capital": "Sequoia Capital",
-    "animoca-brands": "Animoca Brands",
     "fabric-ventures": "Fabric Ventures",
-    "delphi-digital": "Delphi Digital",
     "maven-11": "Maven 11",
-    "mirana-ventures": "Mirana Ventures",
-    "winklevoss-capital": "Winklevoss Capital",
-    # Institutional ETF
-    "blackrock": "BlackRock",
-    "fidelity": "Fidelity FBTC ETF",
-    "fidelity-ethereum-etf": "Fidelity FETH ETF",
-    # Other Funds
-    "three-arrows-capital": "3AC",
-    "cms-holdings": "CMS Holdings",
-    "big-brain-holdings": "Big Brain Holdings",
-    "abraxas-capital-heka-funds": "Abraxas Capital",
-    "sigil-fund": "Sigil Fund",
-    "pharos": "Pharos Fund",
-    "polder-fund": "Polder Fund",
-    "apollo-capital": "Apollo Crypto",
-    "astelek-crypto-fund": "Astelek Crypto Fund",
     "simply-vc": "Simply VC",
-    "ngc-ventures": "NGC Ventures",
-    "ci-global-asset-management": "CI Global Asset Mgmt",
-    "silveridge-holdings": "Silveridge Holdings",
 }
 
 # Notable traders - high balance individuals (>$10M AUM)
