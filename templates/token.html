@@ -117,6 +117,147 @@
         .card-header.flow { border-left: 4px solid #111; }
         .card-header.pnl { border-left: 4px solid #16a34a; }
         .card-header.holders { border-left: 4px solid #6366f1; }
+        .card-header.intelligence { border-left: 4px solid #f59e0b; }
+        .card-header.conviction { border-left: 4px solid #8b5cf6; }
+
+        /* Deep Intelligence Styles */
+        .intelligence-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .score-card {
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 16px;
+        }
+        .score-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .score-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #666;
+        }
+        .score-phase {
+            font-size: 10px;
+            padding: 2px 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .score-phase.strong_accumulation { background: #dcfce7; color: #166534; }
+        .score-phase.accumulation { background: #d1fae5; color: #047857; }
+        .score-phase.neutral { background: #f3f4f6; color: #374151; }
+        .score-phase.distribution { background: #fee2e2; color: #991b1b; }
+        .score-phase.strong_distribution { background: #fecaca; color: #7f1d1d; }
+
+        .score-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .score-value.high { color: #16a34a; }
+        .score-value.medium { color: #f59e0b; }
+        .score-value.low { color: #dc2626; }
+
+        .score-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        .score-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+        .score-fill.high { background: linear-gradient(90deg, #22c55e, #16a34a); }
+        .score-fill.medium { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .score-fill.low { background: linear-gradient(90deg, #f87171, #dc2626); }
+
+        .score-breakdown {
+            font-size: 10px;
+        }
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .breakdown-item:last-child { border-bottom: none; }
+        .breakdown-label { color: #666; }
+        .breakdown-value { font-weight: 600; }
+
+        /* Entry Quality Styles */
+        .entry-quality {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        .entry-quality.early { background: #dcfce7; border: 1px solid #22c55e; }
+        .entry-quality.mid { background: #fef3c7; border: 1px solid #f59e0b; }
+        .entry-quality.late { background: #fee2e2; border: 1px solid #dc2626; }
+        .entry-quality.very_late { background: #fecaca; border: 1px solid #991b1b; }
+        .entry-icon { font-size: 24px; }
+        .entry-details { flex: 1; }
+        .entry-label {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .entry-desc { font-size: 11px; color: #374151; }
+        .entry-stats {
+            font-size: 10px;
+            margin-top: 8px;
+        }
+        .entry-stat {
+            display: inline-block;
+            margin-right: 16px;
+        }
+        .entry-stat-label { color: #666; }
+        .entry-stat-value { font-weight: 600; }
+
+        /* Conviction Styles */
+        .conviction-segments {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .conviction-segment {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px;
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            text-align: center;
+        }
+        .conviction-icon { font-size: 20px; margin-bottom: 4px; }
+        .conviction-name { font-size: 10px; font-weight: 600; text-transform: uppercase; }
+        .conviction-count { font-size: 18px; font-weight: 700; margin: 4px 0; }
+        .conviction-value { font-size: 10px; color: #666; }
+
+        /* Related Tokens */
+        .related-token {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .related-token:hover { background: #f9f9f9; cursor: pointer; }
+        .related-symbol { font-weight: 600; }
+        .related-overlap {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: #e5e7eb;
+        }
 
         .badge {
             font-size: 9px;
@@ -296,6 +437,48 @@
                 <div class="flow-grid" id="flowGrid">
                     <div class="loading">Loading...</div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Deep Intelligence Section -->
+        <section class="card">
+            <div class="card-header intelligence">
+                Deep Intelligence
+                <span class="badge">Accumulation Analysis</span>
+            </div>
+            <div class="card-body">
+                <div class="intelligence-grid">
+                    <!-- Accumulation Score -->
+                    <div class="score-card" id="accumulationScore">
+                        <div class="loading">Loading...</div>
+                    </div>
+                    <!-- Entry Quality -->
+                    <div class="score-card" id="entryQuality">
+                        <div class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Conviction Analysis -->
+        <section class="card">
+            <div class="card-header conviction">
+                Conviction Analysis
+                <span class="badge">Diamond Hands vs Traders</span>
+            </div>
+            <div class="card-body" id="convictionAnalysis">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Related Tokens -->
+        <section class="card">
+            <div class="card-header" style="border-left: 4px solid #06b6d4;">
+                Related Tokens
+                <span class="badge">Shared Smart Money</span>
+            </div>
+            <div class="card-body" id="relatedTokens" style="padding: 0; max-height: 250px; overflow-y: auto;">
+                <div class="loading" style="padding: 16px;">Loading...</div>
             </div>
         </section>
 
@@ -514,8 +697,160 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', loadTokenData);
+        async function loadDeepIntelligence() {
+            try {
+                const res = await fetch(`/api/token/${chain}/${tokenAddress}/intelligence`);
+                const data = await res.json();
+
+                // Render Accumulation Score
+                const accEl = document.getElementById('accumulationScore');
+                const acc = data.accumulation_score || {};
+                const score = acc.score || 0;
+                const scoreClass = score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low';
+                const breakdown = acc.breakdown || {};
+
+                accEl.innerHTML = `
+                    <div class="score-header">
+                        <span class="score-title">Accumulation Score</span>
+                        <span class="score-phase ${acc.phase || 'neutral'}">${(acc.phase || 'neutral').replace('_', ' ')}</span>
+                    </div>
+                    <div class="score-value ${scoreClass}">${score}</div>
+                    <div class="score-bar">
+                        <div class="score-fill ${scoreClass}" style="width: ${score}%"></div>
+                    </div>
+                    <div class="score-breakdown">
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Flow Consistency</span>
+                            <span class="breakdown-value">${breakdown.flow_consistency?.score || 0}/25</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Holder Growth</span>
+                            <span class="breakdown-value">${breakdown.holder_growth?.score || 0}/25</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Smart Money Conviction</span>
+                            <span class="breakdown-value">${breakdown.smart_money_conviction?.score || 0}/25</span>
+                        </div>
+                        <div class="breakdown-item">
+                            <span class="breakdown-label">Stealth Factor</span>
+                            <span class="breakdown-value">${breakdown.stealth_factor?.score || 0}/25</span>
+                        </div>
+                    </div>
+                `;
+
+                // Render Entry Quality
+                const entryEl = document.getElementById('entryQuality');
+                const entry = data.entry_quality || {};
+                const entryClass = entry.quality || 'mid';
+                const entryIcons = {
+                    early: '🎯',
+                    mid: '⚡',
+                    late: '⚠️',
+                    very_late: '🚨'
+                };
+                const entryLabels = {
+                    early: 'Early Entry',
+                    mid: 'Mid Entry',
+                    late: 'Late Entry',
+                    very_late: 'Very Late Entry'
+                };
+                const entryDescs = {
+                    early: 'Most smart money still accumulating - good entry point',
+                    mid: 'Moderate smart money profit - acceptable entry',
+                    late: 'High smart money profit - proceed with caution',
+                    very_late: 'Smart money in heavy profit - risk of distribution'
+                };
+
+                entryEl.innerHTML = `
+                    <div class="score-header">
+                        <span class="score-title">Entry Quality</span>
+                    </div>
+                    <div class="entry-quality ${entryClass}">
+                        <span class="entry-icon">${entryIcons[entryClass] || '❓'}</span>
+                        <div class="entry-details">
+                            <div class="entry-label">${entryLabels[entryClass] || 'Unknown'}</div>
+                            <div class="entry-desc">${entryDescs[entryClass] || ''}</div>
+                            <div class="entry-stats">
+                                <span class="entry-stat">
+                                    <span class="entry-stat-label">In Profit:</span>
+                                    <span class="entry-stat-value">${((entry.pct_in_profit || 0) * 100).toFixed(0)}%</span>
+                                </span>
+                                <span class="entry-stat">
+                                    <span class="entry-stat-label">Avg ROI:</span>
+                                    <span class="entry-stat-value">${((entry.avg_roi || 0) * 100).toFixed(0)}%</span>
+                                </span>
+                                <span class="entry-stat">
+                                    <span class="entry-stat-label">Realized:</span>
+                                    <span class="entry-stat-value">${((entry.profit_realized_pct || 0) * 100).toFixed(0)}%</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Render Conviction Analysis
+                const convEl = document.getElementById('convictionAnalysis');
+                const conv = data.conviction || {};
+                const segments = conv.segments || {};
+                const segmentConfig = {
+                    diamond_hands: { icon: '💎', name: 'Diamond Hands' },
+                    conviction: { icon: '🔒', name: 'High Conviction' },
+                    active_traders: { icon: '📊', name: 'Active Traders' },
+                    new_entrants: { icon: '🆕', name: 'New Entrants' }
+                };
+
+                const segmentHtml = Object.entries(segmentConfig).map(([key, config]) => {
+                    const seg = segments[key] || { count: 0, value_usd: 0 };
+                    return `
+                        <div class="conviction-segment">
+                            <div class="conviction-icon">${config.icon}</div>
+                            <div class="conviction-name">${config.name}</div>
+                            <div class="conviction-count">${seg.count}</div>
+                            <div class="conviction-value">${fmt.usdAbs(seg.value_usd)}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                const stabilityScore = conv.stability_score || 0;
+                const stabilityClass = stabilityScore >= 0.7 ? 'high' : stabilityScore >= 0.4 ? 'medium' : 'low';
+
+                convEl.innerHTML = `
+                    <div style="margin-bottom: 12px;">
+                        <span style="font-size: 11px; color: #666;">Stability Score:</span>
+                        <span style="font-weight: 700; font-size: 14px; margin-left: 8px;" class="score-value ${stabilityClass}">
+                            ${(stabilityScore * 100).toFixed(0)}%
+                        </span>
+                    </div>
+                    <div class="conviction-segments">${segmentHtml}</div>
+                `;
+
+                // Render Related Tokens
+                const relatedEl = document.getElementById('relatedTokens');
+                const related = data.related_tokens || [];
+
+                if (related.length) {
+                    relatedEl.innerHTML = related.map(t => `
+                        <div class="related-token" onclick="window.location.href='/token/${t.chain}/${t.address}'">
+                            <span class="related-symbol">${t.symbol}</span>
+                            <span class="related-overlap">${t.shared_holders} shared holders (${(t.correlation * 100).toFixed(0)}% overlap)</span>
+                        </div>
+                    `).join('');
+                } else {
+                    relatedEl.innerHTML = '<div style="padding: 16px; color: #888; text-align: center;">No related tokens found</div>';
+                }
+
+            } catch (e) {
+                console.error('Deep intelligence error:', e);
+                document.getElementById('accumulationScore').innerHTML = '<div class="error">Failed to load</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTokenData();
+            loadDeepIntelligence();
+        });
         setInterval(loadTokenData, 5000);
+        setInterval(loadDeepIntelligence, 30000); // Refresh deep intelligence less frequently
     </script>
 </body>
 </html>

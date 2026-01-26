@@ -366,6 +366,158 @@
             color: #999;
         }
         .remove-btn:hover { color: #dc2626; }
+
+        /* Alerts Panel */
+        .alerts-panel {
+            position: fixed;
+            top: 60px;
+            right: 16px;
+            width: 320px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #111;
+            z-index: 1000;
+            display: none;
+        }
+        .alerts-panel.active { display: block; }
+        .alerts-header {
+            padding: 10px 12px;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .alert-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+        .alert-item:hover { background: #f9f9f9; }
+        .alert-item.high { border-left: 3px solid #dc2626; }
+        .alert-item.medium { border-left: 3px solid #f59e0b; }
+        .alert-item.warning { border-left: 3px solid #6366f1; }
+        .alert-title {
+            font-weight: 600;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .alert-token {
+            font-size: 10px;
+            color: #666;
+            padding: 1px 4px;
+            background: #f3f4f6;
+        }
+        .alert-message {
+            font-size: 10px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .alert-toggle {
+            background: none;
+            border: 1px solid #ddd;
+            padding: 4px 8px;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .alert-toggle:hover { background: #f3f4f6; }
+        .alert-count {
+            background: #dc2626;
+            color: #fff;
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        /* Accumulation Leaderboard */
+        .card-header.leaderboard { border-left: 4px solid #f59e0b; }
+        .leaderboard-item {
+            display: grid;
+            grid-template-columns: 30px 90px 1fr 60px 80px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            align-items: center;
+            cursor: pointer;
+        }
+        .leaderboard-item:hover { background: #f9f9f9; }
+        .leaderboard-rank {
+            font-weight: 700;
+            font-size: 12px;
+            color: #666;
+        }
+        .leaderboard-rank.top3 { color: #f59e0b; }
+        .score-bar {
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .score-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .score-fill.high { background: #22c55e; }
+        .score-fill.medium { background: #f59e0b; }
+        .score-fill.low { background: #ef4444; }
+        .score-value {
+            font-weight: 700;
+            font-size: 13px;
+            text-align: right;
+        }
+        .phase-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .phase-badge.strong_accumulation { background: #dcfce7; color: #166534; }
+        .phase-badge.accumulation { background: #d1fae5; color: #065f46; }
+        .phase-badge.neutral { background: #f3f4f6; color: #374151; }
+        .phase-badge.distribution { background: #fee2e2; color: #991b1b; }
+
+        /* Intelligence Cards */
+        .intelligence-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .intel-card {
+            background: #fff;
+            border: 1px solid #111;
+            padding: 12px;
+        }
+        .intel-card-title {
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .intel-score {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .intel-score.good { color: #16a34a; }
+        .intel-score.warning { color: #f59e0b; }
+        .intel-score.bad { color: #dc2626; }
+        .intel-label {
+            font-size: 10px;
+            color: #888;
+        }
+
+        @media (max-width: 1000px) {
+            .intelligence-grid { grid-template-columns: 1fr 1fr; }
+            .alerts-panel { width: 100%; right: 0; left: 0; }
+        }
     </style>
 </head>
 <body>
@@ -374,8 +526,23 @@
         <nav class="header-nav">
             <a href="/" class="active">Dashboard</a>
             <a href="/signals">Signals</a>
+            <button class="alert-toggle" onclick="toggleAlerts()">
+                <span>Alerts</span>
+                <span class="alert-count" id="alertCount">0</span>
+            </button>
         </nav>
     </header>
+
+    <!-- Alerts Panel (hidden by default) -->
+    <div id="alertsPanel" class="alerts-panel">
+        <div class="alerts-header">
+            <span>Real-time Alerts</span>
+            <button onclick="toggleAlerts()" style="background:none;border:none;cursor:pointer;">✕</button>
+        </div>
+        <div id="alertsList">
+            <div style="padding: 20px; text-align: center; color: #888; font-size: 11px;">Loading alerts...</div>
+        </div>
+    </div>
 
     <main class="container">
         <div class="status-bar">
@@ -427,6 +594,24 @@
             </div>
             <div class="card-body" id="watchlistBody">
                 <div class="watchlist-empty">No tokens in watchlist. Search and add tokens above.</div>
+            </div>
+        </section>
+
+        <!-- Accumulation Leaderboard -->
+        <section class="card" style="margin-bottom: 16px;">
+            <div class="card-header leaderboard">
+                Accumulation Leaderboard
+                <span class="badge badge-gray">Top Scores</span>
+            </div>
+            <div class="row-header" style="grid-template-columns: 30px 90px 1fr 60px 80px;">
+                <span>#</span>
+                <span>Token</span>
+                <span>Score</span>
+                <span style="text-align:right">24h</span>
+                <span style="text-align:right">Phase</span>
+            </div>
+            <div class="card-body" id="leaderboardBody" style="max-height: 300px;">
+                <div class="loading">Loading...</div>
             </div>
         </section>
 
@@ -918,6 +1103,147 @@
             }
         }
 
+        // ============== ALERTS ==============
+        let alertsVisible = false;
+        let previousAlertCount = 0;
+
+        function toggleAlerts() {
+            alertsVisible = !alertsVisible;
+            document.getElementById('alertsPanel').classList.toggle('active', alertsVisible);
+        }
+
+        async function loadAlerts() {
+            try {
+                const res = await fetch('/api/alerts');
+                const data = await res.json();
+
+                const alerts = data.alerts || [];
+                const countEl = document.getElementById('alertCount');
+                const listEl = document.getElementById('alertsList');
+
+                countEl.textContent = alerts.length;
+
+                // Browser notification for new alerts
+                if (alerts.length > previousAlertCount && previousAlertCount > 0) {
+                    const newAlerts = alerts.length - previousAlertCount;
+                    if (Notification.permission === 'granted') {
+                        new Notification('Smart Money Alert', {
+                            body: `${newAlerts} new alert${newAlerts > 1 ? 's' : ''} detected`,
+                            icon: '/static/icon.png'
+                        });
+                    }
+                }
+                previousAlertCount = alerts.length;
+
+                if (alerts.length) {
+                    listEl.innerHTML = alerts.map(a => `
+                        <div class="alert-item ${a.severity}" onclick="goToToken('${a.chain}', '${a.token_address}')">
+                            <div class="alert-title">
+                                <span>${a.title}</span>
+                                <span class="alert-token">${a.token}</span>
+                            </div>
+                            <div class="alert-message">${a.message}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #888; font-size: 11px;">No alerts</div>';
+                }
+            } catch (e) {
+                console.error('Alerts error:', e);
+            }
+        }
+
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        // ============== LEADERBOARD ==============
+        async function loadLeaderboard() {
+            try {
+                const res = await fetch('/api/leaderboard');
+                const data = await res.json();
+
+                const container = document.getElementById('leaderboardBody');
+                const tokens = data.leaderboard || [];
+
+                if (tokens.length) {
+                    container.innerHTML = tokens.map((t, i) => {
+                        const scoreClass = t.accumulation_score >= 70 ? 'high' : t.accumulation_score >= 40 ? 'medium' : 'low';
+                        const phaseClass = t.phase.replace('_', '-');
+                        return `
+                            <div class="leaderboard-item" onclick="goToToken('${t.chain}', '${t.token_address}')">
+                                <span class="leaderboard-rank ${i < 3 ? 'top3' : ''}">${i + 1}</span>
+                                <div>
+                                    <span class="token-name">${t.token}</span>
+                                    <span class="token-chain">${t.chain.toUpperCase()}</span>
+                                </div>
+                                <div style="padding-right: 12px;">
+                                    <div class="score-bar">
+                                        <div class="score-fill ${scoreClass}" style="width: ${t.accumulation_score}%"></div>
+                                    </div>
+                                </div>
+                                <span class="score-value">${t.accumulation_score}</span>
+                                <span class="phase-badge ${t.phase}">${t.phase_label}</span>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<div class="loading">No data</div>';
+                }
+            } catch (e) {
+                console.error('Leaderboard error:', e);
+                document.getElementById('leaderboardBody').innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        // ============== ENHANCED WATCHLIST ==============
+        async function loadWatchlistIntelligence() {
+            const watchlist = loadWatchlist();
+            if (!watchlist.length) return;
+
+            // Build token specs
+            const tokenSpecs = watchlist
+                .filter(t => t.chain && t.address)
+                .map(t => `${t.chain}:${t.address}`)
+                .join(',');
+
+            if (!tokenSpecs) return;
+
+            try {
+                const res = await fetch(`/api/watchlist/intelligence?tokens=${tokenSpecs}`);
+                if (!res.ok) return;
+
+                const data = await res.json();
+
+                // Update watchlist items with intelligence data
+                for (const token of data.tokens || []) {
+                    const item = Array.from(document.querySelectorAll('.watchlist-item')).find(el => {
+                        const chain = el.querySelector('.token-chain')?.textContent?.toLowerCase();
+                        return chain === token.chain.toUpperCase();
+                    });
+
+                    if (item && token.accumulation_score) {
+                        const score = token.accumulation_score.score;
+                        const phase = token.accumulation_score.phase_label;
+                        const scoreClass = score >= 70 ? 'good' : score >= 40 ? 'warning' : 'bad';
+
+                        // Add score badge if not already there
+                        const metaEl = item.querySelector('.meta');
+                        if (metaEl && !metaEl.querySelector('.score-badge')) {
+                            const scoreBadge = document.createElement('span');
+                            scoreBadge.className = 'score-badge';
+                            scoreBadge.style.cssText = `margin-left: 8px; font-size: 10px; font-weight: 600; color: ${score >= 70 ? '#16a34a' : score >= 40 ? '#f59e0b' : '#dc2626'};`;
+                            scoreBadge.textContent = `Score: ${score}`;
+                            metaEl.appendChild(scoreBadge);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Watchlist intelligence error:', e);
+            }
+        }
+
         // Initialize and set up real-time polling
         document.addEventListener('DOMContentLoaded', () => {
             loadFlows();
@@ -925,13 +1251,20 @@
             loadHoldings();
             loadTopInflowsSummary();
             renderWatchlist();
+            loadAlerts();
+            loadLeaderboard();
 
-            // Real-time updates every 5 seconds
+            // Real-time updates
             setInterval(loadFlows, 5000);
             setInterval(loadTrades, 5000);
             setInterval(loadHoldings, 10000);
             setInterval(loadTopInflowsSummary, 5000);
-            setInterval(renderWatchlist, 30000); // Refresh watchlist every 30s
+            setInterval(renderWatchlist, 30000);
+            setInterval(loadAlerts, 15000);  // Check alerts every 15s
+            setInterval(loadLeaderboard, 30000);  // Update leaderboard every 30s
+
+            // Delayed intelligence load (after initial render)
+            setTimeout(loadWatchlistIntelligence, 2000);
         });
     </script>
 </body>

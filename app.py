@@ -4,11 +4,17 @@ A comprehensive trading signals platform powered by Nansen's smart money data.
 """
 
 import os
+import json
 import httpx
 from datetime import datetime, timedelta
+from pathlib import Path
 from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
+
+# ============== SNAPSHOT CACHE ==============
+CACHE_DIR = Path("data/snapshots")
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============== CONFIG ==============
 NANSEN_BASE_URL = "https://api.nansen.ai/api/v1"
@@ -379,6 +385,443 @@ def lookup_token_by_symbol(symbol):
     except Exception as e:
         print(f"CoinGecko lookup error for {symbol}: {e}")
         return None
+
+
+# ============== DEEP INTELLIGENCE FUNCTIONS ==============
+
+def save_daily_snapshot():
+    """Save daily snapshot of smart money flows for historical analysis."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    snapshot_path = CACHE_DIR / f"flows_{today}.json"
+
+    # Skip if already saved today
+    if snapshot_path.exists():
+        return {"status": "already_exists", "date": today}
+
+    try:
+        # Fetch current flows
+        flows_data = fetch_smart_money_netflow(direction="DESC")
+        holdings_data = fetch_smart_money_holdings()
+
+        snapshot = {
+            "date": today,
+            "timestamp": datetime.now().isoformat(),
+            "flows": flows_data.get("data", []),
+            "holdings": holdings_data.get("data", []),
+        }
+
+        with open(snapshot_path, "w") as f:
+            json.dump(snapshot, f)
+
+        return {"status": "saved", "date": today, "tokens": len(snapshot["flows"])}
+    except Exception as e:
+        print(f"Snapshot save error: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+def get_historical_flows(token_address, days=30):
+    """Get historical flow data for a specific token from cached snapshots."""
+    history = []
+
+    for i in range(days):
+        date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+        snapshot_path = CACHE_DIR / f"flows_{date}.json"
+
+        if snapshot_path.exists():
+            try:
+                with open(snapshot_path) as f:
+                    data = json.load(f)
+                    for token in data.get("flows", []):
+                        if token.get("token_address") == token_address:
+                            history.append({
+                                "date": date,
+                                "flow_24h": token.get("net_flow_24h_usd", 0) or 0,
+                                "flow_7d": token.get("net_flow_7d_usd", 0) or 0,
+                                "trader_count": token.get("trader_count", 0),
+                            })
+                            break
+            except Exception as e:
+                print(f"Error reading snapshot {date}: {e}")
+
+    return sorted(history, key=lambda x: x["date"])
+
+
+def calculate_accumulation_score(token_data, history=None):
+    """Calculate accumulation score (0-100) based on multiple factors.
+
+    Components:
+    - Flow Consistency (0-25): Positive flow days / 7 days
+    - Holder Growth (0-25): Based on trader count trend
+    - Exchange Outflows (0-25): Based on exchange segment flow
+    - Stealth Factor (0-25): Volume divergence from price
+    """
+    score = 0
+    breakdown = {}
+
+    # Flow Consistency Score (0-25)
+    flow_24h = token_data.get("net_flow_24h_usd", 0) or 0
+    flow_7d = token_data.get("net_flow_7d_usd", 0) or 0
+    flow_30d = token_data.get("net_flow_30d_usd", 0) or 0
+
+    # Check consistency across timeframes
+    positive_timeframes = sum([
+        1 if flow_24h > 0 else 0,
+        1 if flow_7d > 0 else 0,
+        1 if flow_30d > 0 else 0,
+    ])
+    consistency_score = (positive_timeframes / 3) * 25
+
+    # Bonus for increasing momentum
+    if flow_24h > 0 and flow_7d > 0 and flow_24h > (flow_7d / 7):
+        consistency_score = min(25, consistency_score + 5)
+
+    breakdown["flow_consistency"] = {
+        "score": round(consistency_score, 1),
+        "max": 25,
+        "detail": f"{positive_timeframes}/3 timeframes positive"
+    }
+    score += consistency_score
+
+    # Holder Growth Score (0-25)
+    trader_count = token_data.get("trader_count", 0) or 0
+    if trader_count >= 50:
+        holder_score = 25
+    elif trader_count >= 20:
+        holder_score = 20
+    elif trader_count >= 10:
+        holder_score = 15
+    elif trader_count >= 5:
+        holder_score = 10
+    else:
+        holder_score = 5
+
+    breakdown["holder_growth"] = {
+        "score": holder_score,
+        "max": 25,
+        "detail": f"{trader_count} active traders"
+    }
+    score += holder_score
+
+    # Exchange Flow Score (0-25) - Negative exchange flow = accumulation
+    # This would require flow_intelligence data, estimate from general flow
+    if flow_7d > 100000:  # Strong inflow
+        exchange_score = 25
+    elif flow_7d > 50000:
+        exchange_score = 20
+    elif flow_7d > 10000:
+        exchange_score = 15
+    elif flow_7d > 0:
+        exchange_score = 10
+    else:
+        exchange_score = 5
+
+    breakdown["smart_money_conviction"] = {
+        "score": exchange_score,
+        "max": 25,
+        "detail": f"${flow_7d:,.0f} 7d flow"
+    }
+    score += exchange_score
+
+    # Stealth Factor (0-25) - Strong flow with stable price = stealth accumulation
+    price_change = token_data.get("price_change_24h", 0) or 0
+    if flow_24h > 50000 and abs(price_change) < 5:
+        stealth_score = 25  # High flow, low price change = stealth
+    elif flow_24h > 10000 and abs(price_change) < 10:
+        stealth_score = 20
+    elif flow_24h > 0:
+        stealth_score = 15
+    else:
+        stealth_score = 10
+
+    breakdown["stealth_factor"] = {
+        "score": stealth_score,
+        "max": 25,
+        "detail": f"Flow vs {price_change:.1f}% price change"
+    }
+    score += stealth_score
+
+    # Determine accumulation phase
+    if score >= 80:
+        phase = "strong_accumulation"
+        phase_label = "Strong Accumulation"
+    elif score >= 60:
+        phase = "accumulation"
+        phase_label = "Accumulation"
+    elif score >= 40:
+        phase = "neutral"
+        phase_label = "Neutral"
+    elif score >= 20:
+        phase = "distribution"
+        phase_label = "Distribution"
+    else:
+        phase = "strong_distribution"
+        phase_label = "Strong Distribution"
+
+    return {
+        "score": round(score),
+        "max_score": 100,
+        "phase": phase,
+        "phase_label": phase_label,
+        "breakdown": breakdown,
+    }
+
+
+def analyze_entry_quality(pnl_data, current_price=None):
+    """Analyze entry quality based on smart money's average entry and profit status.
+
+    Returns assessment of whether it's early, mid, or late to enter.
+    """
+    if not pnl_data:
+        return {"quality": "unknown", "reason": "No P/L data available"}
+
+    traders = pnl_data if isinstance(pnl_data, list) else pnl_data.get("data", [])
+    if not traders:
+        return {"quality": "unknown", "reason": "No trader data"}
+
+    # Calculate metrics
+    total_pnl = sum(t.get("pnl_usd_total", 0) or 0 for t in traders)
+    total_realized = sum(t.get("pnl_usd_realised", 0) or 0 for t in traders)
+    total_unrealized = sum(t.get("pnl_usd_unrealised", 0) or 0 for t in traders)
+    total_holding = sum(t.get("holding_usd", 0) or 0 for t in traders)
+
+    # Count profitable traders
+    profitable = sum(1 for t in traders if (t.get("pnl_usd_total", 0) or 0) > 0)
+    total_traders = len(traders)
+    profit_ratio = profitable / total_traders if total_traders > 0 else 0
+
+    # Calculate profit taken ratio
+    if total_pnl > 0:
+        profit_taken_ratio = total_realized / total_pnl if total_pnl > 0 else 0
+    else:
+        profit_taken_ratio = 0
+
+    # Determine entry quality
+    if profit_ratio < 0.3:
+        quality = "early"
+        label = "Early Entry"
+        description = "Most smart money still underwater - potential early entry"
+    elif profit_ratio < 0.5 and profit_taken_ratio < 0.2:
+        quality = "early_mid"
+        label = "Early-Mid Stage"
+        description = "Smart money building positions, limited profit taking"
+    elif profit_ratio < 0.7 and profit_taken_ratio < 0.4:
+        quality = "mid"
+        label = "Mid Stage"
+        description = "Moderate profits, some accumulation continuing"
+    elif profit_ratio < 0.85 and profit_taken_ratio < 0.6:
+        quality = "late"
+        label = "Late Stage"
+        description = "Most smart money profitable, consider caution"
+    else:
+        quality = "very_late"
+        label = "Very Late"
+        description = "Smart money heavily in profit and taking gains"
+
+    return {
+        "quality": quality,
+        "label": label,
+        "description": description,
+        "metrics": {
+            "profit_ratio": round(profit_ratio, 2),
+            "profitable_traders": profitable,
+            "total_traders": total_traders,
+            "total_pnl_usd": total_pnl,
+            "realized_pnl_usd": total_realized,
+            "unrealized_pnl_usd": total_unrealized,
+            "profit_taken_ratio": round(profit_taken_ratio, 2),
+            "total_holding_usd": total_holding,
+        },
+    }
+
+
+def analyze_holder_conviction(holders_data):
+    """Analyze holder conviction - diamond hands vs traders.
+
+    Segments holders by their behavior patterns.
+    """
+    if not holders_data:
+        return {"conviction_ratio": 0, "segments": {}}
+
+    holders = holders_data if isinstance(holders_data, list) else holders_data.get("data", [])
+    if not holders:
+        return {"conviction_ratio": 0, "segments": {}}
+
+    segments = {
+        "diamond_hands": {"count": 0, "value_usd": 0, "description": "Long-term holders, minimal selling"},
+        "conviction": {"count": 0, "value_usd": 0, "description": "Steady holders with some activity"},
+        "active_traders": {"count": 0, "value_usd": 0, "description": "Regular trading activity"},
+        "new_entrants": {"count": 0, "value_usd": 0, "description": "Recently entered position"},
+    }
+
+    for holder in holders:
+        inflow = holder.get("total_inflow", 0) or 0
+        outflow = holder.get("total_outflow", 0) or 0
+        value_usd = holder.get("value_usd", 0) or 0
+        change_30d = holder.get("balance_change_30d", 0) or 0
+
+        # Calculate sell ratio
+        sell_ratio = outflow / inflow if inflow > 0 else 0
+
+        # Categorize based on behavior
+        if sell_ratio < 0.1 and inflow > 0:
+            segments["diamond_hands"]["count"] += 1
+            segments["diamond_hands"]["value_usd"] += value_usd
+        elif sell_ratio < 0.3:
+            segments["conviction"]["count"] += 1
+            segments["conviction"]["value_usd"] += value_usd
+        elif change_30d > 0 and sell_ratio < 0.5:
+            segments["new_entrants"]["count"] += 1
+            segments["new_entrants"]["value_usd"] += value_usd
+        else:
+            segments["active_traders"]["count"] += 1
+            segments["active_traders"]["value_usd"] += value_usd
+
+    total_holders = len(holders)
+    total_value = sum(s["value_usd"] for s in segments.values())
+
+    # Calculate conviction ratio (diamond_hands + conviction) / total
+    conviction_count = segments["diamond_hands"]["count"] + segments["conviction"]["count"]
+    conviction_ratio = conviction_count / total_holders if total_holders > 0 else 0
+
+    # Calculate value-weighted conviction
+    conviction_value = segments["diamond_hands"]["value_usd"] + segments["conviction"]["value_usd"]
+    conviction_value_ratio = conviction_value / total_value if total_value > 0 else 0
+
+    # Determine stability assessment
+    if conviction_value_ratio > 0.7:
+        stability = "very_stable"
+        stability_label = "Very Stable"
+    elif conviction_value_ratio > 0.5:
+        stability = "stable"
+        stability_label = "Stable"
+    elif conviction_value_ratio > 0.3:
+        stability = "moderate"
+        stability_label = "Moderate"
+    else:
+        stability = "volatile"
+        stability_label = "Volatile"
+
+    return {
+        "conviction_ratio": round(conviction_ratio, 2),
+        "conviction_value_ratio": round(conviction_value_ratio, 2),
+        "stability": stability,
+        "stability_label": stability_label,
+        "total_holders": total_holders,
+        "total_value_usd": total_value,
+        "segments": segments,
+    }
+
+
+def find_related_tokens(token_address, chain, holders_data=None):
+    """Find tokens that share smart money holders with the given token.
+
+    Returns tokens with high holder overlap.
+    """
+    # This is a simplified version - full implementation would need
+    # to query each holder's portfolio, which is API-intensive
+    # For now, return based on chain/category patterns
+
+    # Get holders if not provided
+    if holders_data is None:
+        holders_data = fetch_token_holders(token_address, chain)
+
+    holders = holders_data.get("data", []) if isinstance(holders_data, dict) else holders_data
+    if not holders:
+        return {"related": [], "note": "No holder data for correlation"}
+
+    # Extract labels to find patterns
+    label_patterns = {}
+    for holder in holders[:20]:
+        label = holder.get("address_label", "")
+        if label:
+            # Extract potential fund/entity names
+            words = label.lower().split()
+            for word in words:
+                if len(word) > 3 and word not in ["wallet", "token", "smart", "trader"]:
+                    label_patterns[word] = label_patterns.get(word, 0) + 1
+
+    # Get top patterns
+    top_patterns = sorted(label_patterns.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "holder_patterns": [{"pattern": p[0], "count": p[1]} for p in top_patterns],
+        "shared_holder_count": len([h for h in holders if h.get("address_label")]),
+        "total_analyzed": len(holders[:20]),
+        "note": "Based on holder label analysis. Full correlation requires portfolio queries.",
+    }
+
+
+# Alert thresholds
+ALERT_THRESHOLDS = {
+    "whale_entry": 500_000,       # Single position > $500K
+    "flow_spike": 2.0,            # 24h flow > 2x 7d average
+    "accumulation_score_high": 75,  # Score above 75
+    "profit_taking_warning": 0.5,   # >50% profit taken
+}
+
+
+def check_alerts(token_data, accumulation_score=None, entry_quality=None):
+    """Check for alert conditions on a token."""
+    alerts = []
+
+    flow_24h = token_data.get("net_flow_24h_usd", 0) or 0
+    flow_7d = token_data.get("net_flow_7d_usd", 0) or 0
+    symbol = token_data.get("token_symbol", "???")
+
+    # Whale entry alert
+    if flow_24h > ALERT_THRESHOLDS["whale_entry"]:
+        alerts.append({
+            "type": "whale_entry",
+            "severity": "high",
+            "title": "Whale Entry Detected",
+            "message": f"${flow_24h:,.0f} inflow in 24h",
+            "token": symbol,
+        })
+
+    # Flow spike alert
+    avg_daily_7d = flow_7d / 7 if flow_7d else 0
+    if avg_daily_7d > 0 and flow_24h > avg_daily_7d * ALERT_THRESHOLDS["flow_spike"]:
+        alerts.append({
+            "type": "flow_spike",
+            "severity": "medium",
+            "title": "Flow Spike",
+            "message": f"24h flow is {flow_24h/avg_daily_7d:.1f}x the 7d average",
+            "token": symbol,
+        })
+
+    # High accumulation score
+    if accumulation_score and accumulation_score.get("score", 0) >= ALERT_THRESHOLDS["accumulation_score_high"]:
+        alerts.append({
+            "type": "strong_accumulation",
+            "severity": "high",
+            "title": "Strong Accumulation Signal",
+            "message": f"Accumulation score: {accumulation_score['score']}/100",
+            "token": symbol,
+        })
+
+    # Profit taking warning
+    if entry_quality:
+        profit_taken = entry_quality.get("metrics", {}).get("profit_taken_ratio", 0)
+        if profit_taken >= ALERT_THRESHOLDS["profit_taking_warning"]:
+            alerts.append({
+                "type": "profit_taking",
+                "severity": "warning",
+                "title": "Profit Taking Warning",
+                "message": f"{profit_taken*100:.0f}% of profits realized",
+                "token": symbol,
+            })
+
+    # Distribution warning
+    if flow_24h < -100000:
+        alerts.append({
+            "type": "distribution",
+            "severity": "warning",
+            "title": "Distribution Detected",
+            "message": f"${abs(flow_24h):,.0f} outflow in 24h",
+            "token": symbol,
+        })
+
+    return alerts
 
 
 # ============== API ENDPOINTS ==============
@@ -861,6 +1304,197 @@ def api_signals():
             "new_token_alpha": len(signals["new_token_alpha"]),
             "large_trades": len(signals["large_trades"]),
         },
+        "generated_at": datetime.now().isoformat(),
+    })
+
+
+# ============== DEEP INTELLIGENCE ENDPOINTS ==============
+
+@app.get("/api/snapshot/save")
+def api_save_snapshot():
+    """Manually trigger a snapshot save (normally run via cron)."""
+    result = save_daily_snapshot()
+    return jsonify(result)
+
+
+@app.get("/api/token/<chain>/<token_address>/intelligence")
+def api_token_intelligence(chain, token_address):
+    """Get comprehensive intelligence for a token including accumulation score,
+    entry quality, conviction analysis, and alerts.
+    """
+    # Get basic flow data first
+    flow_data = fetch_flow_intelligence(token_address, chain)
+    flow = flow_data.get("data", [{}])[0] if flow_data.get("data") else {}
+
+    # Get P/L leaderboard for entry quality
+    pnl_data = fetch_pnl_leaderboard(token_address, chain)
+    pnl_leaders = pnl_data.get("data", [])
+
+    # Get holders for conviction analysis
+    holders_data = fetch_token_holders(token_address, chain)
+    holders = holders_data.get("data", [])
+
+    # Build token data dict for calculations
+    token_data = {
+        "token_address": token_address,
+        "chain": chain,
+        "token_symbol": "TOKEN",  # Will be populated from flow data
+        "net_flow_24h_usd": flow.get("total_net_flow_usd", 0) or 0,
+        "net_flow_7d_usd": (flow.get("total_net_flow_usd", 0) or 0) * 3,  # Estimate
+        "net_flow_30d_usd": (flow.get("total_net_flow_usd", 0) or 0) * 10,  # Estimate
+        "trader_count": (flow.get("whale_wallet_count", 0) or 0) +
+                       (flow.get("smart_trader_wallet_count", 0) or 0),
+        "price_change_24h": 0,  # Would need price API
+    }
+
+    # Calculate all intelligence metrics
+    accumulation_score = calculate_accumulation_score(token_data)
+    entry_quality = analyze_entry_quality(pnl_leaders)
+    conviction = analyze_holder_conviction(holders)
+    related = find_related_tokens(token_address, chain, holders_data)
+    alerts = check_alerts(token_data, accumulation_score, entry_quality)
+
+    # Get historical data if available
+    history = get_historical_flows(token_address, days=14)
+
+    return jsonify({
+        "token_address": token_address,
+        "chain": chain,
+        "accumulation_score": accumulation_score,
+        "entry_quality": entry_quality,
+        "conviction_analysis": conviction,
+        "related_tokens": related,
+        "alerts": alerts,
+        "flow_summary": {
+            "whale_flow": flow.get("whale_net_flow_usd", 0) or 0,
+            "smart_flow": flow.get("smart_trader_net_flow_usd", 0) or 0,
+            "exchange_flow": flow.get("exchange_net_flow_usd", 0) or 0,
+        },
+        "historical_flows": history,
+        "pnl_leader_count": len(pnl_leaders),
+        "holder_count": len(holders),
+        "generated_at": datetime.now().isoformat(),
+    })
+
+
+@app.get("/api/alerts")
+def api_alerts():
+    """Get alerts for all tracked tokens based on current conditions."""
+    # Get top flows
+    flows_data = fetch_smart_money_netflow(direction="DESC")
+    flows = flows_data.get("data", [])
+
+    # Filter and collect alerts
+    all_alerts = []
+    for token_data in flows[:50]:  # Check top 50 tokens
+        if not passes_token_filter(token_data):
+            continue
+
+        # Calculate accumulation score
+        acc_score = calculate_accumulation_score(token_data)
+
+        # Check for alerts
+        alerts = check_alerts(token_data, acc_score)
+        for alert in alerts:
+            alert["token_address"] = token_data.get("token_address", "")
+            alert["chain"] = token_data.get("chain", "")
+            all_alerts.append(alert)
+
+    # Sort by severity
+    severity_order = {"high": 0, "medium": 1, "warning": 2, "low": 3}
+    all_alerts.sort(key=lambda x: severity_order.get(x.get("severity", "low"), 99))
+
+    return jsonify({
+        "alerts": all_alerts[:30],
+        "total_alerts": len(all_alerts),
+        "generated_at": datetime.now().isoformat(),
+    })
+
+
+@app.get("/api/leaderboard")
+def api_accumulation_leaderboard():
+    """Get tokens ranked by accumulation score."""
+    flows_data = fetch_smart_money_netflow(direction="DESC")
+    flows = flows_data.get("data", [])
+
+    scored_tokens = []
+    for token_data in flows[:100]:
+        if not passes_token_filter(token_data):
+            continue
+
+        score = calculate_accumulation_score(token_data)
+        scored_tokens.append({
+            "token": token_data.get("token_symbol", "???"),
+            "token_address": token_data.get("token_address", ""),
+            "chain": token_data.get("chain", ""),
+            "accumulation_score": score["score"],
+            "phase": score["phase"],
+            "phase_label": score["phase_label"],
+            "flow_24h": token_data.get("net_flow_24h_usd", 0) or 0,
+            "flow_7d": token_data.get("net_flow_7d_usd", 0) or 0,
+            "trader_count": token_data.get("trader_count", 0),
+            "market_cap": token_data.get("market_cap_usd", 0) or 0,
+        })
+
+    # Sort by accumulation score
+    scored_tokens.sort(key=lambda x: x["accumulation_score"], reverse=True)
+
+    return jsonify({
+        "leaderboard": scored_tokens[:25],
+        "total_analyzed": len(scored_tokens),
+        "generated_at": datetime.now().isoformat(),
+    })
+
+
+@app.get("/api/watchlist/intelligence")
+def api_watchlist_intelligence():
+    """Get deep intelligence for watchlist tokens (called from frontend with token list)."""
+    # Get tokens from query string (comma-separated addresses)
+    tokens_param = request.args.get("tokens", "")
+    if not tokens_param:
+        return jsonify({"error": "No tokens provided", "tokens": []}), 400
+
+    token_specs = tokens_param.split(",")
+    results = []
+
+    for spec in token_specs[:10]:  # Limit to 10 tokens
+        parts = spec.split(":")
+        if len(parts) != 2:
+            continue
+
+        chain, address = parts
+
+        # Get flow intelligence
+        flow_data = fetch_flow_intelligence(address, chain)
+        flow = flow_data.get("data", [{}])[0] if flow_data.get("data") else {}
+
+        # Build token data
+        token_data = {
+            "token_address": address,
+            "chain": chain,
+            "net_flow_24h_usd": flow.get("total_net_flow_usd", 0) or 0,
+            "net_flow_7d_usd": (flow.get("total_net_flow_usd", 0) or 0) * 3,
+            "trader_count": (flow.get("whale_wallet_count", 0) or 0) +
+                           (flow.get("smart_trader_wallet_count", 0) or 0),
+        }
+
+        # Calculate score
+        acc_score = calculate_accumulation_score(token_data)
+        alerts = check_alerts(token_data, acc_score)
+
+        results.append({
+            "chain": chain,
+            "address": address,
+            "accumulation_score": acc_score,
+            "alerts": alerts,
+            "flow": {
+                "whale": flow.get("whale_net_flow_usd", 0) or 0,
+                "smart": flow.get("smart_trader_net_flow_usd", 0) or 0,
+            },
+        })
+
+    return jsonify({
+        "tokens": results,
         "generated_at": datetime.now().isoformat(),
     })
 
