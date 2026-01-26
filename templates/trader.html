@@ -5,232 +5,240 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trader Profile</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-            background: #0a0a0f;
-            color: #e5e5e7;
-            line-height: 1.4;
-            font-size: 13px;
+            font-family: 'IBM Plex Mono', 'SF Mono', Monaco, monospace;
+            background: #fafafa;
+            color: #111;
+            line-height: 1.5;
+            font-size: 12px;
         }
 
         .header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-bottom: 1px solid #2a2a4a;
-            padding: 0.8rem 1.5rem;
+            background: #fff;
+            border-bottom: 2px solid #111;
+            padding: 12px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         .header h1 {
-            font-size: 1.1rem;
+            font-size: 14px;
             font-weight: 700;
-            background: linear-gradient(90deg, #00d4ff, #7c3aed);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
         }
-        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav { display: flex; gap: 16px; }
         .header-nav a {
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 11px;
             text-decoration: none;
+            color: #666;
             font-weight: 500;
-            background: rgba(255,255,255,0.1);
-            color: #a0a0b0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .header-nav a:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        .header-nav a:hover { color: #111; }
 
-        .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
 
-        /* Trader header */
         .trader-header {
-            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
-            border: 1px solid #2a2a4a;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
+            background: #fff;
+            border: 1px solid #111;
+            padding: 16px;
+            margin-bottom: 16px;
         }
         .trader-title {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 0.5rem;
-        }
-        .trader-icon {
-            font-size: 2rem;
+            gap: 12px;
+            margin-bottom: 8px;
         }
         .trader-label {
-            font-size: 1.2rem;
+            font-size: 16px;
             font-weight: 700;
-            color: #a78bfa;
         }
         .trader-chain {
-            font-size: 0.7rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            background: rgba(124, 58, 237, 0.2);
-            color: #a78bfa;
+            font-size: 10px;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            text-transform: uppercase;
         }
         .trader-address {
-            font-family: 'SF Mono', monospace;
-            font-size: 0.75rem;
-            color: #6b6b80;
+            font-size: 11px;
+            color: #666;
             word-break: break-all;
         }
 
-        /* Stats grid */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 16px;
+            font-size: 10px;
+            color: #666;
+        }
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1rem;
+            gap: 12px;
+            margin-bottom: 16px;
         }
         .stat-card {
-            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
-            border: 1px solid #2a2a4a;
-            border-radius: 10px;
-            padding: 1rem;
+            background: #fff;
+            border: 1px solid #111;
+            padding: 12px;
             text-align: center;
         }
         .stat-label {
-            font-size: 0.65rem;
-            color: #6b6b80;
+            font-size: 9px;
+            color: #666;
             text-transform: uppercase;
-            margin-bottom: 0.5rem;
+            margin-bottom: 4px;
         }
         .stat-value {
-            font-family: 'SF Mono', monospace;
-            font-size: 1.3rem;
+            font-size: 18px;
             font-weight: 700;
+            transition: all 0.3s;
         }
-        .stat-value.positive { color: #10b981; }
-        .stat-value.negative { color: #ef4444; }
-        .stat-value.neutral { color: #a78bfa; }
+        .stat-value.positive { color: #16a34a; }
+        .stat-value.negative { color: #dc2626; }
+        .stat-value.neutral { color: #111; }
+        .stat-value.flash { animation: flash 0.5s ease-out; }
+        @keyframes flash {
+            0% { background: #fef08a; }
+            100% { background: transparent; }
+        }
 
-        /* Grid */
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            gap: 16px;
         }
 
-        /* Cards */
         .card {
-            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
-            border: 1px solid #2a2a4a;
-            border-radius: 12px;
-            overflow: hidden;
+            background: #fff;
+            border: 1px solid #111;
         }
         .card-header {
-            padding: 0.75rem 1rem;
+            padding: 10px 12px;
             font-weight: 600;
-            font-size: 0.8rem;
-            background: rgba(255,255,255,0.02);
-            border-bottom: 1px solid #2a2a4a;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #111;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .card-header.tokens { border-left: 3px solid #f59e0b; }
-        .card-header.history { border-left: 3px solid #7c3aed; }
+        .card-header.tokens { border-left: 4px solid #16a34a; }
+        .card-header.history { border-left: 4px solid #111; }
 
         .badge {
-            font-size: 0.6rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
+            font-size: 9px;
+            padding: 2px 6px;
             font-weight: 600;
+            text-transform: uppercase;
+            background: #f3f4f6;
+            color: #374151;
         }
-        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-        .badge-purple { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
 
         .card-body {
-            padding: 1rem;
             max-height: 400px;
             overflow-y: auto;
         }
 
-        /* Top tokens */
+        .row-header {
+            display: grid;
+            padding: 8px 12px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #666;
+            background: #f9f9f9;
+            border-bottom: 1px solid #eee;
+        }
+        .token-row-header { grid-template-columns: 80px 1fr 80px; }
+        .tx-row-header { grid-template-columns: 60px 1fr 80px; }
+
         .token-item {
             display: grid;
             grid-template-columns: 80px 1fr 80px;
-            gap: 0.5rem;
-            padding: 0.6rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
             align-items: center;
             cursor: pointer;
         }
-        .token-item:hover { background: rgba(255,255,255,0.03); margin: 0 -1rem; padding-left: 1rem; padding-right: 1rem; }
-        .token-item:last-child { border-bottom: none; }
+        .token-item:hover { background: #f9f9f9; }
         .token-symbol {
-            font-weight: 700;
-            color: #fff;
+            font-weight: 600;
         }
         .token-chain {
-            font-size: 0.6rem;
-            padding: 0.1rem 0.3rem;
-            border-radius: 3px;
-            background: rgba(255,255,255,0.1);
-            color: #6b6b80;
+            font-size: 9px;
+            color: #888;
+            margin-left: 4px;
+        }
+        .token-roi {
+            font-size: 10px;
+            color: #888;
         }
         .token-pnl {
-            font-family: 'SF Mono', monospace;
             font-weight: 600;
+            text-align: right;
         }
-        .token-pnl.positive { color: #10b981; }
-        .token-pnl.negative { color: #ef4444; }
-        .token-roi {
-            font-size: 0.7rem;
-            color: #6b6b80;
-        }
+        .token-pnl.positive { color: #16a34a; }
+        .token-pnl.negative { color: #dc2626; }
 
-        /* Transaction history */
         .tx-item {
             display: grid;
-            grid-template-columns: 70px 1fr 90px;
-            gap: 0.5rem;
-            padding: 0.6rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            grid-template-columns: 60px 1fr 80px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
             align-items: center;
-            font-size: 0.75rem;
+            font-size: 11px;
         }
-        .tx-item:last-child { border-bottom: none; }
         .tx-time {
-            font-size: 0.65rem;
-            color: #6b6b80;
+            font-size: 10px;
+            color: #888;
         }
-        .tx-method {
-            font-weight: 500;
-            color: #a78bfa;
-        }
-        .tx-tokens {
-            font-size: 0.7rem;
-        }
-        .tx-tokens .sent { color: #ef4444; }
-        .tx-tokens .received { color: #10b981; }
+        .tx-tokens { font-size: 11px; }
+        .tx-tokens .sent { color: #dc2626; }
+        .tx-tokens .received { color: #16a34a; }
         .tx-value {
-            font-family: 'SF Mono', monospace;
             font-weight: 600;
-            color: #f59e0b;
             text-align: right;
         }
 
         .loading {
             text-align: center;
-            padding: 2rem;
-            color: #6b6b80;
+            padding: 32px;
+            color: #888;
         }
         .error {
-            color: #ef4444;
-            padding: 1rem;
-            background: rgba(239, 68, 68, 0.1);
-            border-radius: 6px;
+            color: #dc2626;
+            padding: 12px;
+            background: #fee2e2;
         }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
 
         @media (max-width: 900px) {
             .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -248,17 +256,22 @@
     </header>
 
     <main class="container">
-        <!-- Trader Header -->
         <div class="trader-header">
             <div class="trader-title">
-                <span class="trader-icon">🤓</span>
                 <span class="trader-label" id="traderLabel">Smart Trader</span>
                 <span class="trader-chain">{{ chain }}</span>
             </div>
             <div class="trader-address">{{ address }}</div>
         </div>
 
-        <!-- Stats -->
+        <div class="status-bar">
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span>LIVE</span>
+            </div>
+            <span id="lastUpdate">Loading...</span>
+        </div>
+
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
                 <div class="stat-label">Realized P/L</div>
@@ -278,27 +291,34 @@
             </div>
         </div>
 
-        <!-- Content -->
         <div class="grid-2">
-            <!-- Top Tokens -->
             <section class="card">
                 <div class="card-header tokens">
-                    Top Profitable Tokens
-                    <span class="badge badge-orange">Best performers</span>
+                    Top Tokens
+                    <span class="badge">Best performers</span>
+                </div>
+                <div class="row-header token-row-header">
+                    <span>Token</span>
+                    <span>ROI</span>
+                    <span style="text-align:right">P/L</span>
                 </div>
                 <div class="card-body" id="topTokens">
-                    <div class="loading">Loading tokens...</div>
+                    <div class="loading">Loading...</div>
                 </div>
             </section>
 
-            <!-- Transaction History -->
             <section class="card">
                 <div class="card-header history">
                     Recent Transactions
-                    <span class="badge badge-purple">Last 30 days</span>
+                    <span class="badge">Last 30 days</span>
+                </div>
+                <div class="row-header tx-row-header">
+                    <span>Time</span>
+                    <span>Tokens</span>
+                    <span style="text-align:right">Value</span>
                 </div>
                 <div class="card-body" id="txHistory">
-                    <div class="loading">Loading transactions...</div>
+                    <div class="loading">Loading...</div>
                 </div>
             </section>
         </div>
@@ -307,6 +327,7 @@
     <script>
         const chain = '{{ chain }}';
         const address = '{{ address }}';
+        let prevPnl = null;
 
         const fmt = {
             usd: (v) => {
@@ -339,16 +360,24 @@
             if (tokenAddress) window.location.href = `/token/${chain}/${tokenAddress}`;
         }
 
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = `Updated ${now.toLocaleTimeString()}`;
+        }
+
         async function loadTraderData() {
             try {
                 const res = await fetch(`/api/trader/${chain}/${address}`);
                 const data = await res.json();
 
-                // Stats
                 const pnl = data.pnl_summary || {};
                 const realizedPnl = pnl.realized_pnl || 0;
-                document.getElementById('realizedPnl').textContent = fmt.usd(realizedPnl);
-                document.getElementById('realizedPnl').className = `stat-value ${realizedPnl >= 0 ? 'positive' : 'negative'}`;
+                const pnlEl = document.getElementById('realizedPnl');
+                const changed = prevPnl !== null && prevPnl !== realizedPnl;
+                prevPnl = realizedPnl;
+
+                pnlEl.textContent = fmt.usd(realizedPnl);
+                pnlEl.className = `stat-value ${realizedPnl >= 0 ? 'positive' : 'negative'} ${changed ? 'flash' : ''}`;
 
                 const winRate = pnl.win_rate || 0;
                 document.getElementById('winRate').textContent = fmt.pct(winRate);
@@ -357,7 +386,6 @@
                 document.getElementById('tokensTraded').textContent = pnl.traded_tokens || 0;
                 document.getElementById('totalTrades').textContent = pnl.total_trades || 0;
 
-                // Top Tokens
                 const topTokens = document.getElementById('topTokens');
                 const tokens = data.top_tokens || [];
 
@@ -367,8 +395,8 @@
                         return `
                             <div class="token-item" onclick="goToToken('${t.address}')">
                                 <div>
-                                    <div class="token-symbol">${t.symbol}</div>
-                                    <span class="token-chain">${t.chain}</span>
+                                    <span class="token-symbol">${t.symbol}</span>
+                                    <span class="token-chain">${t.chain.toUpperCase()}</span>
                                 </div>
                                 <div class="token-roi">${fmt.roi(t.roi)}</div>
                                 <div class="token-pnl ${pnlClass}">${fmt.usd(t.pnl)}</div>
@@ -379,7 +407,6 @@
                     topTokens.innerHTML = '<div class="loading">No token data</div>';
                 }
 
-                // Transaction History
                 const txHistory = document.getElementById('txHistory');
                 const txs = data.transactions || [];
 
@@ -392,7 +419,7 @@
                                 <span class="tx-time">${tx.time_ago}</span>
                                 <div class="tx-tokens">
                                     ${sent ? `<span class="sent">-${sent}</span>` : ''}
-                                    ${sent && received ? ' → ' : ''}
+                                    ${sent && received ? ' -> ' : ''}
                                     ${received ? `<span class="received">+${received}</span>` : ''}
                                 </div>
                                 <span class="tx-value">${fmt.usdAbs(tx.volume_usd)}</span>
@@ -400,16 +427,18 @@
                         `;
                     }).join('');
                 } else {
-                    txHistory.innerHTML = '<div class="loading">No transaction history</div>';
+                    txHistory.innerHTML = '<div class="loading">No transactions</div>';
                 }
 
+                updateTimestamp();
             } catch (e) {
-                console.error('Error loading trader data:', e);
+                console.error('Error:', e);
                 document.getElementById('topTokens').innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }
         }
 
         document.addEventListener('DOMContentLoaded', loadTraderData);
+        setInterval(loadTraderData, 5000);
     </script>
 </body>
 </html>

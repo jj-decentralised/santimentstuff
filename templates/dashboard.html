@@ -5,19 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Money Intelligence</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-            background: #0a0a0f;
-            color: #e5e5e7;
-            line-height: 1.4;
-            font-size: 13px;
+            font-family: 'IBM Plex Mono', 'SF Mono', Monaco, monospace;
+            background: #fafafa;
+            color: #111;
+            line-height: 1.5;
+            font-size: 12px;
         }
 
         .header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-bottom: 1px solid #2a2a4a;
-            padding: 0.8rem 1.5rem;
+            background: #fff;
+            border-bottom: 2px solid #111;
+            padding: 12px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -26,239 +28,208 @@
             z-index: 100;
         }
         .header h1 {
-            font-size: 1.1rem;
+            font-size: 14px;
             font-weight: 700;
-            background: linear-gradient(90deg, #00d4ff, #7c3aed);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
         }
-        .header-nav { display: flex; gap: 0.5rem; }
+        .header-nav { display: flex; gap: 16px; }
         .header-nav a {
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 11px;
             text-decoration: none;
+            color: #666;
             font-weight: 500;
-            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .nav-active { background: #7c3aed; color: #fff; }
-        .nav-default { background: rgba(255,255,255,0.1); color: #a0a0b0; }
-        .nav-default:hover { background: rgba(255,255,255,0.15); color: #fff; }
+        .header-nav a:hover { color: #111; }
+        .header-nav a.active { color: #111; border-bottom: 2px solid #111; }
 
-        .container { max-width: 1600px; margin: 0 auto; padding: 1rem; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
 
-        /* Timeframe selector */
-        .controls {
+        .status-bar {
             display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            justify-content: space-between;
             align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 16px;
+            font-size: 10px;
+            color: #666;
         }
-        .timeframe-btns {
+        .live-indicator {
             display: flex;
-            gap: 0.25rem;
-            background: rgba(255,255,255,0.05);
-            padding: 0.25rem;
-            border-radius: 8px;
+            align-items: center;
+            gap: 6px;
         }
-        .timeframe-btn {
-            padding: 0.4rem 0.8rem;
-            border: none;
-            background: transparent;
-            color: #a0a0b0;
-            font-size: 0.75rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
         }
-        .timeframe-btn.active { background: #7c3aed; color: #fff; }
-        .timeframe-btn:hover:not(.active) { background: rgba(255,255,255,0.1); }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
 
-        .chain-filter {
-            display: flex;
-            gap: 0.25rem;
-        }
-        .chain-chip {
-            padding: 0.3rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.65rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-        .chain-chip.active { border-color: #7c3aed; background: rgba(124, 58, 237, 0.2); }
-        .chain-chip.sol { color: #14f195; }
-        .chain-chip.eth { color: #627eea; }
-        .chain-chip.base { color: #0052ff; }
-        .chain-chip.arb { color: #28a0f0; }
-
-        /* Grid layout */
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        .grid-3 {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin-bottom: 1rem;
+            gap: 16px;
+            margin-bottom: 16px;
         }
 
-        /* Cards */
         .card {
-            background: linear-gradient(180deg, #1a1a2e 0%, #141428 100%);
-            border: 1px solid #2a2a4a;
-            border-radius: 12px;
-            overflow: hidden;
+            background: #fff;
+            border: 1px solid #111;
         }
         .card-header {
-            padding: 0.75rem 1rem;
+            padding: 10px 12px;
             font-weight: 600;
-            font-size: 0.8rem;
-            background: rgba(255,255,255,0.02);
-            border-bottom: 1px solid #2a2a4a;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #111;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .card-header.inflow { border-left: 3px solid #10b981; }
-        .card-header.outflow { border-left: 3px solid #ef4444; }
-        .card-header.holdings { border-left: 3px solid #7c3aed; }
-        .card-header.trades { border-left: 3px solid #f59e0b; }
+        .card-header.inflow { border-left: 4px solid #22c55e; }
+        .card-header.outflow { border-left: 4px solid #ef4444; }
+        .card-header.trades { border-left: 4px solid #111; }
+        .card-header.holdings { border-left: 4px solid #666; }
 
         .badge {
-            font-size: 0.6rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
+            font-size: 9px;
+            padding: 2px 6px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
-        .badge-green { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-        .badge-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .badge-purple { background: rgba(124, 58, 237, 0.2); color: #a78bfa; }
-        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-gray { background: #f3f4f6; color: #374151; }
 
         .card-body {
-            max-height: 400px;
+            max-height: 380px;
             overflow-y: auto;
         }
 
-        /* Flow items */
+        /* Table-like rows */
+        .row-header {
+            display: grid;
+            padding: 8px 12px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            background: #f9f9f9;
+            border-bottom: 1px solid #eee;
+        }
+        .flow-row-header { grid-template-columns: 90px 1fr 100px; }
+        .trade-row-header { grid-template-columns: 50px 120px 1fr 80px 60px; }
+        .holding-row-header { grid-template-columns: 90px 1fr 90px 70px; }
+
         .flow-item {
             display: grid;
-            grid-template-columns: 80px 1fr 100px;
-            gap: 0.5rem;
-            padding: 0.6rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            grid-template-columns: 90px 1fr 100px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
             align-items: center;
             cursor: pointer;
             transition: background 0.1s;
         }
-        .flow-item:hover { background: rgba(255,255,255,0.03); }
-        .flow-token {
-            font-weight: 700;
-            color: #fff;
+        .flow-item:hover { background: #f9f9f9; }
+
+        .token-name {
+            font-weight: 600;
+            color: #111;
         }
-        .flow-chain {
-            font-size: 0.6rem;
-            padding: 0.1rem 0.3rem;
-            border-radius: 3px;
-            background: rgba(255,255,255,0.1);
+        .token-chain {
+            font-size: 9px;
+            color: #888;
+            margin-left: 4px;
         }
-        .flow-chain.solana { color: #14f195; }
-        .flow-chain.ethereum { color: #627eea; }
-        .flow-chain.base { color: #0052ff; }
-        .flow-meta {
-            font-size: 0.65rem;
-            color: #6b6b80;
+        .meta {
+            font-size: 10px;
+            color: #888;
         }
-        .flow-value {
-            font-family: 'SF Mono', monospace;
+        .value {
             font-weight: 600;
             text-align: right;
+            font-size: 12px;
+            transition: all 0.3s;
         }
-        .flow-value.positive { color: #10b981; }
-        .flow-value.negative { color: #ef4444; }
+        .value.positive { color: #16a34a; }
+        .value.negative { color: #dc2626; }
+        .value.flash {
+            animation: flash 0.5s ease-out;
+        }
+        @keyframes flash {
+            0% { background: #fef08a; }
+            100% { background: transparent; }
+        }
 
-        /* Holdings items */
-        .holding-item {
-            display: grid;
-            grid-template-columns: 80px 1fr 90px 70px;
-            gap: 0.5rem;
-            padding: 0.6rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            align-items: center;
-            cursor: pointer;
-        }
-        .holding-item:hover { background: rgba(255,255,255,0.03); }
-        .holding-value {
-            font-family: 'SF Mono', monospace;
-            font-weight: 600;
-            color: #a78bfa;
-        }
-        .holding-change {
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .holding-change.up { color: #10b981; }
-        .holding-change.down { color: #ef4444; }
-
-        /* Trade items */
         .trade-item {
             display: grid;
-            grid-template-columns: 55px 1fr 70px 85px 50px;
-            gap: 0.4rem;
-            padding: 0.5rem 1rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            grid-template-columns: 50px 120px 1fr 80px 60px;
+            padding: 6px 12px;
+            border-bottom: 1px solid #f0f0f0;
             align-items: center;
-            font-size: 0.75rem;
+            font-size: 11px;
             cursor: pointer;
         }
-        .trade-item:hover { background: rgba(255,255,255,0.03); }
-        .trade-time { color: #6b6b80; font-size: 0.65rem; }
+        .trade-item:hover { background: #f9f9f9; }
+        .trade-time { color: #888; font-size: 10px; }
         .trade-trader {
-            color: #a78bfa;
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .trade-pair {
-            display: flex;
+        .trade-pair { display: flex; align-items: center; gap: 4px; }
+        .trade-arrow { color: #888; }
+        .sold { color: #dc2626; }
+        .bought { color: #16a34a; }
+        .trade-value { font-weight: 600; text-align: right; }
+
+        .holding-item {
+            display: grid;
+            grid-template-columns: 90px 1fr 90px 70px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
             align-items: center;
-            gap: 0.3rem;
+            cursor: pointer;
         }
-        .trade-arrow { color: #6b6b80; }
-        .trade-token { font-weight: 600; }
-        .trade-token.bought { color: #10b981; }
-        .trade-token.sold { color: #ef4444; }
-        .trade-value {
-            font-family: 'SF Mono', monospace;
-            font-weight: 600;
-            color: #f59e0b;
-        }
+        .holding-item:hover { background: #f9f9f9; }
+        .holding-value { font-weight: 600; text-align: right; }
+        .holding-change { font-weight: 600; text-align: right; font-size: 11px; }
+        .holding-change.up { color: #16a34a; }
+        .holding-change.down { color: #dc2626; }
 
         .loading {
             text-align: center;
-            padding: 2rem;
-            color: #6b6b80;
+            padding: 32px;
+            color: #888;
+            font-size: 11px;
         }
         .error {
-            color: #ef4444;
-            padding: 1rem;
-            background: rgba(239, 68, 68, 0.1);
-            margin: 0.5rem;
-            border-radius: 6px;
+            color: #dc2626;
+            padding: 12px;
+            background: #fee2e2;
+            margin: 8px;
+            font-size: 11px;
         }
 
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #f0f0f0; }
+        ::-webkit-scrollbar-thumb { background: #ccc; }
 
-        @media (max-width: 1200px) {
-            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        @media (max-width: 1000px) {
+            .grid-2 { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -266,43 +237,46 @@
     <header class="header">
         <h1>Smart Money Intelligence</h1>
         <nav class="header-nav">
-            <a href="/" class="nav-active">Dashboard</a>
-            <a href="/signals" class="nav-default">Signals</a>
+            <a href="/" class="active">Dashboard</a>
+            <a href="/signals">Signals</a>
         </nav>
     </header>
 
     <main class="container">
-        <!-- Controls -->
-        <div class="controls">
-            <div class="timeframe-btns">
-                <button class="timeframe-btn active" data-tf="24h">24H</button>
-                <button class="timeframe-btn" data-tf="7d">7D</button>
-                <button class="timeframe-btn" data-tf="30d">30D</button>
+        <div class="status-bar">
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span>LIVE</span>
             </div>
-            <div class="chain-filter">
-                <span class="chain-chip active sol" data-chain="solana">SOL</span>
-                <span class="chain-chip active eth" data-chain="ethereum">ETH</span>
-                <span class="chain-chip active base" data-chain="base">BASE</span>
-                <span class="chain-chip arb" data-chain="arbitrum">ARB</span>
-            </div>
+            <span id="lastUpdate">Loading...</span>
         </div>
 
         <!-- Flows -->
         <section class="grid-2">
             <div class="card">
                 <div class="card-header inflow">
-                    Smart Money Inflows
-                    <span class="badge badge-green">Accumulation</span>
+                    Inflows (24h)
+                    <span class="badge badge-green">Accumulating</span>
+                </div>
+                <div class="row-header flow-row-header">
+                    <span>Token</span>
+                    <span>Details</span>
+                    <span style="text-align:right">Net Flow</span>
                 </div>
                 <div class="card-body" id="inflowsList">
-                    <div class="loading">Loading flows...</div>
+                    <div class="loading">Loading...</div>
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-header outflow">
-                    Smart Money Outflows
-                    <span class="badge badge-red">Distribution</span>
+                    Outflows (24h)
+                    <span class="badge badge-red">Distributing</span>
+                </div>
+                <div class="row-header flow-row-header">
+                    <span>Token</span>
+                    <span>Details</span>
+                    <span style="text-align:right">Net Flow</span>
                 </div>
                 <div class="card-body" id="outflowsList">
                     <div class="loading">Loading...</div>
@@ -311,24 +285,37 @@
         </section>
 
         <!-- Live Trades -->
-        <section class="card" style="margin-bottom: 1rem;">
+        <section class="card" style="margin-bottom: 16px;">
             <div class="card-header trades">
-                Live DEX Activity
-                <span class="badge badge-orange">Real-time swaps</span>
+                Live DEX Trades
+                <span class="badge badge-gray">Real-time</span>
             </div>
-            <div class="card-body" id="tradesList" style="max-height: 350px;">
-                <div class="loading">Loading trades...</div>
+            <div class="row-header trade-row-header">
+                <span>Time</span>
+                <span>Trader</span>
+                <span>Swap</span>
+                <span style="text-align:right">Value</span>
+                <span>Chain</span>
+            </div>
+            <div class="card-body" id="tradesList" style="max-height: 300px;">
+                <div class="loading">Loading...</div>
             </div>
         </section>
 
         <!-- Holdings -->
         <section class="card">
             <div class="card-header holdings">
-                Smart Money Top Holdings
-                <span class="badge badge-purple">Highest conviction</span>
+                Top Holdings
+                <span class="badge badge-gray">Smart Money Positions</span>
+            </div>
+            <div class="row-header holding-row-header">
+                <span>Token</span>
+                <span>Details</span>
+                <span style="text-align:right">Value</span>
+                <span style="text-align:right">24h</span>
             </div>
             <div class="card-body" id="holdingsList">
-                <div class="loading">Loading holdings...</div>
+                <div class="loading">Loading...</div>
             </div>
         </section>
     </main>
@@ -359,13 +346,15 @@
             },
             mcap: (v) => {
                 if (!v) return '';
-                if (v >= 1e9) return 'MCap $' + (v/1e9).toFixed(1) + 'B';
-                if (v >= 1e6) return 'MCap $' + (v/1e6).toFixed(0) + 'M';
-                return 'MCap $' + (v/1e3).toFixed(0) + 'K';
+                if (v >= 1e9) return '$' + (v/1e9).toFixed(1) + 'B mcap';
+                if (v >= 1e6) return '$' + (v/1e6).toFixed(0) + 'M mcap';
+                return '$' + (v/1e3).toFixed(0) + 'K mcap';
             }
         };
 
-        let currentTimeframe = '24h';
+        // Store previous values for flash animation
+        let prevFlows = {};
+        let prevHoldings = {};
 
         function goToToken(chain, address) {
             if (address) window.location.href = `/token/${chain}/${address}`;
@@ -373,6 +362,12 @@
 
         function goToTrader(chain, address) {
             if (address) window.location.href = `/trader/${chain}/${address}`;
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent =
+                `Updated ${now.toLocaleTimeString()}`;
         }
 
         async function loadFlows() {
@@ -383,40 +378,52 @@
                 // Inflows
                 const inflowsList = document.getElementById('inflowsList');
                 if (data.inflows?.length) {
-                    inflowsList.innerHTML = data.inflows.map(f => `
-                        <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
-                            <div>
-                                <div class="flow-token">${f.token}</div>
-                                <span class="flow-chain ${f.chain}">${f.chain}</span>
+                    inflowsList.innerHTML = data.inflows.map(f => {
+                        const key = f.token_address;
+                        const changed = prevFlows[key] !== undefined && prevFlows[key] !== f.flow_24h;
+                        prevFlows[key] = f.flow_24h;
+                        return `
+                            <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
+                                <div>
+                                    <span class="token-name">${f.token}</span>
+                                    <span class="token-chain">${f.chain.toUpperCase()}</span>
+                                </div>
+                                <div class="meta">
+                                    ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
+                                </div>
+                                <div class="value positive ${changed ? 'flash' : ''}">${fmt.usd(f.flow_24h)}</div>
                             </div>
-                            <div class="flow-meta">
-                                ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
-                            </div>
-                            <div class="flow-value positive">${fmt.usd(f.flow_24h)}</div>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 } else {
-                    inflowsList.innerHTML = '<div class="loading">No inflow data</div>';
+                    inflowsList.innerHTML = '<div class="loading">No data</div>';
                 }
 
                 // Outflows
                 const outflowsList = document.getElementById('outflowsList');
                 if (data.outflows?.length) {
-                    outflowsList.innerHTML = data.outflows.map(f => `
-                        <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
-                            <div>
-                                <div class="flow-token">${f.token}</div>
-                                <span class="flow-chain ${f.chain}">${f.chain}</span>
+                    outflowsList.innerHTML = data.outflows.map(f => {
+                        const key = f.token_address + '_out';
+                        const changed = prevFlows[key] !== undefined && prevFlows[key] !== f.flow_24h;
+                        prevFlows[key] = f.flow_24h;
+                        return `
+                            <div class="flow-item" onclick="goToToken('${f.chain}', '${f.token_address}')">
+                                <div>
+                                    <span class="token-name">${f.token}</span>
+                                    <span class="token-chain">${f.chain.toUpperCase()}</span>
+                                </div>
+                                <div class="meta">
+                                    ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
+                                </div>
+                                <div class="value negative ${changed ? 'flash' : ''}">${fmt.usd(f.flow_24h)}</div>
                             </div>
-                            <div class="flow-meta">
-                                ${fmt.mcap(f.market_cap)} | ${f.trader_count} traders
-                            </div>
-                            <div class="flow-value negative">${fmt.usd(f.flow_24h)}</div>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 } else {
-                    outflowsList.innerHTML = '<div class="loading">No outflow data</div>';
+                    outflowsList.innerHTML = '<div class="loading">No data</div>';
                 }
+
+                updateTimestamp();
             } catch (e) {
                 console.error('Flows error:', e);
                 document.getElementById('inflowsList').innerHTML = `<div class="error">Error: ${e.message}</div>`;
@@ -435,16 +442,16 @@
                             <span class="trade-time">${t.time_ago}</span>
                             <span class="trade-trader">${t.trader}</span>
                             <div class="trade-pair">
-                                <span class="trade-token sold">${t.token_sold}</span>
-                                <span class="trade-arrow">→</span>
-                                <span class="trade-token bought">${t.token_bought}</span>
+                                <span class="sold">${t.token_sold}</span>
+                                <span class="trade-arrow">-></span>
+                                <span class="bought">${t.token_bought}</span>
                             </div>
                             <span class="trade-value">${fmt.usdAbs(t.value_usd)}</span>
-                            <span class="flow-chain ${t.chain}">${t.chain}</span>
+                            <span class="token-chain">${t.chain.toUpperCase()}</span>
                         </div>
                     `).join('');
                 } else {
-                    tradesList.innerHTML = '<div class="loading">No recent trades</div>';
+                    tradesList.innerHTML = '<div class="loading">No trades</div>';
                 }
             } catch (e) {
                 console.error('Trades error:', e);
@@ -459,21 +466,26 @@
 
                 const holdingsList = document.getElementById('holdingsList');
                 if (data.holdings?.length) {
-                    holdingsList.innerHTML = data.holdings.map(h => `
-                        <div class="holding-item" onclick="goToToken('${h.chain}', '${h.token_address}')">
-                            <div>
-                                <div class="flow-token">${h.token}</div>
-                                <span class="flow-chain ${h.chain}">${h.chain}</span>
+                    holdingsList.innerHTML = data.holdings.map(h => {
+                        const key = h.token_address;
+                        const changed = prevHoldings[key] !== undefined && prevHoldings[key] !== h.value_usd;
+                        prevHoldings[key] = h.value_usd;
+                        return `
+                            <div class="holding-item" onclick="goToToken('${h.chain}', '${h.token_address}')">
+                                <div>
+                                    <span class="token-name">${h.token}</span>
+                                    <span class="token-chain">${h.chain.toUpperCase()}</span>
+                                </div>
+                                <div class="meta">
+                                    ${h.holders_count} holders | ${h.share_percent.toFixed(1)}% supply
+                                </div>
+                                <span class="holding-value ${changed ? 'flash' : ''}">${fmt.usdAbs(h.value_usd)}</span>
+                                <span class="holding-change ${h.change_24h >= 0 ? 'up' : 'down'}">${fmt.pct(h.change_24h)}</span>
                             </div>
-                            <div class="flow-meta">
-                                ${h.holders_count} holders | ${h.share_percent.toFixed(1)}% of supply
-                            </div>
-                            <span class="holding-value">${fmt.usdAbs(h.value_usd)}</span>
-                            <span class="holding-change ${h.change_24h >= 0 ? 'up' : 'down'}">${fmt.pct(h.change_24h)}</span>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 } else {
-                    holdingsList.innerHTML = '<div class="loading">No holdings data</div>';
+                    holdingsList.innerHTML = '<div class="loading">No data</div>';
                 }
             } catch (e) {
                 console.error('Holdings error:', e);
@@ -481,24 +493,16 @@
             }
         }
 
-        // Initialize
+        // Initialize and set up real-time polling
         document.addEventListener('DOMContentLoaded', () => {
             loadFlows();
             loadTrades();
             loadHoldings();
 
-            // Auto-refresh trades every 30s
-            setInterval(loadTrades, 30000);
-        });
-
-        // Timeframe buttons
-        document.querySelectorAll('.timeframe-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentTimeframe = btn.dataset.tf;
-                loadFlows();
-            });
+            // Real-time updates every 5 seconds
+            setInterval(loadFlows, 5000);
+            setInterval(loadTrades, 5000);
+            setInterval(loadHoldings, 10000);
         });
     </script>
 </body>
