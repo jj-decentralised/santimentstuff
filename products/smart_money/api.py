@@ -258,6 +258,95 @@ def create_app() -> FastAPI:
             '<script src="/static/js/dashboard.js"></script>',
             data_script + '<script src="/static/js/dashboard.js"></script>',
         )
+
+        # Server-side render the market table rows so data shows without JS
+        tokens = preload_data.get("tokens", [])
+        if tokens:
+            def _fmt_usd(n):
+                if n is None: return "&mdash;"
+                a = abs(n)
+                if a >= 1e12: return f"${n/1e12:.2f}T"
+                if a >= 1e9: return f"${n/1e9:.2f}B"
+                if a >= 1e6: return f"${n/1e6:.2f}M"
+                if a >= 1e3: return f"${n/1e3:.1f}K"
+                if a >= 1: return f"${n:.2f}"
+                if a >= 0.01: return f"${n:.4f}"
+                return f"${n:.6f}"
+
+            def _fmt_num(n):
+                if n is None: return "&mdash;"
+                a = abs(n)
+                if a >= 1e9: return f"{n/1e9:.2f}B"
+                if a >= 1e6: return f"{n/1e6:.2f}M"
+                if a >= 1e3: return f"{n/1e3:.1f}K"
+                if a >= 100: return f"{n:.0f}"
+                return f"{n:.2f}"
+
+            def _fmt_pct(n):
+                if n is None: return "&mdash;"
+                sign = "+" if n > 0 else ""
+                return f"{sign}{n:.2f}%"
+
+            def _pct_class(n):
+                if n is None: return "num-neutral"
+                if n > 0: return "num-positive"
+                if n < 0: return "num-negative"
+                return "num-neutral"
+
+            rows_html = []
+            for i, t in enumerate(tokens):
+                pct_change = t.get("price_usd_change")
+                mvrv = t.get("mvrv_usd")
+                nvt = t.get("nvt")
+                daa = t.get("daily_active_addresses")
+                dev = t.get("dev_activity")
+                rows_html.append(f'''<tr data-slug="{t['slug']}">
+                    <td class="col-rank">{i+1}</td>
+                    <td class="col-name"><div class="token-name"><strong>{t['name']}</strong> <span class="ticker">{t['ticker']}</span></div></td>
+                    <td class="col-num num-bold">{_fmt_usd(t.get('price_usd'))}</td>
+                    <td class="col-num {_pct_class(pct_change)}">{_fmt_pct(pct_change)}</td>
+                    <td class="col-num">{_fmt_usd(t.get('marketcap_usd'))}</td>
+                    <td class="col-num">{_fmt_usd(t.get('volume_usd'))}</td>
+                    <td class="col-num">{f"{mvrv:.2f}" if mvrv is not None else "&mdash;"}</td>
+                    <td class="col-num">{f"{nvt:.1f}" if nvt is not None else "&mdash;"}</td>
+                    <td class="col-num hide-mobile">{_fmt_num(daa)}</td>
+                    <td class="col-num hide-mobile">{f"{dev:.0f}" if dev is not None else "&mdash;"}</td>
+                </tr>''')
+            ssr_tbody = "\n".join(rows_html)
+
+            # Also SSR the summary stats
+            total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
+            total_vol = sum(t.get("volume_usd") or 0 for t in tokens)
+            mvrv_vals = [t["mvrv_usd"] for t in tokens if t.get("mvrv_usd") is not None]
+            nvt_vals = [t["nvt"] for t in tokens if t.get("nvt") is not None]
+            avg_mvrv = sum(mvrv_vals) / len(mvrv_vals) if mvrv_vals else None
+            avg_nvt = sum(nvt_vals) / len(nvt_vals) if nvt_vals else None
+
+            html = html.replace(
+                '<tr><td colspan="10" class="empty-cell">Loading market data...</td></tr>',
+                ssr_tbody,
+            )
+            html = html.replace(
+                '<p class="view-subtitle" id="tokenCount"></p>',
+                f'<p class="view-subtitle" id="tokenCount">{len(tokens)} tokens tracked</p>',
+            )
+            html = html.replace(
+                '<div class="stat-value" id="statMcap">&mdash;</div>',
+                f'<div class="stat-value" id="statMcap">{_fmt_usd(total_mcap)}</div>',
+            )
+            html = html.replace(
+                '<div class="stat-value" id="statVolume">&mdash;</div>',
+                f'<div class="stat-value" id="statVolume">{_fmt_usd(total_vol)}</div>',
+            )
+            html = html.replace(
+                '<div class="stat-value" id="statMvrv">&mdash;</div>',
+                f'<div class="stat-value" id="statMvrv">{f"{avg_mvrv:.2f}" if avg_mvrv is not None else "&mdash;"}</div>',
+            )
+            html = html.replace(
+                '<div class="stat-value" id="statNvt">&mdash;</div>',
+                f'<div class="stat-value" id="statNvt">{f"{avg_nvt:.1f}" if avg_nvt is not None else "&mdash;"}</div>',
+            )
+
         return html
 
     # === Market Overview (all tokens with latest metrics) ===
