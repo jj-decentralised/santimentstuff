@@ -326,6 +326,40 @@ a { color: inherit; }
 }
 .back-link:hover { background: var(--gray-100); border-color: var(--gray-400); }
 
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin: 24px 0 16px;
+  flex-wrap: wrap;
+}
+.page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--gray-700);
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+.page-link:hover { background: var(--gray-100); border-color: var(--gray-400); }
+.page-link.active { background: var(--black); color: var(--white); border-color: var(--black); }
+.page-link.disabled { color: var(--gray-300); cursor: default; pointer-events: none; }
+.page-link.ellipsis { border: none; cursor: default; pointer-events: none; }
+.page-info {
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  margin-bottom: 8px;
+}
+
 .profile-hero {
   display: flex;
   justify-content: space-between;

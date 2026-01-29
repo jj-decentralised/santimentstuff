@@ -230,8 +230,12 @@ def page_shell(title: str, content: str, active_nav: str = "") -> str:
 # MARKET OVERVIEW PAGE
 # ============================================================
 
-def render_market_page(tokens: list, pull_status: str, last_pull: str = None) -> str:
-    """Render the full market overview page."""
+def render_market_page(
+    tokens: list, pull_status: str, last_pull: str = None,
+    page: int = 1, per_page: int = 100, total: int = 0,
+    universe_size: int = 0,
+) -> str:
+    """Render the full market overview page with pagination."""
     # Summary stats
     total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
     total_vol = sum(t.get("volume_usd") or 0 for t in tokens)
@@ -252,8 +256,13 @@ def render_market_page(tokens: list, pull_status: str, last_pull: str = None) ->
         except Exception:
             pass
 
+    # Pagination info
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+    start_rank = (page - 1) * per_page
+
     rows = []
     for i, t in enumerate(tokens):
+        rank = start_rank + i + 1
         slug = t.get("slug", "")
         pct = t.get("price_usd_change")
         mvrv = t.get("mvrv_usd")
@@ -271,7 +280,7 @@ def render_market_page(tokens: list, pull_status: str, last_pull: str = None) ->
             zone_html = "&mdash;"
 
         rows.append(f"""<tr>
-            <td class="col-rank">{i+1}</td>
+            <td class="col-rank">{rank}</td>
             <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{html_mod.escape(t.get('name', slug))}</strong> <span class="ticker">{html_mod.escape(t.get('ticker', ''))}</span></a></td>
             <td class="col-num num-bold">{fmt_usd(t.get('price_usd'))}</td>
             <td class="col-num {pct_class(pct)}">{fmt_pct(pct)}</td>
@@ -286,11 +295,42 @@ def render_market_page(tokens: list, pull_status: str, last_pull: str = None) ->
 
     table_body = "\n".join(rows) if rows else '<tr><td colspan="11" class="empty-cell">Data is being pulled. Refresh in a few minutes...</td></tr>'
 
+    # Pagination controls
+    pagination_html = ""
+    if total_pages > 1:
+        pages = []
+        if page > 1:
+            pages.append(f'<a href="/?page={page-1}&per_page={per_page}" class="page-link">&laquo; Prev</a>')
+        else:
+            pages.append('<span class="page-link disabled">&laquo; Prev</span>')
+
+        # Show page numbers with ellipsis
+        for p in range(1, total_pages + 1):
+            if p == page:
+                pages.append(f'<span class="page-link active">{p}</span>')
+            elif p <= 3 or p > total_pages - 2 or abs(p - page) <= 2:
+                pages.append(f'<a href="/?page={p}&per_page={per_page}" class="page-link">{p}</a>')
+            elif (p == 4 and page > 6) or (p == total_pages - 2 and page < total_pages - 5):
+                pages.append('<span class="page-link ellipsis">&hellip;</span>')
+
+        if page < total_pages:
+            pages.append(f'<a href="/?page={page+1}&per_page={per_page}" class="page-link">&raquo; Next</a>')
+        else:
+            pages.append('<span class="page-link disabled">&raquo; Next</span>')
+
+        pagination_html = f'<div class="pagination">{"".join(pages)}</div>'
+
+    # Status subtitle
+    data_info = f"{total} tokens with data"
+    if universe_size:
+        data_info += f" (of {universe_size} discovered)"
+    showing_info = f"Showing {start_rank+1}&ndash;{min(start_rank + per_page, total)}" if total > 0 else "No data yet"
+
     content = f"""
     <div class="view-header">
         <div>
             <h2 class="view-title">Market Overview</h2>
-            <p class="view-subtitle">{len(tokens)} tokens tracked &middot; {pull_status}{update_str}</p>
+            <p class="view-subtitle">{data_info} &middot; {pull_status}{update_str}</p>
         </div>
     </div>
 
@@ -298,6 +338,7 @@ def render_market_page(tokens: list, pull_status: str, last_pull: str = None) ->
         <div class="stat-card">
             <div class="stat-label">Total Market Cap</div>
             <div class="stat-value">{fmt_usd(total_mcap)}</div>
+            <div class="stat-sub">(this page)</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">24h Volume</div>
@@ -317,6 +358,8 @@ def render_market_page(tokens: list, pull_status: str, last_pull: str = None) ->
             <div class="stat-value">{fmt_num(total_daa)}</div>
         </div>
     </div>
+
+    <div class="page-info">{showing_info} of {total}</div>
 
     <div class="table-wrap">
         <table class="data-table">
@@ -340,6 +383,8 @@ def render_market_page(tokens: list, pull_status: str, last_pull: str = None) ->
             </tbody>
         </table>
     </div>
+
+    {pagination_html}
     """
     return page_shell("Market", content, active_nav="market")
 

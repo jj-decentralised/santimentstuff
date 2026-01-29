@@ -67,7 +67,7 @@ class SantimentClient:
         self,
         api_key: Optional[str] = None,
         cache: Optional[CacheManager] = None,
-        requests_per_minute: int = 60,
+        requests_per_minute: int = 180,
     ):
         self._api_key = api_key or os.environ.get("SANTIMENT_API_KEY")
         if not self._api_key:
