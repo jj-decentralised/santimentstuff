@@ -50,36 +50,52 @@ async def _santiment_background_pull():
         _san_pull_status = {"status": "skipped", "reason": "SANTIMENT_API_KEY not set"}
         return
 
-    # Initial pull
-    try:
-        _san_pull_status = {"status": "discovering", "started_at": datetime.now(timezone.utc).isoformat()}
-        logger.info("Santiment: Starting discovery...")
-        await _san_puller.run_full_discovery()
+    # Wait for app to fully start before hitting the API
+    logger.info("Santiment: Waiting 10s for app startup to complete...")
+    await asyncio.sleep(10)
 
-        _san_pull_status["status"] = "pulling"
-        logger.info("Santiment: Starting bulk pull (Tier 1+2, 50 tokens, 3 years)...")
-        await _san_puller.run_bulk_pull(
-            slugs=TOP_TOKENS,
-            years_back=3,
-            tiers=[1, 2],
-        )
+    # Retry the entire pull up to 3 times if it fails
+    for pull_attempt in range(3):
+        try:
+            _san_pull_status = {
+                "status": "discovering",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "attempt": pull_attempt + 1,
+            }
+            logger.info(f"Santiment: Starting discovery (attempt {pull_attempt + 1}/3)...")
+            await _san_puller.run_full_discovery()
 
-        _san_pull_status = {
-            "status": "ready",
-            "last_pull": datetime.now(timezone.utc).isoformat(),
-            "cache_stats": _san_cache.get_pull_stats(),
-        }
-        logger.info(f"Santiment: Initial pull complete. Cache: {_san_cache.get_pull_stats()}")
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        logger.error(f"Santiment: Initial pull failed: {e}\n{tb}")
-        _san_pull_status = {
-            "status": "error",
-            "error": str(e),
-            "traceback": tb[-500:],
-            "client_stats": _san_client.stats if _san_client else None,
-        }
+            _san_pull_status["status"] = "pulling"
+            logger.info("Santiment: Starting bulk pull (Tier 1+2, 50 tokens, 3 years)...")
+            await _san_puller.run_bulk_pull(
+                slugs=TOP_TOKENS,
+                years_back=3,
+                tiers=[1, 2],
+            )
+
+            _san_pull_status = {
+                "status": "ready",
+                "last_pull": datetime.now(timezone.utc).isoformat(),
+                "cache_stats": _san_cache.get_pull_stats(),
+            }
+            logger.info(f"Santiment: Initial pull complete. Cache: {_san_cache.get_pull_stats()}")
+            break  # Success — exit retry loop
+
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            logger.error(f"Santiment: Pull attempt {pull_attempt + 1}/3 failed: {e}\n{tb}")
+            _san_pull_status = {
+                "status": "error",
+                "error": str(e),
+                "attempt": pull_attempt + 1,
+                "traceback": tb[-500:],
+                "client_stats": _san_client.stats if _san_client else None,
+            }
+            if pull_attempt < 2:
+                wait = 30 * (pull_attempt + 1)
+                logger.info(f"Santiment: Retrying in {wait}s...")
+                await asyncio.sleep(wait)
 
     # Periodic refresh every 4 hours
     while True:
@@ -452,6 +468,18 @@ def create_app() -> FastAPI:
                 "error": f"{type(e).__name__}: {str(e)}",
                 "key_prefix": api_key[:8] + "...",
             }
+
+    @app.post("/api/v1/santiment/retry")
+    async def santiment_retry():
+        """Manually trigger a Santiment data pull retry."""
+        global _san_pull_status
+        if not _san_client or not _san_puller:
+            raise HTTPException(503, "Santiment not configured")
+        if _san_pull_status.get("status") in ("discovering", "pulling"):
+            return {"message": "Pull already in progress", "status": _san_pull_status}
+        # Launch new background pull
+        asyncio.create_task(_santiment_background_pull())
+        return {"message": "Pull retry triggered", "status": _san_pull_status}
 
     @app.get("/api/v1/santiment/projects")
     async def santiment_projects(
