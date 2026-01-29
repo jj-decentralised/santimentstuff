@@ -453,7 +453,7 @@ class SantimentClient:
     ) -> list[dict]:
         """Get OHLCV price data."""
         query = """{
-            ohlcv(
+            ohlc(
                 slug: "%s"
                 from: "%s"
                 to: "%s"
@@ -474,10 +474,10 @@ class SantimentClient:
 
         if "errors" in result:
             error_msg = result["errors"][0].get("message", "Unknown error")
-            logger.warning(f"GraphQL error for OHLCV/{slug}: {error_msg}")
+            logger.warning(f"GraphQL error for OHLC/{slug}: {error_msg}")
             return []
 
-        data = result.get("ohlcv", [])
+        data = result.get("ohlc", [])
         self._stats["total_data_points"] += len(data) if data else 0
         return data or []
 
