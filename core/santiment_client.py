@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class SantimentRateLimiter:
     """Rate limiter respecting Santiment Pro limits: 600/min, 30K/hour."""
 
-    def __init__(self, requests_per_minute: int = 500):
+    def __init__(self, requests_per_minute: int = 180):
         self._rpm = requests_per_minute
         self._interval = 60.0 / requests_per_minute
         self._last_request = 0.0
@@ -67,7 +67,7 @@ class SantimentClient:
         self,
         api_key: Optional[str] = None,
         cache: Optional[CacheManager] = None,
-        requests_per_minute: int = 500,
+        requests_per_minute: int = 180,
     ):
         self._api_key = api_key or os.environ.get("SANTIMENT_API_KEY")
         if not self._api_key:

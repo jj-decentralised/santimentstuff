@@ -99,11 +99,16 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     global _client, _tracker, _san_client, _san_cache, _san_puller
 
-    # Initialize Nansen
+    # Initialize Nansen (graceful if key missing or invalid)
     cache = CacheManager()
-    _client = NansenClient(cache=cache)
-    await _client.__aenter__()
-    _tracker = SmartMoneyTracker(_client)
+    try:
+        _client = NansenClient(cache=cache)
+        await _client.__aenter__()
+        _tracker = SmartMoneyTracker(_client)
+    except Exception as e:
+        logger.error(f"Nansen init failed (dashboard will show errors): {e}")
+        _client = None
+        _tracker = None
 
     # Initialize Santiment (if key is available)
     san_task = None

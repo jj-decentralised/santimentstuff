@@ -102,17 +102,21 @@ TIER3_METRICS = [
 ALL_PROFILE_METRICS = TIER1_METRICS + TIER2_METRICS + TIER3_METRICS
 
 # Top tokens by market cap — our target universe
+# NOTE: Slugs must match Santiment's project slugs exactly.
+# Discovery phase validates these against the API and skips invalid ones.
 TOP_TOKENS = [
     "bitcoin", "ethereum", "tether", "xrp", "binance-coin",
     "solana", "usd-coin", "cardano", "dogecoin", "tron",
     "avalanche", "chainlink", "polkadot", "polygon", "shiba-inu",
     "litecoin", "uniswap", "bitcoin-cash", "stellar", "near-protocol",
-    "optimism", "arbitrum", "internet-computer", "cosmos", "filecoin",
-    "aave", "maker", "the-graph", "render-token", "injective-protocol",
-    "fantom", "theta-token", "quant-network", "algorand", "hedera-hashgraph",
-    "elrond-egld", "flow", "axie-infinity", "decentraland", "the-sandbox",
-    "lido-dao", "rocket-pool", "compound", "sushi", "curve-finance",
-    "yearn-finance", "1inch", "ens", "convex-finance", "gmx",
+    "internet-computer", "cosmos", "filecoin",
+    "aave", "maker", "the-graph", "render-token", "injective",
+    "fantom", "algorand", "hedera-hashgraph",
+    "multiversx-egld", "flow", "axie-infinity", "decentraland", "the-sandbox",
+    "lido-dao", "rocket-pool", "compound", "sushiswap", "curve",
+    "yearn-finance", "1inch", "ethereum-name-service", "convex-finance", "gmx",
+    "pepe", "bonk", "sui", "aptos", "sei-network",
+    "celestia", "stacks", "mantle", "immutable-x",
 ]
 
 
@@ -127,6 +131,7 @@ class SantimentDataPuller:
             "stress_test": {},
             "pull_stats": {},
         }
+        self._valid_slugs: set[str] = set()  # Populated during discovery
 
     # ================================================================
     # PHASE 1: DISCOVERY — Map the API surface
@@ -142,12 +147,24 @@ class SantimentDataPuller:
         return metrics
 
     async def discover_all_projects(self) -> list[dict]:
-        """Pull all projects and store in cache."""
+        """Pull all projects and store in cache. Populates _valid_slugs."""
         logger.info("DISCOVERY: Fetching all projects...")
         projects = await self._client.get_all_projects()
         stored = self._cache.store_projects(projects)
         logger.info(f"  Found {len(projects)} projects, stored {stored}")
         self._results["discovery"]["total_projects"] = len(projects)
+
+        # Build set of all valid slugs
+        self._valid_slugs = {p["slug"] for p in projects if p.get("slug")}
+        logger.info(f"  Valid slugs in Santiment: {len(self._valid_slugs)}")
+
+        # Validate our TOP_TOKENS list against actual slugs
+        valid_top = [s for s in TOP_TOKENS if s in self._valid_slugs]
+        invalid_top = [s for s in TOP_TOKENS if s not in self._valid_slugs]
+        if invalid_top:
+            logger.warning(f"  Invalid slugs in TOP_TOKENS (will skip): {invalid_top}")
+        self._results["discovery"]["valid_top_tokens"] = valid_top
+        self._results["discovery"]["invalid_top_tokens"] = invalid_top
 
         # Sort by market cap to find the top ones
         with_mcap = [p for p in projects if p.get("marketcapUsd")]
@@ -574,7 +591,7 @@ class SantimentDataPuller:
             years_back: Years of history to pull
             tiers: Which metric tiers to include [1], [1,2], or [1,2,3]
         """
-        target_slugs = slugs or TOP_TOKENS
+        raw_slugs = slugs or TOP_TOKENS
         target_metrics = metrics or []
         if not target_metrics:
             if 1 in tiers:
@@ -583,6 +600,15 @@ class SantimentDataPuller:
                 target_metrics.extend(TIER2_METRICS)
             if 3 in tiers:
                 target_metrics.extend(TIER3_METRICS)
+
+        # Filter to only valid slugs (discovered during discovery phase)
+        if self._valid_slugs:
+            target_slugs = [s for s in raw_slugs if s in self._valid_slugs]
+            skipped = [s for s in raw_slugs if s not in self._valid_slugs]
+            if skipped:
+                logger.warning(f"  Skipping {len(skipped)} invalid slugs: {skipped}")
+        else:
+            target_slugs = raw_slugs
 
         total_combinations = len(target_slugs) * (len(target_metrics) + 1)  # +1 for OHLCV
         logger.info("=" * 60)
