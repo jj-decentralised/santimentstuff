@@ -1,8 +1,8 @@
 """
 Crypto Analytics Dashboard API.
 
-FastAPI application serving Santiment on-chain data
-for a TradFi-inspired token analytics dashboard.
+FastAPI application serving Santiment on-chain data.
+All pages are server-side rendered — no JavaScript required.
 """
 
 import asyncio
@@ -27,6 +27,14 @@ from core.santiment_data_puller import (
     TIER1_METRICS,
     TIER2_METRICS,
     ALL_PROFILE_METRICS,
+)
+from core.ssr_renderer import (
+    render_market_page,
+    render_valuation_page,
+    render_token_profile,
+    fmt_usd,
+    fmt_pct,
+    pct_class,
 )
 
 logger = logging.getLogger(__name__)
@@ -171,13 +179,80 @@ async def lifespan(app: FastAPI):
         _san_cache.close()
 
 
+# ============================================================
+# SHARED DATA HELPERS
+# ============================================================
+
+KEY_METRICS = [
+    "price_usd", "marketcap_usd", "volume_usd",
+    "daily_active_addresses", "mvrv_usd", "nvt",
+    "dev_activity", "exchange_balance", "network_growth",
+    "transaction_volume",
+]
+
+
+def _build_token_list():
+    """Build the market token list from cache."""
+    if not _san_cache:
+        return []
+    tokens = []
+    for slug in TOP_TOKENS:
+        project = _san_cache.get_project(slug)
+        token_data = {
+            "slug": slug,
+            "name": project.get("name", slug) if project else slug,
+            "ticker": project.get("ticker", "") if project else "",
+        }
+        for metric in KEY_METRICS:
+            data = _san_cache.get_timeseries(metric, slug)
+            if data and len(data) >= 2:
+                latest = data[-1]["value"]
+                prev = data[-2]["value"]
+                change_pct = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
+                token_data[metric] = latest
+                token_data[f"{metric}_change"] = round(change_pct, 2)
+            elif data and len(data) == 1:
+                token_data[metric] = data[-1]["value"]
+                token_data[f"{metric}_change"] = 0
+            else:
+                token_data[metric] = None
+                token_data[f"{metric}_change"] = None
+        if token_data.get("price_usd") is not None:
+            tokens.append(token_data)
+    tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
+    return tokens
+
+
+def _build_profile_metrics(slug: str):
+    """Build full metrics dict for a token profile."""
+    metrics_data = {}
+    for metric in ALL_PROFILE_METRICS:
+        data = _san_cache.get_timeseries(metric, slug)
+        if data:
+            values = [d["value"] for d in data if d.get("value") is not None]
+            metrics_data[metric] = {
+                "data": data,
+                "count": len(data),
+                "latest": data[-1]["value"] if data else None,
+                "latest_date": data[-1]["datetime"] if data else None,
+                "min_365d": min(values[-365:]) if len(values) >= 30 else (min(values) if values else None),
+                "max_365d": max(values[-365:]) if len(values) >= 30 else (max(values) if values else None),
+                "avg_30d": round(sum(values[-30:]) / len(values[-30:]), 4) if len(values) >= 30 else None,
+            }
+    return metrics_data
+
+
+# ============================================================
+# APP FACTORY
+# ============================================================
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
 
     app = FastAPI(
         title="Crypto Analytics Dashboard",
         description="TradFi-inspired on-chain analytics powered by Santiment",
-        version="2.0.0",
+        version="3.0.0",
         lifespan=lifespan,
     )
 
@@ -194,210 +269,67 @@ def create_app() -> FastAPI:
     if os.path.exists(static_path):
         app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-    # === Dashboard HTML ===
+    # ============================================================
+    # SERVER-RENDERED PAGES (no JS required)
+    # ============================================================
 
     @app.get("/", response_class=HTMLResponse)
-    async def get_dashboard():
-        """Serve the main dashboard HTML with pre-loaded market data."""
-        template_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "templates", "dashboard.html"
-        )
-        try:
-            with open(template_path, "r") as f:
-                html = f.read()
-        except FileNotFoundError:
-            return "<html><body><h1>Dashboard template not found</h1></body></html>"
+    async def get_market_page():
+        """Market overview — fully server-rendered."""
+        tokens = _build_token_list()
+        status = _san_pull_status.get("status", "unknown")
+        last_pull = _san_pull_status.get("last_pull")
+        return render_market_page(tokens, status, last_pull)
 
-        # Inject market data so JS doesn't need to fetch on first load
-        preload_data = {"tokens": [], "count": 0, "pull_status": "loading", "last_pull": None}
-        if _san_cache:
-            try:
-                key_metrics = [
-                    "price_usd", "marketcap_usd", "volume_usd",
-                    "daily_active_addresses", "mvrv_usd", "nvt",
-                    "dev_activity", "exchange_balance", "network_growth",
-                    "transaction_volume",
-                ]
-                tokens = []
-                for slug in TOP_TOKENS:
-                    project = _san_cache.get_project(slug)
-                    token_data = {
-                        "slug": slug,
-                        "name": project.get("name", slug) if project else slug,
-                        "ticker": project.get("ticker", "") if project else "",
-                    }
-                    for metric in key_metrics:
-                        data = _san_cache.get_timeseries(metric, slug)
-                        if data and len(data) >= 2:
-                            latest = data[-1]["value"]
-                            prev = data[-2]["value"]
-                            change_pct = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
-                            token_data[metric] = latest
-                            token_data[f"{metric}_change"] = round(change_pct, 2)
-                        elif data and len(data) == 1:
-                            token_data[metric] = data[-1]["value"]
-                            token_data[f"{metric}_change"] = 0
-                        else:
-                            token_data[metric] = None
-                            token_data[f"{metric}_change"] = None
-                    if token_data.get("price_usd") is not None:
-                        tokens.append(token_data)
-                tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
-                preload_data = {
-                    "tokens": tokens,
-                    "count": len(tokens),
-                    "pull_status": _san_pull_status.get("status", "unknown"),
-                    "last_pull": _san_pull_status.get("last_pull"),
-                }
-            except Exception as e:
-                logger.error(f"Error pre-loading market data: {e}")
+    @app.get("/valuation", response_class=HTMLResponse)
+    async def get_valuation_page():
+        """Valuation scanner — fully server-rendered."""
+        if not _san_cache:
+            return render_valuation_page([])
 
-        # Inject data as a script tag before dashboard.js
-        data_script = f'<script>window.__MARKET_DATA__ = {json.dumps(preload_data)};</script>\n'
-        html = html.replace(
-            '<script src="/static/js/dashboard.js"></script>',
-            data_script + '<script src="/static/js/dashboard.js"></script>',
-        )
+        tokens = _build_token_list()
+        # Enrich with valuation averages
+        enriched = []
+        for t in tokens:
+            if t.get("mvrv_usd") is None and t.get("nvt") is None:
+                continue
+            # Pull 90d and 365d averages for MVRV
+            mvrv_data = _san_cache.get_timeseries("mvrv_usd", t["slug"])
+            if mvrv_data:
+                vals = [d["value"] for d in mvrv_data if d.get("value") is not None]
+                t["mvrv_90d"] = round(sum(vals[-90:]) / len(vals[-90:]), 4) if len(vals) >= 90 else None
+                t["mvrv_365d"] = round(sum(vals[-365:]) / len(vals[-365:]), 4) if len(vals) >= 365 else None
+            enriched.append(t)
 
-        # Server-side render the market table rows so data shows without JS
-        tokens = preload_data.get("tokens", [])
-        if tokens:
-            def _fmt_usd(n):
-                if n is None: return "&mdash;"
-                a = abs(n)
-                if a >= 1e12: return f"${n/1e12:.2f}T"
-                if a >= 1e9: return f"${n/1e9:.2f}B"
-                if a >= 1e6: return f"${n/1e6:.2f}M"
-                if a >= 1e3: return f"${n/1e3:.1f}K"
-                if a >= 1: return f"${n:.2f}"
-                if a >= 0.01: return f"${n:.4f}"
-                return f"${n:.6f}"
+        return render_valuation_page(enriched)
 
-            def _fmt_num(n):
-                if n is None: return "&mdash;"
-                a = abs(n)
-                if a >= 1e9: return f"{n/1e9:.2f}B"
-                if a >= 1e6: return f"{n/1e6:.2f}M"
-                if a >= 1e3: return f"{n/1e3:.1f}K"
-                if a >= 100: return f"{n:.0f}"
-                return f"{n:.2f}"
+    @app.get("/token/{slug}", response_class=HTMLResponse)
+    async def get_token_page(slug: str):
+        """Token profile — fully server-rendered with deep metrics."""
+        if not _san_cache:
+            return HTMLResponse("<html><body><h1>Data not available yet</h1><a href='/'>Back</a></body></html>")
 
-            def _fmt_pct(n):
-                if n is None: return "&mdash;"
-                sign = "+" if n > 0 else ""
-                return f"{sign}{n:.2f}%"
+        project = _san_cache.get_project(slug)
+        if not project:
+            # Try to still show data if we have timeseries
+            project = {"name": slug.replace("-", " ").title(), "ticker": slug.upper()[:5]}
 
-            def _pct_class(n):
-                if n is None: return "num-neutral"
-                if n > 0: return "num-positive"
-                if n < 0: return "num-negative"
-                return "num-neutral"
+        metrics = _build_profile_metrics(slug)
+        if not metrics:
+            return HTMLResponse(f"<html><body><h1>No data for {slug}</h1><p>Data may still be loading.</p><a href='/'>Back</a></body></html>")
 
-            rows_html = []
-            for i, t in enumerate(tokens):
-                pct_change = t.get("price_usd_change")
-                mvrv = t.get("mvrv_usd")
-                nvt = t.get("nvt")
-                daa = t.get("daily_active_addresses")
-                dev = t.get("dev_activity")
-                rows_html.append(f'''<tr data-slug="{t['slug']}">
-                    <td class="col-rank">{i+1}</td>
-                    <td class="col-name"><div class="token-name"><strong>{t['name']}</strong> <span class="ticker">{t['ticker']}</span></div></td>
-                    <td class="col-num num-bold">{_fmt_usd(t.get('price_usd'))}</td>
-                    <td class="col-num {_pct_class(pct_change)}">{_fmt_pct(pct_change)}</td>
-                    <td class="col-num">{_fmt_usd(t.get('marketcap_usd'))}</td>
-                    <td class="col-num">{_fmt_usd(t.get('volume_usd'))}</td>
-                    <td class="col-num">{f"{mvrv:.2f}" if mvrv is not None else "&mdash;"}</td>
-                    <td class="col-num">{f"{nvt:.1f}" if nvt is not None else "&mdash;"}</td>
-                    <td class="col-num hide-mobile">{_fmt_num(daa)}</td>
-                    <td class="col-num hide-mobile">{f"{dev:.0f}" if dev is not None else "&mdash;"}</td>
-                </tr>''')
-            ssr_tbody = "\n".join(rows_html)
+        return render_token_profile(project, metrics, slug)
 
-            # Also SSR the summary stats
-            total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
-            total_vol = sum(t.get("volume_usd") or 0 for t in tokens)
-            mvrv_vals = [t["mvrv_usd"] for t in tokens if t.get("mvrv_usd") is not None]
-            nvt_vals = [t["nvt"] for t in tokens if t.get("nvt") is not None]
-            avg_mvrv = sum(mvrv_vals) / len(mvrv_vals) if mvrv_vals else None
-            avg_nvt = sum(nvt_vals) / len(nvt_vals) if nvt_vals else None
-
-            html = html.replace(
-                '<tr><td colspan="10" class="empty-cell">Loading market data...</td></tr>',
-                ssr_tbody,
-            )
-            html = html.replace(
-                '<p class="view-subtitle" id="tokenCount"></p>',
-                f'<p class="view-subtitle" id="tokenCount">{len(tokens)} tokens tracked</p>',
-            )
-            html = html.replace(
-                '<div class="stat-value" id="statMcap">&mdash;</div>',
-                f'<div class="stat-value" id="statMcap">{_fmt_usd(total_mcap)}</div>',
-            )
-            html = html.replace(
-                '<div class="stat-value" id="statVolume">&mdash;</div>',
-                f'<div class="stat-value" id="statVolume">{_fmt_usd(total_vol)}</div>',
-            )
-            html = html.replace(
-                '<div class="stat-value" id="statMvrv">&mdash;</div>',
-                f'<div class="stat-value" id="statMvrv">{f"{avg_mvrv:.2f}" if avg_mvrv is not None else "&mdash;"}</div>',
-            )
-            html = html.replace(
-                '<div class="stat-value" id="statNvt">&mdash;</div>',
-                f'<div class="stat-value" id="statNvt">{f"{avg_nvt:.1f}" if avg_nvt is not None else "&mdash;"}</div>',
-            )
-
-        return html
-
-    # === Market Overview (all tokens with latest metrics) ===
+    # ============================================================
+    # JSON API ENDPOINTS (for programmatic access)
+    # ============================================================
 
     @app.get("/api/v1/market")
     async def get_market_overview():
-        """
-        Get all tokens with their latest metric values.
-        Returns a compact table-ready format for the dashboard.
-        """
+        """JSON: all tokens with latest metrics."""
         if not _san_cache:
             raise HTTPException(503, "Santiment not configured")
-
-        key_metrics = [
-            "price_usd", "marketcap_usd", "volume_usd",
-            "daily_active_addresses", "mvrv_usd", "nvt",
-            "dev_activity", "exchange_balance", "network_growth",
-            "transaction_volume",
-        ]
-
-        tokens = []
-        for slug in TOP_TOKENS:
-            project = _san_cache.get_project(slug)
-            token_data = {
-                "slug": slug,
-                "name": project.get("name", slug) if project else slug,
-                "ticker": project.get("ticker", "") if project else "",
-            }
-
-            for metric in key_metrics:
-                data = _san_cache.get_timeseries(metric, slug)
-                if data and len(data) >= 2:
-                    latest = data[-1]["value"]
-                    prev = data[-2]["value"]
-                    change_pct = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
-                    token_data[metric] = latest
-                    token_data[f"{metric}_change"] = round(change_pct, 2)
-                elif data and len(data) == 1:
-                    token_data[metric] = data[-1]["value"]
-                    token_data[f"{metric}_change"] = 0
-                else:
-                    token_data[metric] = None
-                    token_data[f"{metric}_change"] = None
-
-            # Only include tokens that have at least price data
-            if token_data.get("price_usd") is not None:
-                tokens.append(token_data)
-
-        # Sort by market cap descending
-        tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
-
+        tokens = _build_token_list()
         return {
             "tokens": tokens,
             "count": len(tokens),
@@ -405,86 +337,16 @@ def create_app() -> FastAPI:
             "last_pull": _san_pull_status.get("last_pull"),
         }
 
-    # === Token Profile ===
-
     @app.get("/api/v1/profile/{slug}")
-    async def get_token_profile(slug: str):
-        """Full TradFi-style profile for a token with all cached metrics."""
+    async def get_token_profile_api(slug: str):
+        """JSON: full token profile."""
         if not _san_cache:
             raise HTTPException(503, "Santiment not configured")
-
         project = _san_cache.get_project(slug)
         if not project:
             raise HTTPException(404, f"Project '{slug}' not found")
-
-        metrics_data = {}
-        for metric in ALL_PROFILE_METRICS:
-            data = _san_cache.get_timeseries(metric, slug)
-            if data:
-                values = [d["value"] for d in data if d.get("value") is not None]
-                metrics_data[metric] = {
-                    "data": data,
-                    "count": len(data),
-                    "latest": data[-1]["value"] if data else None,
-                    "latest_date": data[-1]["datetime"] if data else None,
-                    "min_365d": min(values[-365:]) if len(values) >= 30 else (min(values) if values else None),
-                    "max_365d": max(values[-365:]) if len(values) >= 30 else (max(values) if values else None),
-                    "avg_30d": round(sum(values[-30:]) / len(values[-30:]), 4) if len(values) >= 30 else None,
-                }
-
-        # Valuation zones
-        valuation = {}
-        mvrv = metrics_data.get("mvrv_usd", {}).get("latest")
-        if mvrv is not None:
-            if mvrv > 3.5: valuation["mvrv_zone"] = "extremely_overvalued"
-            elif mvrv > 2.5: valuation["mvrv_zone"] = "overvalued"
-            elif mvrv > 1.5: valuation["mvrv_zone"] = "fair_to_high"
-            elif mvrv > 1.0: valuation["mvrv_zone"] = "fair"
-            elif mvrv > 0.5: valuation["mvrv_zone"] = "undervalued"
-            else: valuation["mvrv_zone"] = "extremely_undervalued"
-            valuation["mvrv_value"] = mvrv
-
-        return {
-            "project": project,
-            "metrics": metrics_data,
-            "valuation": valuation,
-        }
-
-    # === Comparison ===
-
-    @app.get("/api/v1/compare")
-    async def compare_tokens(
-        slugs: str = Query(..., description="Comma-separated slugs"),
-        metrics: str = Query(
-            default="price_usd,mvrv_usd,nvt,daily_active_addresses",
-            description="Comma-separated metrics",
-        ),
-    ):
-        """Compare multiple tokens across metrics."""
-        if not _san_cache:
-            raise HTTPException(503, "Santiment not configured")
-
-        slug_list = [s.strip() for s in slugs.split(",")]
-        metric_list = [m.strip() for m in metrics.split(",")]
-
-        comparison = {}
-        for slug in slug_list:
-            comparison[slug] = {}
-            for metric in metric_list:
-                data = _san_cache.get_timeseries(metric, slug)
-                if data and data[-1].get("value") is not None:
-                    values = [d["value"] for d in data if d.get("value") is not None]
-                    comparison[slug][metric] = {
-                        "latest": data[-1]["value"],
-                        "avg_30d": round(sum(values[-30:]) / len(values[-30:]), 4) if len(values) >= 30 else None,
-                        "data_points": len(data),
-                    }
-                else:
-                    comparison[slug][metric] = None
-
-        return {"comparison": comparison, "slugs": slug_list, "metrics": metric_list}
-
-    # === Metric Timeseries ===
+        metrics = _build_profile_metrics(slug)
+        return {"project": project, "metrics": metrics}
 
     @app.get("/api/v1/metric/{metric}")
     async def get_metric(
@@ -493,25 +355,18 @@ def create_app() -> FastAPI:
         from_date: Optional[str] = Query(default=None),
         to_date: Optional[str] = Query(default=None),
     ):
-        """Get timeseries data for a specific metric and token."""
+        """JSON: timeseries data for a specific metric."""
         if not _san_cache:
             raise HTTPException(503, "Santiment not configured")
-
         data = _san_cache.get_timeseries(metric, slug, from_date, to_date)
         return {"metric": metric, "slug": slug, "data": data, "count": len(data)}
 
-    # === Valuation ===
-
     @app.get("/api/v1/valuation/{slug}")
     async def get_valuation(slug: str):
-        """TradFi-style valuation summary with MVRV/NVT zones."""
+        """JSON: valuation summary."""
         if not _san_cache:
             raise HTTPException(503, "Santiment not configured")
-
-        valuation_metrics = [
-            "mvrv_usd", "nvt", "price_usd", "marketcap_usd", "volume_usd",
-        ]
-
+        valuation_metrics = ["mvrv_usd", "nvt", "price_usd", "marketcap_usd", "volume_usd"]
         result = {}
         for metric in valuation_metrics:
             data = _san_cache.get_timeseries(metric, slug)
@@ -523,31 +378,16 @@ def create_app() -> FastAPI:
                     "avg_365d": round(sum(values[-365:]) / len(values[-365:]), 2) if len(values) >= 365 else None,
                     "min_365d": min(values[-365:]) if len(values) >= 365 else None,
                     "max_365d": max(values[-365:]) if len(values) >= 365 else None,
-                    "percentile": None,
                 }
-                if result[metric]["min_365d"] is not None and result[metric]["max_365d"] is not None:
-                    r = result[metric]["max_365d"] - result[metric]["min_365d"]
-                    if r > 0 and result[metric]["current"] is not None:
-                        result[metric]["percentile"] = round(
-                            (result[metric]["current"] - result[metric]["min_365d"]) / r * 100, 1
-                        )
-
-        mvrv = result.get("mvrv_usd", {}).get("current")
-        if mvrv is not None:
-            if mvrv > 3.5: result["mvrv_zone"] = "extremely_overvalued"
-            elif mvrv > 2.5: result["mvrv_zone"] = "overvalued"
-            elif mvrv > 1.5: result["mvrv_zone"] = "fair_to_high"
-            elif mvrv > 1.0: result["mvrv_zone"] = "fair"
-            elif mvrv > 0.5: result["mvrv_zone"] = "undervalued"
-            else: result["mvrv_zone"] = "extremely_undervalued"
-
         return {"slug": slug, "valuation": result}
 
-    # === System Endpoints ===
+    # ============================================================
+    # SYSTEM ENDPOINTS
+    # ============================================================
 
     @app.get("/api/v1/status")
     async def get_status():
-        """Get system status and data pull progress."""
+        """System status and pull progress."""
         return {
             "pull_status": _san_pull_status,
             "cache_stats": _san_cache.get_pull_stats() if _san_cache else None,
@@ -556,7 +396,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/v1/retry")
     async def retry_pull():
-        """Manually trigger a data pull retry."""
+        """Trigger a data pull retry."""
         global _san_pull_status
         if not _san_client or not _san_puller:
             raise HTTPException(503, "Santiment not configured")
@@ -565,24 +405,9 @@ def create_app() -> FastAPI:
         asyncio.create_task(_santiment_background_pull())
         return {"message": "Pull retry triggered"}
 
-    @app.get("/debug/render", response_class=HTMLResponse)
-    async def debug_render():
-        """Debug: server-rendered market table to verify data + rendering."""
-        if not _san_cache:
-            return "<html><body><p>Santiment not configured</p></body></html>"
-        rows = []
-        for slug in TOP_TOKENS[:10]:
-            data = _san_cache.get_timeseries("price_usd", slug)
-            project = _san_cache.get_project(slug)
-            name = project.get("name", slug) if project else slug
-            price = data[-1]["value"] if data else "N/A"
-            rows.append(f"<tr><td>{name}</td><td>{price}</td><td>{len(data) if data else 0} pts</td></tr>")
-        table = "<table border=1><tr><th>Name</th><th>Price</th><th>Data</th></tr>" + "".join(rows) + "</table>"
-        return f"<html><body><h2>Debug Render ({len(rows)} tokens)</h2>{table}<p>Status: {_san_pull_status.get('status')}</p></body></html>"
-
     @app.get("/health")
     async def health_check():
-        """Health check endpoint."""
+        """Health check."""
         return {
             "status": "healthy",
             "timestamp": datetime.now(timezone.utc).isoformat(),
