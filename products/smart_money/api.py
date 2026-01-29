@@ -71,8 +71,15 @@ async def _santiment_background_pull():
         }
         logger.info(f"Santiment: Initial pull complete. Cache: {_san_cache.get_pull_stats()}")
     except Exception as e:
-        logger.error(f"Santiment: Initial pull failed: {e}")
-        _san_pull_status = {"status": "error", "error": str(e)}
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Santiment: Initial pull failed: {e}\n{tb}")
+        _san_pull_status = {
+            "status": "error",
+            "error": str(e),
+            "traceback": tb[-500:],
+            "client_stats": _san_client.stats if _san_client else None,
+        }
 
     # Periodic refresh every 4 hours
     while True:
@@ -407,7 +414,44 @@ def create_app() -> FastAPI:
             "pull_status": _san_pull_status,
             "cache_stats": _san_cache.get_pull_stats() if _san_cache else None,
             "client_stats": _san_client.stats if _san_client else None,
+            "api_key_set": bool(os.environ.get("SANTIMENT_API_KEY")),
+            "api_key_prefix": os.environ.get("SANTIMENT_API_KEY", "")[:8] + "..." if os.environ.get("SANTIMENT_API_KEY") else None,
         }
+
+    @app.get("/api/v1/santiment/test")
+    async def santiment_test():
+        """
+        Diagnostic: test Santiment API connectivity with a minimal query.
+        Bypasses all caching and the background puller.
+        """
+        import httpx as _httpx
+        api_key = os.environ.get("SANTIMENT_API_KEY")
+        if not api_key:
+            return {"error": "SANTIMENT_API_KEY not set", "key_set": False}
+
+        query = '{ getMetric(metric: "price_usd") { metadata { minInterval } } }'
+        try:
+            async with _httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    "https://api.santiment.net/graphql",
+                    json={"query": query},
+                    headers={
+                        "Authorization": f"Apikey {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                return {
+                    "status_code": resp.status_code,
+                    "response_body": resp.text[:1000],
+                    "key_prefix": api_key[:8] + "...",
+                    "key_length": len(api_key),
+                    "headers_sent": "Apikey " + api_key[:8] + "...",
+                }
+        except Exception as e:
+            return {
+                "error": f"{type(e).__name__}: {str(e)}",
+                "key_prefix": api_key[:8] + "...",
+            }
 
     @app.get("/api/v1/santiment/projects")
     async def santiment_projects(

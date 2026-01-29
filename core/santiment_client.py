@@ -134,9 +134,19 @@ class SantimentClient:
 
                 response = await self._client.post(self.GRAPHQL_URL, json=payload)
 
+                # Log every non-200 response for debugging
+                if response.status_code != 200:
+                    body_preview = response.text[:500] if response.text else "(empty)"
+                    logger.error(
+                        f"Santiment HTTP {response.status_code} "
+                        f"(attempt {attempt+1}/{retries}): {body_preview}"
+                    )
+                    self._stats["last_error"] = f"HTTP {response.status_code}: {body_preview[:200]}"
+
                 if response.status_code == 429:
                     wait = 2 ** (attempt + 1)
                     logger.warning(f"Rate limited (429). Waiting {wait}s...")
+                    self._stats["errors"] += 1
                     self._stats["retries"] += 1
                     await asyncio.sleep(wait)
                     continue
@@ -148,6 +158,7 @@ class SantimentClient:
                     error_msg = data["errors"][0].get("message", "Unknown GraphQL error")
                     logger.error(f"GraphQL error: {error_msg}")
                     self._stats["errors"] += 1
+                    self._stats["last_error"] = f"GraphQL: {error_msg}"
                     # Some errors are retryable
                     if "timeout" in error_msg.lower() or "rate" in error_msg.lower():
                         wait = 2 ** (attempt + 1)
@@ -167,22 +178,27 @@ class SantimentClient:
             except httpx.HTTPStatusError as e:
                 last_error = e
                 self._stats["errors"] += 1
+                self._stats["last_error"] = f"HTTPStatusError {e.response.status_code}: {str(e)[:200]}"
+                logger.error(f"HTTP error (attempt {attempt+1}/{retries}): {e}")
                 if e.response.status_code >= 500:
                     wait = 2 ** (attempt + 1)
                     self._stats["retries"] += 1
                     await asyncio.sleep(wait)
                     continue
                 raise
-            except (httpx.ConnectError, httpx.ReadTimeout) as e:
+            except Exception as e:
                 last_error = e
                 self._stats["errors"] += 1
                 self._stats["retries"] += 1
+                self._stats["last_error"] = f"{type(e).__name__}: {str(e)[:200]}"
                 wait = 2 ** (attempt + 1)
-                logger.warning(f"Connection error, retry {attempt+1}/{retries} in {wait}s: {e}")
+                logger.error(f"Request error (attempt {attempt+1}/{retries}), retry in {wait}s: {type(e).__name__}: {e}")
                 await asyncio.sleep(wait)
                 continue
 
-        raise last_error or RuntimeError("All retries exhausted")
+        error_msg = f"All retries exhausted. Last error: {last_error}"
+        self._stats["last_error"] = str(error_msg)[:300]
+        raise RuntimeError(error_msg)
 
     # ================================================================
     # DISCOVERY: What metrics and slugs are available?
