@@ -6,6 +6,7 @@ for a TradFi-inspired token analytics dashboard.
 """
 
 import asyncio
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -197,15 +198,67 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def get_dashboard():
-        """Serve the main dashboard HTML."""
+        """Serve the main dashboard HTML with pre-loaded market data."""
         template_path = os.path.join(
             os.path.dirname(__file__), "..", "..", "templates", "dashboard.html"
         )
         try:
             with open(template_path, "r") as f:
-                return f.read()
+                html = f.read()
         except FileNotFoundError:
             return "<html><body><h1>Dashboard template not found</h1></body></html>"
+
+        # Inject market data so JS doesn't need to fetch on first load
+        preload_data = {"tokens": [], "count": 0, "pull_status": "loading", "last_pull": None}
+        if _san_cache:
+            try:
+                key_metrics = [
+                    "price_usd", "marketcap_usd", "volume_usd",
+                    "daily_active_addresses", "mvrv_usd", "nvt",
+                    "dev_activity", "exchange_balance", "network_growth",
+                    "transaction_volume",
+                ]
+                tokens = []
+                for slug in TOP_TOKENS:
+                    project = _san_cache.get_project(slug)
+                    token_data = {
+                        "slug": slug,
+                        "name": project.get("name", slug) if project else slug,
+                        "ticker": project.get("ticker", "") if project else "",
+                    }
+                    for metric in key_metrics:
+                        data = _san_cache.get_timeseries(metric, slug)
+                        if data and len(data) >= 2:
+                            latest = data[-1]["value"]
+                            prev = data[-2]["value"]
+                            change_pct = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
+                            token_data[metric] = latest
+                            token_data[f"{metric}_change"] = round(change_pct, 2)
+                        elif data and len(data) == 1:
+                            token_data[metric] = data[-1]["value"]
+                            token_data[f"{metric}_change"] = 0
+                        else:
+                            token_data[metric] = None
+                            token_data[f"{metric}_change"] = None
+                    if token_data.get("price_usd") is not None:
+                        tokens.append(token_data)
+                tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
+                preload_data = {
+                    "tokens": tokens,
+                    "count": len(tokens),
+                    "pull_status": _san_pull_status.get("status", "unknown"),
+                    "last_pull": _san_pull_status.get("last_pull"),
+                }
+            except Exception as e:
+                logger.error(f"Error pre-loading market data: {e}")
+
+        # Inject data as a script tag before dashboard.js
+        data_script = f'<script>window.__MARKET_DATA__ = {json.dumps(preload_data)};</script>\n'
+        html = html.replace(
+            '<script src="/static/js/dashboard.js"></script>',
+            data_script + '<script src="/static/js/dashboard.js"></script>',
+        )
+        return html
 
     # === Market Overview (all tokens with latest metrics) ===
 

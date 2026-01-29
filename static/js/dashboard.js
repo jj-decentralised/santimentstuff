@@ -124,9 +124,8 @@ function openProfile(slug) {
 // ============================================================
 // MARKET VIEW
 // ============================================================
-async function loadMarket() {
+function renderMarket(data) {
   try {
-    const data = await api('/market');
     state.marketData = data;
 
     // Update status
@@ -194,6 +193,17 @@ async function loadMarket() {
     tbody.querySelectorAll('tr[data-slug]').forEach(row => {
       row.addEventListener('click', () => openProfile(row.dataset.slug));
     });
+  } catch (e) {
+    console.error('Market render error:', e);
+    document.getElementById('marketBody').innerHTML =
+      `<tr><td colspan="10" class="empty-cell">Render error: ${e.message}</td></tr>`;
+  }
+}
+
+async function loadMarket() {
+  try {
+    const data = await api('/market');
+    renderMarket(data);
   } catch (e) {
     console.error('Market load error:', e);
     document.getElementById('marketBody').innerHTML =
@@ -564,9 +574,15 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('[Dashboard] Init error:', e);
   }
 
-  // Initial load
+  // Initial load - use pre-loaded data if available, otherwise fetch
   console.log('[Dashboard] Loading market data...');
-  loadMarket();
+  if (window.__MARKET_DATA__ && window.__MARKET_DATA__.tokens && window.__MARKET_DATA__.tokens.length > 0) {
+    console.log('[Dashboard] Using pre-loaded data:', window.__MARKET_DATA__.count, 'tokens');
+    renderMarket(window.__MARKET_DATA__);
+  } else {
+    console.log('[Dashboard] No pre-loaded data, fetching from API...');
+    loadMarket();
+  }
 
   // Auto refresh every 5 minutes
   setInterval(() => {
