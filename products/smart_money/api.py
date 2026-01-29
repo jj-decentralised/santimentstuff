@@ -33,6 +33,7 @@ from core.ssr_renderer import (
     render_market_page,
     render_valuation_page,
     render_token_profile,
+    render_sync_page,
     fmt_usd,
     fmt_pct,
     pct_class,
@@ -384,10 +385,11 @@ def create_app() -> FastAPI:
         status = _san_pull_status.get("status", "unknown")
         last_pull = _san_pull_status.get("last_pull")
         universe_size = _san_pull_status.get("universe_size", 0)
+        cache_stats = _san_cache.get_pull_stats() if _san_cache else {}
         return render_market_page(
             tokens, status, last_pull,
             page=page, per_page=per_page, total=total,
-            universe_size=universe_size,
+            universe_size=universe_size, cache_stats=cache_stats,
         )
 
     @app.get("/valuation", response_class=HTMLResponse)
@@ -397,6 +399,13 @@ def create_app() -> FastAPI:
             return render_valuation_page([])
         enriched = _build_all_tokens_for_valuation()
         return render_valuation_page(enriched)
+
+    @app.get("/sync", response_class=HTMLResponse)
+    async def get_sync_page():
+        """Sync status — fully server-rendered."""
+        cache_stats = _san_cache.get_pull_stats() if _san_cache else {}
+        client_stats = _san_client.stats if _san_client else {}
+        return render_sync_page(_san_pull_status, cache_stats, client_stats)
 
     @app.get("/token/{slug}", response_class=HTMLResponse)
     async def get_token_page(slug: str):

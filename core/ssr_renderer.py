@@ -210,6 +210,7 @@ def page_shell(title: str, content: str, active_nav: str = "") -> str:
         <nav class="header-nav">
             <a href="/" class="{nav_cls('market')}">Market</a>
             <a href="/valuation" class="{nav_cls('valuation')}">Valuation</a>
+            <a href="/sync" class="{nav_cls('sync')}">Sync</a>
         </nav>
         <div class="header-right">
             <div class="status-indicator live"></div>
@@ -233,7 +234,7 @@ def page_shell(title: str, content: str, active_nav: str = "") -> str:
 def render_market_page(
     tokens: list, pull_status: str, last_pull: str = None,
     page: int = 1, per_page: int = 100, total: int = 0,
-    universe_size: int = 0,
+    universe_size: int = 0, cache_stats: dict = None,
 ) -> str:
     """Render the full market overview page with pagination."""
     # Summary stats
@@ -326,6 +327,47 @@ def render_market_page(
         data_info += f" (of {universe_size} discovered)"
     showing_info = f"Showing {start_rank+1}&ndash;{min(start_rank + per_page, total)}" if total > 0 else "No data yet"
 
+    # Sync banner (shown when still pulling)
+    sync_banner = ""
+    is_syncing = pull_status not in ("ready", "idle", "skipped")
+    if is_syncing:
+        cs = cache_stats or {}
+        ts_rows = cs.get("timeseries_rows", 0)
+        db_mb = cs.get("db_size_mb", 0)
+        pct_done = 0
+        if universe_size and total:
+            pct_done = min(99, int(total / universe_size * 100))
+        phase_labels = {
+            "phase1_discovery": "Phase 1: Discovering projects...",
+            "phase1_pulling": "Phase 1: Loading top 10 tokens...",
+            "phase1_complete": "Phase 1 complete. Starting universe pull...",
+            "phase2_universe": f"Phase 2: Pulling core data for all {universe_size} tokens (7yr history)...",
+            "phase2_complete": "Phase 2 complete. Starting deep pull...",
+            "phase3_deep": "Phase 3: Pulling deep metrics for top 200 tokens...",
+            "refreshing": "Refreshing latest data...",
+        }
+        phase_label = phase_labels.get(pull_status, pull_status)
+
+        sync_banner = f"""
+    <div class="sync-banner">
+        <div class="sync-banner-inner">
+            <div class="sync-status-row">
+                <span class="sync-dot"></span>
+                <strong>Data Sync In Progress</strong>
+                <span class="sync-phase">{html_mod.escape(phase_label)}</span>
+            </div>
+            <div class="sync-progress-bar">
+                <div class="sync-progress-fill" style="width:{pct_done}%"></div>
+            </div>
+            <div class="sync-stats-row">
+                <span>{total} / {universe_size} tokens loaded ({pct_done}%)</span>
+                <span>{fmt_num(ts_rows)} data points</span>
+                <span>{db_mb:.1f} MB cached</span>
+                <a href="/sync" class="sync-detail-link">Full details &rarr;</a>
+            </div>
+        </div>
+    </div>"""
+
     content = f"""
     <div class="view-header">
         <div>
@@ -333,6 +375,8 @@ def render_market_page(
             <p class="view-subtitle">{data_info} &middot; {pull_status}{update_str}</p>
         </div>
     </div>
+
+    {sync_banner}
 
     <div class="stats-row">
         <div class="stat-card">
@@ -896,3 +940,193 @@ def _build_metric_rows(metrics: dict, metric_list: list) -> list:
             <td class="col-num hide-mobile">{count}</td>
         </tr>""")
     return rows
+
+
+# ============================================================
+# SYNC STATUS PAGE
+# ============================================================
+
+PHASE_DESCRIPTIONS = {
+    "idle": ("Idle", "System is starting up."),
+    "skipped": ("Skipped", "SANTIMENT_API_KEY not configured."),
+    "phase1_discovery": ("Phase 1", "Discovering all projects from Santiment..."),
+    "phase1_pulling": ("Phase 1", "Loading core data for top 10 tokens (quick startup)."),
+    "phase1_complete": ("Phase 1 Done", "Initial data loaded. Starting universe pull."),
+    "phase1_error": ("Phase 1 Error", "Discovery/initial pull failed. Will retry."),
+    "phase2_universe": ("Phase 2", "Pulling core metrics (price, volume, market cap) for ALL tokens with 7 years of history."),
+    "phase2_complete": ("Phase 2 Done", "Universe core data loaded. Starting deep pull."),
+    "phase2_error": ("Phase 2 Error", "Universe pull encountered an error. Continuing with available data."),
+    "phase3_deep": ("Phase 3", "Pulling deep analytics (MVRV, NVT, on-chain, social, dev) for top 200 tokens."),
+    "partial": ("Partial", "Some data loaded. Deep pull may have encountered errors."),
+    "ready": ("Complete", "All data synced. Refreshes every 4 hours."),
+    "refreshing": ("Refreshing", "Updating latest data points..."),
+}
+
+
+def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -> str:
+    """Render the full sync status page with detailed progress."""
+    status_key = pull_status.get("status", "unknown")
+    phase_title, phase_desc = PHASE_DESCRIPTIONS.get(status_key, (status_key, ""))
+    universe_size = pull_status.get("universe_size", 0)
+    last_pull = pull_status.get("last_pull", "")
+    error = pull_status.get("error", "")
+
+    # Cache stats
+    cs = cache_stats or {}
+    ts_rows = cs.get("timeseries_rows", 0)
+    ohlcv_rows = cs.get("ohlcv_rows", 0)
+    total_pulls = cs.get("total_pulls", 0)
+    success_pulls = cs.get("successful_pulls", 0)
+    failed_pulls = cs.get("failed_pulls", 0)
+    projects_cached = cs.get("projects_cached", 0)
+    db_size_mb = cs.get("db_size_mb", 0)
+    total_data_pts = cs.get("total_data_points_pulled", 0)
+    metrics_cataloged = cs.get("metrics_cataloged", 0)
+
+    # Client stats
+    cl = client_stats or {}
+    total_requests = cl.get("total_requests", 0)
+    cache_hits = cl.get("cache_hits", 0)
+    errors = cl.get("errors", 0)
+    last_error = cl.get("last_error", "")
+
+    # Progress calculation
+    is_done = status_key in ("ready", "partial")
+    is_syncing = status_key not in ("ready", "idle", "skipped", "partial")
+
+    # Phase progress indicator
+    phases = [
+        ("Discovery", status_key in ("phase1_discovery",)),
+        ("Phase 1: Quick Load", status_key in ("phase1_pulling",)),
+        ("Phase 2: Universe", status_key in ("phase2_universe",)),
+        ("Phase 3: Deep Pull", status_key in ("phase3_deep",)),
+        ("Ready", status_key in ("ready",)),
+    ]
+
+    phase_steps = []
+    past_active = True
+    for label, is_active in phases:
+        if is_active:
+            cls = "sync-step active"
+            past_active = False
+        elif past_active and not is_done:
+            cls = "sync-step done"
+        elif is_done:
+            cls = "sync-step done"
+        else:
+            cls = "sync-step pending"
+        phase_steps.append(f'<div class="{cls}"><span class="sync-step-dot"></span><span class="sync-step-label">{label}</span></div>')
+
+    # Determine which phases are complete vs pending
+    phase_order = ["phase1_discovery", "phase1_pulling", "phase1_complete",
+                   "phase2_universe", "phase2_complete",
+                   "phase3_deep", "ready", "partial"]
+    current_idx = phase_order.index(status_key) if status_key in phase_order else 0
+
+    done_phases = []
+    if current_idx >= 2:
+        done_phases.append(("Phase 1: Quick Load", "Top 10 tokens, Tier 1 metrics, 1 year", "check"))
+    if current_idx >= 4:
+        done_phases.append(("Phase 2: Universe Pull", f"{universe_size} tokens, core metrics, 7 years", "check"))
+    if current_idx >= 6:
+        done_phases.append(("Phase 3: Deep Pull", "Top 200 tokens, Tier 1+2 metrics, 7 years", "check"))
+
+    done_html = ""
+    for label, desc, icon in done_phases:
+        done_html += f"""
+        <div class="sync-phase-card done">
+            <div class="sync-phase-icon">&#10003;</div>
+            <div><strong>{label}</strong><br><span class="sync-phase-desc">{desc}</span></div>
+        </div>"""
+
+    # Error section
+    error_html = ""
+    if error:
+        error_html = f"""
+    <div class="sync-error">
+        <strong>Error:</strong> {html_mod.escape(str(error)[:500])}
+    </div>"""
+
+    if last_error:
+        error_html += f"""
+    <div class="sync-warning">
+        <strong>Last API Error:</strong> {html_mod.escape(str(last_error)[:300])}
+    </div>"""
+
+    # Last pull time
+    last_pull_str = ""
+    if last_pull:
+        try:
+            d = datetime.fromisoformat(last_pull.replace("Z", "+00:00"))
+            last_pull_str = d.strftime("%b %d, %Y %H:%M UTC")
+        except Exception:
+            last_pull_str = last_pull
+
+    content = f"""
+    <div class="view-header">
+        <h2 class="view-title">Data Sync Status</h2>
+        <p class="view-subtitle">{'Syncing data from Santiment API...' if is_syncing else 'All data synced' if is_done else phase_desc}</p>
+    </div>
+
+    <div class="sync-phase-banner">
+        <div class="sync-current-phase">
+            <span class="sync-phase-badge {'sync-active' if is_syncing else 'sync-done' if is_done else ''}">{phase_title}</span>
+            <span class="sync-phase-text">{phase_desc}</span>
+        </div>
+    </div>
+
+    <div class="sync-pipeline">
+        {''.join(phase_steps)}
+    </div>
+
+    {done_html}
+
+    {error_html}
+
+    <div class="sync-grid">
+        <div class="sync-card">
+            <div class="sync-card-label">Projects Discovered</div>
+            <div class="sync-card-value">{fmt_num(universe_size)}</div>
+        </div>
+        <div class="sync-card">
+            <div class="sync-card-label">Projects Cached</div>
+            <div class="sync-card-value">{fmt_num(projects_cached)}</div>
+        </div>
+        <div class="sync-card">
+            <div class="sync-card-label">Timeseries Rows</div>
+            <div class="sync-card-value">{fmt_num(ts_rows)}</div>
+        </div>
+        <div class="sync-card">
+            <div class="sync-card-label">OHLCV Rows</div>
+            <div class="sync-card-value">{fmt_num(ohlcv_rows)}</div>
+        </div>
+        <div class="sync-card">
+            <div class="sync-card-label">Data Points Pulled</div>
+            <div class="sync-card-value">{fmt_num(total_data_pts)}</div>
+        </div>
+        <div class="sync-card">
+            <div class="sync-card-label">Database Size</div>
+            <div class="sync-card-value">{db_size_mb:.1f} MB</div>
+        </div>
+    </div>
+
+    <div class="profile-section">
+        <h3 class="section-heading">API Activity</h3>
+        <div class="table-wrap">
+            <table class="data-table compact">
+                <tbody>
+                    <tr><td class="col-name">Total API Requests</td><td class="col-num num-bold">{fmt_num(total_requests)}</td></tr>
+                    <tr><td class="col-name">Successful Pulls</td><td class="col-num num-positive">{fmt_num(success_pulls)}</td></tr>
+                    <tr><td class="col-name">Failed Pulls</td><td class="col-num {'num-negative' if failed_pulls else 'num-neutral'}">{fmt_num(failed_pulls)}</td></tr>
+                    <tr><td class="col-name">Cache Hits</td><td class="col-num">{fmt_num(cache_hits)}</td></tr>
+                    <tr><td class="col-name">API Errors</td><td class="col-num {'num-negative' if errors else 'num-neutral'}">{fmt_num(errors)}</td></tr>
+                    <tr><td class="col-name">Metrics Cataloged</td><td class="col-num">{fmt_num(metrics_cataloged)}</td></tr>
+                    <tr><td class="col-name">Last Updated</td><td class="col-num">{last_pull_str or '&mdash;'}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <p class="sync-hint">This page shows a snapshot. Refresh to see the latest progress.</p>
+    """
+    return page_shell("Sync Status", content, active_nav="sync")

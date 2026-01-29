@@ -360,6 +360,214 @@ a { color: inherit; }
   margin-bottom: 8px;
 }
 
+/* ============================================================
+   SYNC STATUS
+   ============================================================ */
+
+/* Sync banner on market page */
+.sync-banner {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.sync-banner-inner { display: flex; flex-direction: column; gap: 10px; }
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.sync-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: sync-pulse 1.5s infinite;
+}
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.sync-phase { color: var(--gray-500); }
+.sync-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sync-progress-fill {
+  height: 100%;
+  background: var(--black);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.sync-stats-row {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  flex-wrap: wrap;
+}
+.sync-detail-link {
+  color: var(--black);
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: auto;
+}
+.sync-detail-link:hover { text-decoration: underline; }
+
+/* Sync page */
+.sync-phase-banner {
+  margin-bottom: 20px;
+}
+.sync-current-phase {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sync-phase-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+.sync-phase-badge.sync-active {
+  background: var(--amber-bg);
+  color: var(--amber);
+  border: 1px solid var(--amber);
+}
+.sync-phase-badge.sync-done {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+.sync-phase-text {
+  color: var(--gray-600);
+  font-size: 0.9rem;
+}
+
+/* Phase pipeline */
+.sync-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+.sync-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--gray-400);
+  position: relative;
+}
+.sync-step:not(:last-child)::after {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--gray-200);
+  margin-left: 10px;
+}
+.sync-step.done { color: var(--green); }
+.sync-step.done::after { background: var(--green); }
+.sync-step.active { color: var(--amber); }
+.sync-step.active::after { background: var(--gray-200); }
+.sync-step-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  flex-shrink: 0;
+}
+.sync-step.done .sync-step-dot { background: var(--green); }
+.sync-step.active .sync-step-dot {
+  background: var(--amber);
+  animation: sync-pulse 1.5s infinite;
+}
+
+/* Phase cards */
+.sync-phase-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.sync-phase-card.done { border-color: var(--green); background: var(--green-bg); }
+.sync-phase-icon {
+  font-size: 1.2rem;
+  color: var(--green);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sync-phase-desc { color: var(--gray-500); font-size: 0.85rem; }
+
+/* Sync stats grid */
+.sync-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+.sync-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.sync-card-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-500);
+  margin-bottom: 4px;
+}
+.sync-card-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+/* Error/warning */
+.sync-error {
+  background: var(--red-bg);
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  color: var(--red);
+}
+.sync-warning {
+  background: var(--amber-bg);
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  color: var(--amber);
+}
+.sync-hint {
+  font-size: 0.8rem;
+  color: var(--gray-400);
+  margin-top: 24px;
+  text-align: center;
+  font-style: italic;
+}
+
 .profile-hero {
   display: flex;
   justify-content: space-between;
