@@ -34,6 +34,8 @@ from core.ssr_renderer import (
     render_valuation_page,
     render_token_profile,
     render_sync_page,
+    render_compare_page,
+    render_screener_page,
     fmt_usd,
     fmt_pct,
     pct_class,
@@ -270,7 +272,19 @@ def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
     # Apply pagination
     start = (page - 1) * per_page
     end = start + per_page
-    return tokens[start:end], total
+    page_tokens = tokens[start:end]
+
+    # Add 7-day sparkline data for page tokens only (expensive to compute for all)
+    for t in page_tokens:
+        price_data = _san_cache.get_timeseries("price_usd", t["slug"])
+        if price_data and len(price_data) >= 7:
+            t["sparkline_7d"] = price_data[-7:]
+        elif price_data and len(price_data) >= 2:
+            t["sparkline_7d"] = price_data[-len(price_data):]
+        else:
+            t["sparkline_7d"] = []
+
+    return page_tokens, total
 
 
 def _build_all_tokens_for_valuation():
@@ -344,6 +358,127 @@ def _build_profile_metrics(slug: str):
     return metrics_data
 
 
+def _build_gainers_losers(count: int = 10):
+    """Get top gainers and losers by 24h price change."""
+    if not _san_cache:
+        return [], []
+
+    all_projects = _san_cache.get_all_projects()
+    tokens = []
+    for project in all_projects:
+        slug = project.get("slug")
+        if not slug:
+            continue
+        data = _san_cache.get_timeseries("price_usd", slug)
+        if data and len(data) >= 2:
+            latest = data[-1]["value"]
+            prev = data[-2]["value"]
+            if prev and prev != 0 and latest:
+                change = ((latest - prev) / prev) * 100
+                tokens.append({
+                    "slug": slug,
+                    "name": project.get("name", slug),
+                    "ticker": project.get("ticker", ""),
+                    "price_usd": latest,
+                    "price_usd_change": round(change, 2),
+                    "marketcap_usd": project.get("marketcap_usd"),
+                })
+
+    # Filter out extreme outliers (>500% change usually bad data)
+    tokens = [t for t in tokens if abs(t["price_usd_change"]) < 500]
+    tokens.sort(key=lambda x: x["price_usd_change"], reverse=True)
+    gainers = tokens[:count]
+    losers = list(reversed(tokens[-count:]))
+    return gainers, losers
+
+
+def _build_screener_tokens(
+    min_mcap: float = 0,
+    max_mcap: float = float("inf"),
+    min_change: float = -999,
+    max_change: float = 999,
+    sort_by: str = "marketcap_usd",
+    order: str = "desc",
+):
+    """Build token list with filters for the screener."""
+    if not _san_cache:
+        return []
+
+    all_projects = _san_cache.get_all_projects()
+    tokens = []
+    for project in all_projects:
+        slug = project.get("slug")
+        if not slug:
+            continue
+
+        mcap = project.get("marketcap_usd") or 0
+        if mcap < min_mcap or mcap > max_mcap:
+            continue
+
+        token_data = {
+            "slug": slug,
+            "name": project.get("name", slug),
+            "ticker": project.get("ticker", ""),
+            "marketcap_usd": mcap,
+        }
+
+        price_data = _san_cache.get_timeseries("price_usd", slug)
+        if price_data and len(price_data) >= 2:
+            latest = price_data[-1]["value"]
+            prev = price_data[-2]["value"]
+            change = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
+            token_data["price_usd"] = latest
+            token_data["price_usd_change"] = round(change, 2)
+        elif price_data and len(price_data) == 1:
+            token_data["price_usd"] = price_data[-1]["value"]
+            token_data["price_usd_change"] = 0
+        else:
+            continue
+
+        if token_data["price_usd_change"] < min_change or token_data["price_usd_change"] > max_change:
+            continue
+
+        # Get MVRV if available
+        mvrv_data = _san_cache.get_timeseries("mvrv_usd", slug)
+        if mvrv_data:
+            token_data["mvrv_usd"] = mvrv_data[-1]["value"]
+
+        vol_data = _san_cache.get_timeseries("volume_usd", slug)
+        if vol_data:
+            token_data["volume_usd"] = vol_data[-1]["value"]
+
+        # 7-day sparkline
+        if price_data and len(price_data) >= 7:
+            token_data["sparkline_7d"] = price_data[-7:]
+
+        tokens.append(token_data)
+
+    reverse = order == "desc"
+    tokens.sort(key=lambda x: x.get(sort_by) or 0, reverse=reverse)
+    return tokens
+
+
+def _build_comparison_data(slugs: list[str]):
+    """Build comparison data for multiple tokens."""
+    if not _san_cache:
+        return []
+
+    results = []
+    for slug in slugs:
+        project = _san_cache.get_project(slug)
+        if not project:
+            project = {"name": slug.replace("-", " ").title(), "ticker": slug.upper()[:5]}
+
+        metrics = _build_profile_metrics(slug)
+        results.append({
+            "slug": slug,
+            "name": project.get("name", slug),
+            "ticker": project.get("ticker", ""),
+            "metrics": metrics,
+        })
+    return results
+
+
 # ============================================================
 # APP FACTORY
 # ============================================================
@@ -382,6 +517,7 @@ def create_app() -> FastAPI:
     ):
         """Market overview — fully server-rendered with pagination."""
         tokens, total = _build_token_list(page, per_page)
+        gainers, losers = _build_gainers_losers(10)
         status = _san_pull_status.get("status", "unknown")
         last_pull = _san_pull_status.get("last_pull")
         universe_size = _san_pull_status.get("universe_size", 0)
@@ -390,6 +526,7 @@ def create_app() -> FastAPI:
             tokens, status, last_pull,
             page=page, per_page=per_page, total=total,
             universe_size=universe_size, cache_stats=cache_stats,
+            gainers=gainers, losers=losers,
         )
 
     @app.get("/valuation", response_class=HTMLResponse)
@@ -406,6 +543,39 @@ def create_app() -> FastAPI:
         cache_stats = _san_cache.get_pull_stats() if _san_cache else {}
         client_stats = _san_client.stats if _san_client else {}
         return render_sync_page(_san_pull_status, cache_stats, client_stats)
+
+    @app.get("/compare", response_class=HTMLResponse)
+    async def get_compare_page(
+        tokens: str = Query(default="bitcoin,ethereum,solana", description="Comma-separated slugs"),
+    ):
+        """Side-by-side token comparison with charts."""
+        slug_list = [s.strip() for s in tokens.split(",") if s.strip()][:5]
+        comparison_data = _build_comparison_data(slug_list)
+        return render_compare_page(comparison_data)
+
+    @app.get("/screener", response_class=HTMLResponse)
+    async def get_screener_page(
+        tier: str = Query(default="all", description="Market cap tier: mega, large, mid, small, micro, all"),
+        min_change: float = Query(default=-999),
+        max_change: float = Query(default=999),
+        sort: str = Query(default="marketcap_usd"),
+        order: str = Query(default="desc"),
+    ):
+        """Token screener with filters."""
+        tier_ranges = {
+            "mega": (100e9, float("inf")),
+            "large": (10e9, 100e9),
+            "mid": (1e9, 10e9),
+            "small": (100e6, 1e9),
+            "micro": (0, 100e6),
+            "all": (0, float("inf")),
+        }
+        min_mcap, max_mcap = tier_ranges.get(tier, (0, float("inf")))
+        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order)
+        return render_screener_page(
+            tokens, tier=tier, min_change=min_change, max_change=max_change,
+            sort_by=sort, order=order,
+        )
 
     @app.get("/token/{slug}", response_class=HTMLResponse)
     async def get_token_page(slug: str):

@@ -9,6 +9,8 @@ import html as html_mod
 from datetime import datetime, timezone
 from typing import Optional
 
+from .svg_charts import sparkline_svg, line_chart_svg, chart_panel, comparison_table
+
 
 # ============================================================
 # FORMATTING HELPERS
@@ -209,6 +211,8 @@ def page_shell(title: str, content: str, active_nav: str = "") -> str:
         </div>
         <nav class="header-nav">
             <a href="/" class="{nav_cls('market')}">Market</a>
+            <a href="/screener" class="{nav_cls('screener')}">Screener</a>
+            <a href="/compare" class="{nav_cls('compare')}">Compare</a>
             <a href="/valuation" class="{nav_cls('valuation')}">Valuation</a>
             <a href="/sync" class="{nav_cls('sync')}">Sync</a>
         </nav>
@@ -235,6 +239,7 @@ def render_market_page(
     tokens: list, pull_status: str, last_pull: str = None,
     page: int = 1, per_page: int = 100, total: int = 0,
     universe_size: int = 0, cache_stats: dict = None,
+    gainers: list = None, losers: list = None,
 ) -> str:
     """Render the full market overview page with pagination."""
     # Summary stats
@@ -280,21 +285,24 @@ def render_market_page(
         else:
             zone_html = "&mdash;"
 
+        # 7-day sparkline
+        spark_data = t.get("sparkline_7d", [])
+        spark_html = sparkline_svg(spark_data, width=80, height=24) if spark_data else "&mdash;"
+
         rows.append(f"""<tr>
             <td class="col-rank">{rank}</td>
             <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{html_mod.escape(t.get('name', slug))}</strong> <span class="ticker">{html_mod.escape(t.get('ticker', ''))}</span></a></td>
             <td class="col-num num-bold">{fmt_usd(t.get('price_usd'))}</td>
             <td class="col-num {pct_class(pct)}">{fmt_pct(pct)}</td>
+            <td class="col-spark hide-mobile">{spark_html}</td>
             <td class="col-num">{fmt_usd(t.get('marketcap_usd'))}</td>
             <td class="col-num">{fmt_usd(t.get('volume_usd'))}</td>
-            <td class="col-num">{f'{mvrv:.2f}' if mvrv is not None else '&mdash;'}</td>
+            <td class="col-num hide-mobile">{f'{mvrv:.2f}' if mvrv is not None else '&mdash;'}</td>
             <td class="col-tag hide-mobile">{zone_html}</td>
             <td class="col-num hide-mobile">{fmt_num(daa)}</td>
-            <td class="col-num hide-mobile">{f'{dev:.0f}' if dev is not None else '&mdash;'}</td>
-            <td class="col-num hide-mobile">{fmt_num(nw_growth)}</td>
         </tr>""")
 
-    table_body = "\n".join(rows) if rows else '<tr><td colspan="11" class="empty-cell">Data is being pulled. Refresh in a few minutes...</td></tr>'
+    table_body = "\n".join(rows) if rows else '<tr><td colspan="10" class="empty-cell">Data is being pulled. Refresh in a few minutes...</td></tr>'
 
     # Pagination controls
     pagination_html = ""
@@ -403,6 +411,8 @@ def render_market_page(
         </div>
     </div>
 
+    {_render_gainers_losers(gainers or [], losers or [])}
+
     <div class="page-info">{showing_info} of {total}</div>
 
     <div class="table-wrap">
@@ -413,13 +423,12 @@ def render_market_page(
                     <th class="col-name">Name</th>
                     <th class="col-num">Price</th>
                     <th class="col-num">24h</th>
+                    <th class="col-spark hide-mobile">7d</th>
                     <th class="col-num">Market Cap</th>
                     <th class="col-num">Volume</th>
-                    <th class="col-num">MVRV</th>
+                    <th class="col-num hide-mobile">MVRV</th>
                     <th class="col-tag hide-mobile">Zone</th>
                     <th class="col-num hide-mobile">Active Addr</th>
-                    <th class="col-num hide-mobile">Dev</th>
-                    <th class="col-num hide-mobile">Net Growth</th>
                 </tr>
             </thead>
             <tbody>
@@ -789,56 +798,101 @@ def render_token_profile(project: dict, metrics: dict, slug: str) -> str:
         </div>"""
 
     # ============================================================
-    # HISTORICAL PRICE TABLE (last 30 days)
+    # CHARTS SECTION — Visual line charts for key metrics
     # ============================================================
-    price_history_html = ""
-    if price_data and len(price_data) > 1:
-        # Take last 30 entries
-        recent = price_data[-30:]
-        vol_data = metrics.get("volume_usd", {}).get("data", [])
-        mcap_data = metrics.get("marketcap_usd", {}).get("data", [])
+    charts_html = ""
 
-        # Index volume and mcap by date
-        vol_by_date = {d["datetime"][:10]: d["value"] for d in vol_data} if vol_data else {}
-        mcap_by_date = {d["datetime"][:10]: d["value"] for d in mcap_data} if mcap_data else {}
+    # Price chart (full history)
+    price_chart = ""
+    if price_data and len(price_data) > 5:
+        price_chart = line_chart_svg(
+            [{"label": "Price (USD)", "data": price_data, "color": "#000000"}],
+            title=f"{name} Price History ({len(price_data)} days)",
+            metric_key="price_usd",
+            height=320,
+        )
 
-        hist_rows = []
-        for i, entry in enumerate(reversed(recent)):
-            dt = entry.get("datetime", "")
-            val = entry.get("value")
-            date_key = dt[:10]
-            vol = vol_by_date.get(date_key)
-            mcap = mcap_by_date.get(date_key)
+    # Volume chart
+    vol_data_full = metrics.get("volume_usd", {}).get("data", [])
+    vol_chart = ""
+    if vol_data_full and len(vol_data_full) > 5:
+        vol_chart = line_chart_svg(
+            [{"label": "Volume (USD)", "data": vol_data_full, "color": "#2563EB"}],
+            title="Daily Volume",
+            metric_key="volume_usd",
+            height=220,
+        )
 
-            day_change = None
-            if i < len(recent) - 1:
-                prev_val = recent[len(recent) - 2 - i].get("value")
-                if prev_val and prev_val != 0 and val:
-                    day_change = ((val - prev_val) / prev_val) * 100
+    # Market cap chart
+    mcap_data_full = metrics.get("marketcap_usd", {}).get("data", [])
+    mcap_chart = ""
+    if mcap_data_full and len(mcap_data_full) > 5:
+        mcap_chart = line_chart_svg(
+            [{"label": "Market Cap", "data": mcap_data_full, "color": "#7C3AED"}],
+            title="Market Cap",
+            metric_key="marketcap_usd",
+            height=220,
+        )
 
-            hist_rows.append(f"""<tr>
-                <td class="col-name">{fmt_date_short(dt)}</td>
-                <td class="col-num num-bold">{fmt_usd(val)}</td>
-                <td class="col-num {pct_class(day_change)}">{fmt_pct(day_change)}</td>
-                <td class="col-num">{fmt_usd(vol)}</td>
-                <td class="col-num hide-mobile">{fmt_usd(mcap)}</td>
-            </tr>""")
+    # MVRV chart
+    mvrv_data = metrics.get("mvrv_usd", {}).get("data", [])
+    mvrv_chart = ""
+    if mvrv_data and len(mvrv_data) > 5:
+        mvrv_chart = line_chart_svg(
+            [{"label": "MVRV Ratio", "data": mvrv_data, "color": "#D97706"}],
+            title="MVRV Ratio History",
+            metric_key="mvrv_usd",
+            height=220,
+        )
 
-        price_history_html = f"""
+    # Active addresses chart
+    daa_data = metrics.get("daily_active_addresses", {}).get("data", [])
+    daa_chart = ""
+    if daa_data and len(daa_data) > 5:
+        daa_chart = line_chart_svg(
+            [{"label": "Active Addresses", "data": daa_data, "color": "#16A34A"}],
+            title="Daily Active Addresses",
+            metric_key="daily_active_addresses",
+            height=220,
+        )
+
+    # Exchange balance chart
+    exch_data = metrics.get("exchange_balance", {}).get("data", [])
+    exch_chart = ""
+    if exch_data and len(exch_data) > 5:
+        exch_chart = line_chart_svg(
+            [{"label": "Exchange Balance", "data": exch_data, "color": "#DC2626"}],
+            title="Exchange Balance",
+            metric_key="exchange_balance",
+            height=220,
+        )
+
+    # Dev activity chart
+    dev_data_full = metrics.get("dev_activity", {}).get("data", [])
+    dev_chart = ""
+    if dev_data_full and len(dev_data_full) > 5:
+        dev_chart = line_chart_svg(
+            [{"label": "Dev Activity", "data": dev_data_full, "color": "#0891B2"}],
+            title="Development Activity",
+            metric_key="dev_activity",
+            height=220,
+        )
+
+    # Assemble charts
+    if price_chart:
+        charts_html += f"""
         <div class="profile-section">
-            <h3 class="section-heading">Price History (Last 30 Days)</h3>
-            <div class="table-wrap">
-                <table class="data-table compact">
-                    <thead><tr>
-                        <th class="col-name">Date</th>
-                        <th class="col-num">Price</th>
-                        <th class="col-num">Change</th>
-                        <th class="col-num">Volume</th>
-                        <th class="col-num hide-mobile">Market Cap</th>
-                    </tr></thead>
-                    <tbody>{''.join(hist_rows)}</tbody>
-                </table>
-            </div>
+            <h3 class="section-heading">Price Chart</h3>
+            <div class="chart-container">{price_chart}</div>
+        </div>"""
+
+    # Secondary charts in 2-column grid
+    secondary_charts = [c for c in [vol_chart, mcap_chart, mvrv_chart, daa_chart, exch_chart, dev_chart] if c]
+    if secondary_charts:
+        charts_html += f"""
+        <div class="profile-section">
+            <h3 class="section-heading">Key Metrics Charts</h3>
+            {chart_panel(secondary_charts, columns=2)}
         </div>"""
 
     # ============================================================
@@ -900,11 +954,11 @@ def render_token_profile(project: dict, metrics: dict, slug: str) -> str:
         {cards_html}
     </div>
 
+    {charts_html}
     {valuation_html}
     {onchain_html}
     {social_html}
     {dev_html}
-    {price_history_html}
     {all_metrics_html}
     """
     return page_shell(f"{name} ({ticker})", content)
@@ -940,6 +994,295 @@ def _build_metric_rows(metrics: dict, metric_list: list) -> list:
             <td class="col-num hide-mobile">{count}</td>
         </tr>""")
     return rows
+
+
+# ============================================================
+# GAINERS / LOSERS HELPER
+# ============================================================
+
+def _render_gainers_losers(gainers: list, losers: list) -> str:
+    """Render the gainers/losers section for the market page."""
+    if not gainers and not losers:
+        return ""
+
+    def _mover_card(token, idx):
+        slug = token.get("slug", "")
+        name = html_mod.escape(token.get("name", slug)[:20])
+        ticker = html_mod.escape(token.get("ticker", ""))
+        price = fmt_usd(token.get("price_usd"))
+        pct = token.get("price_usd_change", 0)
+        cls = pct_class(pct)
+        return (
+            f'<a href="/token/{slug}" class="mover-card">'
+            f'<span class="mover-rank">{idx+1}</span>'
+            f'<span class="mover-name"><strong>{name}</strong> <span class="ticker">{ticker}</span></span>'
+            f'<span class="mover-price">{price}</span>'
+            f'<span class="mover-change {cls}">{fmt_pct(pct)}</span>'
+            f'</a>'
+        )
+
+    gainer_cards = "".join(_mover_card(t, i) for i, t in enumerate(gainers[:5]))
+    loser_cards = "".join(_mover_card(t, i) for i, t in enumerate(losers[:5]))
+
+    return f"""
+    <div class="movers-section">
+        <div class="movers-col">
+            <h4 class="movers-title movers-up">Top Gainers (24h)</h4>
+            <div class="movers-list">{gainer_cards}</div>
+        </div>
+        <div class="movers-col">
+            <h4 class="movers-title movers-down">Top Losers (24h)</h4>
+            <div class="movers-list">{loser_cards}</div>
+        </div>
+    </div>"""
+
+
+# ============================================================
+# COMPARISON PAGE
+# ============================================================
+
+def render_compare_page(tokens: list) -> str:
+    """Render side-by-side token comparison with charts."""
+    if not tokens:
+        return page_shell("Compare", '<p>No tokens selected. Use ?tokens=bitcoin,ethereum</p>', active_nav="")
+
+    names = [t.get("name", t.get("slug")) for t in tokens]
+    title = " vs ".join(names)
+
+    # Comparison metric rows
+    compare_metrics = [
+        ("price_usd", "Price"),
+        ("marketcap_usd", "Market Cap"),
+        ("volume_usd", "Volume (24h)"),
+        ("mvrv_usd", "MVRV Ratio"),
+        ("nvt", "NVT Ratio"),
+        ("daily_active_addresses", "Active Addresses"),
+        ("transaction_volume", "Tx Volume"),
+        ("dev_activity", "Dev Activity"),
+        ("exchange_balance", "Exchange Balance"),
+        ("network_growth", "Network Growth"),
+        ("circulation", "Circulation"),
+        ("velocity", "Token Velocity"),
+    ]
+
+    comp_table = comparison_table(tokens, compare_metrics)
+
+    # Overlay charts — price, volume, active addresses
+    overlay_charts = []
+
+    # Price overlay
+    price_series = []
+    for i, t in enumerate(tokens):
+        data = t.get("metrics", {}).get("price_usd", {}).get("data", [])
+        if data:
+            price_series.append({
+                "label": t.get("name", t.get("slug")),
+                "data": data,
+            })
+    if len(price_series) >= 2:
+        overlay_charts.append(line_chart_svg(
+            price_series, title="Price Comparison", metric_key="price_usd",
+            show_area=False, height=300,
+        ))
+
+    # MVRV overlay
+    mvrv_series = []
+    for i, t in enumerate(tokens):
+        data = t.get("metrics", {}).get("mvrv_usd", {}).get("data", [])
+        if data:
+            mvrv_series.append({
+                "label": t.get("name", t.get("slug")),
+                "data": data,
+            })
+    if len(mvrv_series) >= 2:
+        overlay_charts.append(line_chart_svg(
+            mvrv_series, title="MVRV Ratio Comparison", metric_key="mvrv_usd",
+            show_area=False, height=280,
+        ))
+
+    # Active addresses overlay
+    daa_series = []
+    for i, t in enumerate(tokens):
+        data = t.get("metrics", {}).get("daily_active_addresses", {}).get("data", [])
+        if data:
+            daa_series.append({
+                "label": t.get("name", t.get("slug")),
+                "data": data,
+            })
+    if len(daa_series) >= 2:
+        overlay_charts.append(line_chart_svg(
+            daa_series, title="Active Addresses Comparison",
+            metric_key="daily_active_addresses",
+            show_area=False, height=280,
+        ))
+
+    # Volume overlay
+    vol_series = []
+    for i, t in enumerate(tokens):
+        data = t.get("metrics", {}).get("volume_usd", {}).get("data", [])
+        if data:
+            vol_series.append({
+                "label": t.get("name", t.get("slug")),
+                "data": data,
+            })
+    if len(vol_series) >= 2:
+        overlay_charts.append(line_chart_svg(
+            vol_series, title="Volume Comparison", metric_key="volume_usd",
+            show_area=False, height=280,
+        ))
+
+    charts_html = ""
+    if overlay_charts:
+        charts_section = "".join(f'<div class="chart-container">{c}</div>' for c in overlay_charts)
+        charts_html = f'<div class="profile-section"><h3 class="section-heading">Overlay Charts</h3>{charts_section}</div>'
+
+    # Slug links for quick compare
+    slug_str = ",".join(t.get("slug", "") for t in tokens)
+    quick_links = """
+    <div class="compare-quick">
+        <span class="compare-quick-label">Quick compare:</span>
+        <a href="/compare?tokens=bitcoin,ethereum" class="compare-link">BTC vs ETH</a>
+        <a href="/compare?tokens=bitcoin,ethereum,solana" class="compare-link">BTC vs ETH vs SOL</a>
+        <a href="/compare?tokens=cardano,polkadot,solana" class="compare-link">ADA vs DOT vs SOL</a>
+        <a href="/compare?tokens=uniswap,aave,maker" class="compare-link">UNI vs AAVE vs MKR</a>
+    </div>"""
+
+    content = f"""
+    <a href="/" class="back-link">&larr; Back to Market</a>
+
+    <div class="view-header">
+        <h2 class="view-title">{html_mod.escape(title)}</h2>
+        <p class="view-subtitle">Side-by-side comparison of {len(tokens)} tokens</p>
+    </div>
+
+    {quick_links}
+
+    <div class="profile-section">
+        <h3 class="section-heading">Metrics Comparison</h3>
+        {comp_table}
+    </div>
+
+    {charts_html}
+    """
+    return page_shell("Compare", content)
+
+
+# ============================================================
+# SCREENER PAGE
+# ============================================================
+
+TIER_LABELS = {
+    "all": "All Market Caps",
+    "mega": "Mega Cap ($100B+)",
+    "large": "Large Cap ($10B–$100B)",
+    "mid": "Mid Cap ($1B–$10B)",
+    "small": "Small Cap ($100M–$1B)",
+    "micro": "Micro Cap (<$100M)",
+}
+
+
+def render_screener_page(
+    tokens: list, tier: str = "all",
+    min_change: float = -999, max_change: float = 999,
+    sort_by: str = "marketcap_usd", order: str = "desc",
+) -> str:
+    """Render the screener page with filterable token list."""
+
+    tier_label = TIER_LABELS.get(tier, tier)
+
+    # Filter buttons
+    def tier_cls(t):
+        return "filter-btn active" if t == tier else "filter-btn"
+
+    tier_buttons = "".join(
+        f'<a href="/screener?tier={t}&sort={sort_by}&order={order}" class="{tier_cls(t)}">{l}</a>'
+        for t, l in [("all", "All"), ("mega", "Mega"), ("large", "Large"),
+                     ("mid", "Mid"), ("small", "Small"), ("micro", "Micro")]
+    )
+
+    # Change filter links
+    change_links = ""
+    if min_change != -999 or max_change != 999:
+        change_links = f'<a href="/screener?tier={tier}&sort={sort_by}&order={order}" class="filter-btn">Clear change filter</a>'
+
+    change_presets = (
+        f'<a href="/screener?tier={tier}&min_change=5&sort=price_usd_change&order=desc" class="filter-btn">Gainers &gt;5%</a>'
+        f'<a href="/screener?tier={tier}&max_change=-5&sort=price_usd_change&order=asc" class="filter-btn">Losers &lt;-5%</a>'
+        f'<a href="/screener?tier={tier}&min_change=-2&max_change=2&sort={sort_by}&order={order}" class="filter-btn">Stable (&plusmn;2%)</a>'
+    )
+
+    # Sort toggle
+    def sort_link(col, label):
+        new_order = "asc" if sort_by == col and order == "desc" else "desc"
+        arrow = " &darr;" if sort_by == col and order == "desc" else (" &uarr;" if sort_by == col else "")
+        return f'<a href="/screener?tier={tier}&min_change={min_change}&max_change={max_change}&sort={col}&order={new_order}" class="sort-link">{label}{arrow}</a>'
+
+    # Table rows
+    rows = []
+    for i, t in enumerate(tokens[:200]):  # Cap at 200 for performance
+        slug = t.get("slug", "")
+        pct = t.get("price_usd_change", 0)
+        mvrv = t.get("mvrv_usd")
+        spark_data = t.get("sparkline_7d", [])
+        spark_html = sparkline_svg(spark_data, width=70, height=20) if spark_data else ""
+
+        rows.append(f"""<tr>
+            <td class="col-rank">{i+1}</td>
+            <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{html_mod.escape(t.get('name', slug)[:30])}</strong> <span class="ticker">{html_mod.escape(t.get('ticker', ''))}</span></a></td>
+            <td class="col-num num-bold">{fmt_usd(t.get('price_usd'))}</td>
+            <td class="col-num {pct_class(pct)}">{fmt_pct(pct)}</td>
+            <td class="col-spark hide-mobile">{spark_html}</td>
+            <td class="col-num">{fmt_usd(t.get('marketcap_usd'))}</td>
+            <td class="col-num hide-mobile">{fmt_usd(t.get('volume_usd'))}</td>
+            <td class="col-num hide-mobile">{f'{mvrv:.2f}' if mvrv is not None else '&mdash;'}</td>
+        </tr>""")
+
+    table_body = "\n".join(rows) if rows else '<tr><td colspan="8" class="empty-cell">No tokens match these filters.</td></tr>'
+
+    # Tier distribution summary
+    tier_summary = f"{len(tokens)} tokens"
+    if tier != "all":
+        tier_summary += f" in {tier_label}"
+
+    content = f"""
+    <div class="view-header">
+        <h2 class="view-title">Token Screener</h2>
+        <p class="view-subtitle">{tier_summary}</p>
+    </div>
+
+    <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">Market Cap:</span>
+            {tier_buttons}
+        </div>
+        <div class="filter-group">
+            <span class="filter-label">24h Change:</span>
+            {change_presets}
+            {change_links}
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="col-rank">#</th>
+                    <th class="col-name">{sort_link('name', 'Name')}</th>
+                    <th class="col-num">{sort_link('price_usd', 'Price')}</th>
+                    <th class="col-num">{sort_link('price_usd_change', '24h')}</th>
+                    <th class="col-spark hide-mobile">7d</th>
+                    <th class="col-num">{sort_link('marketcap_usd', 'Market Cap')}</th>
+                    <th class="col-num hide-mobile">{sort_link('volume_usd', 'Volume')}</th>
+                    <th class="col-num hide-mobile">MVRV</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_body}
+            </tbody>
+        </table>
+    </div>
+    """
+    return page_shell("Screener", content, active_nav="screener")
 
 
 # ============================================================
