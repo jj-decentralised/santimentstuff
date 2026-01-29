@@ -197,7 +197,7 @@ async function loadMarket() {
   } catch (e) {
     console.error('Market load error:', e);
     document.getElementById('marketBody').innerHTML =
-      '<tr><td colspan="10" class="empty-cell">Error loading data. Retrying...</td></tr>';
+      `<tr><td colspan="10" class="empty-cell">Error: ${e.message}</td></tr>`;
   }
 }
 
@@ -377,166 +377,195 @@ function renderValuationBars(metrics) {
 // ============================================================
 // CHART HELPERS
 // ============================================================
-const chartDefaults = {
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: { duration: 300 },
-  interaction: { intersect: false, mode: 'index' },
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: '#000',
-      titleColor: '#fff',
-      bodyColor: '#fff',
-      cornerRadius: 4,
-      padding: 10,
-      titleFont: { weight: 700, size: 12 },
-      bodyFont: { size: 12 },
+function getChartDefaults() {
+  // Detect if time scale adapter is available
+  const hasTimeAdapter = typeof luxon !== 'undefined';
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 300 },
+    interaction: { intersect: false, mode: 'index' },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#000',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        cornerRadius: 4,
+        padding: 10,
+        titleFont: { weight: 700, size: 12 },
+        bodyFont: { size: 12 },
+      },
     },
-  },
-  scales: {
-    x: {
-      type: 'time',
-      grid: { display: false },
-      ticks: { font: { size: 11, weight: 500 }, color: '#737373', maxTicksLimit: 8 },
-      border: { display: false },
+    scales: {
+      x: {
+        type: hasTimeAdapter ? 'time' : 'category',
+        grid: { display: false },
+        ticks: {
+          font: { size: 11, weight: 500 },
+          color: '#737373',
+          maxTicksLimit: 8,
+          maxRotation: 0,
+        },
+        border: { display: false },
+      },
+      y: {
+        grid: { color: '#F5F5F5' },
+        ticks: { font: { size: 11, weight: 500 }, color: '#737373', maxTicksLimit: 6 },
+        border: { display: false },
+      },
     },
-    y: {
-      grid: { color: '#F5F5F5' },
-      ticks: { font: { size: 11, weight: 500 }, color: '#737373', maxTicksLimit: 6 },
-      border: { display: false },
-    },
-  },
-};
+  };
+}
 
 function destroyChart(id) {
-  if (state.charts[id]) {
-    state.charts[id].destroy();
-    delete state.charts[id];
-  }
+  try {
+    if (state.charts[id]) {
+      state.charts[id].destroy();
+      delete state.charts[id];
+    }
+  } catch (e) { /* ignore */ }
 }
 
 function filterByDays(data, days) {
-  if (!data || !days) return data;
+  if (!data || !days) return data || [];
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   return data.filter(d => new Date(d.datetime) >= cutoff);
 }
 
-function renderPriceChart(data, days) {
-  if (!data) return;
-  const filtered = filterByDays(data, days);
-  destroyChart('priceChart');
+function formatDateLabel(dt) {
+  try {
+    const d = new Date(dt);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch (e) { return dt; }
+}
 
-  const ctx = document.getElementById('priceChart').getContext('2d');
-  state.charts.priceChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: filtered.map(d => d.datetime),
-      datasets: [{
-        data: filtered.map(d => d.value),
-        borderColor: '#000',
-        backgroundColor: 'rgba(0,0,0,0.04)',
-        borderWidth: 1.5,
-        fill: true,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHoverBackgroundColor: '#000',
-        tension: 0.1,
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      scales: {
-        ...chartDefaults.scales,
-        y: {
-          ...chartDefaults.scales.y,
-          ticks: {
-            ...chartDefaults.scales.y.ticks,
-            callback: v => fmt.usd(v),
+function renderPriceChart(data, days) {
+  if (!data || !data.length) return;
+  try {
+    const filtered = filterByDays(data, days);
+    destroyChart('priceChart');
+    const defaults = getChartDefaults();
+
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    state.charts.priceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: filtered.map(d => defaults.scales.x.type === 'time' ? d.datetime : formatDateLabel(d.datetime)),
+        datasets: [{
+          data: filtered.map(d => d.value),
+          borderColor: '#000',
+          backgroundColor: 'rgba(0,0,0,0.04)',
+          borderWidth: 1.5,
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: '#000',
+          tension: 0.1,
+        }],
+      },
+      options: {
+        ...defaults,
+        scales: {
+          ...defaults.scales,
+          y: {
+            ...defaults.scales.y,
+            ticks: { ...defaults.scales.y.ticks, callback: v => fmt.usd(v) },
           },
         },
       },
-    },
-  });
+    });
+  } catch (e) {
+    console.error('Price chart error:', e);
+  }
 }
 
 function renderMetricChart(canvasId, data, label) {
-  if (!data) return;
-  const filtered = filterByDays(data, 365);
-  destroyChart(canvasId);
+  if (!data || !data.length) return;
+  try {
+    const filtered = filterByDays(data, 365);
+    destroyChart(canvasId);
+    const defaults = getChartDefaults();
 
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  state.charts[canvasId] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: filtered.map(d => d.datetime),
-      datasets: [{
-        data: filtered.map(d => d.value),
-        borderColor: '#000',
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        borderWidth: 1.2,
-        fill: true,
-        pointRadius: 0,
-        tension: 0.2,
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      scales: {
-        ...chartDefaults.scales,
-        y: {
-          ...chartDefaults.scales.y,
-          ticks: {
-            ...chartDefaults.scales.y.ticks,
-            callback: v => fmt.num(v),
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    state.charts[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: filtered.map(d => defaults.scales.x.type === 'time' ? d.datetime : formatDateLabel(d.datetime)),
+        datasets: [{
+          data: filtered.map(d => d.value),
+          borderColor: '#000',
+          backgroundColor: 'rgba(0,0,0,0.03)',
+          borderWidth: 1.2,
+          fill: true,
+          pointRadius: 0,
+          tension: 0.2,
+        }],
+      },
+      options: {
+        ...defaults,
+        scales: {
+          ...defaults.scales,
+          y: {
+            ...defaults.scales.y,
+            ticks: { ...defaults.scales.y.ticks, callback: v => fmt.num(v) },
           },
         },
       },
-    },
-  });
+    });
+  } catch (e) {
+    console.error('Metric chart error:', e);
+  }
 }
 
 // ============================================================
 // INIT
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-  // Nav links
-  document.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', e => {
+  console.log('[Dashboard] Initializing...');
+
+  try {
+    // Nav links
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        const view = link.dataset.view;
+        showView(view);
+        if (view === 'market') loadMarket();
+        if (view === 'valuation') loadValuation();
+      });
+    });
+
+    // Logo goes to market
+    document.getElementById('logoLink').addEventListener('click', e => {
       e.preventDefault();
-      const view = link.dataset.view;
-      showView(view);
-      if (view === 'market') loadMarket();
-      if (view === 'valuation') loadValuation();
+      showView('market');
+      loadMarket();
     });
-  });
 
-  // Logo goes to market
-  document.getElementById('logoLink').addEventListener('click', e => {
-    e.preventDefault();
-    showView('market');
-    loadMarket();
-  });
-
-  // Back button
-  document.getElementById('backBtn').addEventListener('click', () => {
-    showView('market');
-  });
-
-  // Chart range buttons
-  document.querySelectorAll('.range-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.priceRange = parseInt(btn.dataset.days);
-      if (state.profileData?.metrics?.price_usd?.data) {
-        renderPriceChart(state.profileData.metrics.price_usd.data, state.priceRange);
-      }
+    // Back button
+    document.getElementById('backBtn').addEventListener('click', () => {
+      showView('market');
     });
-  });
+
+    // Chart range buttons
+    document.querySelectorAll('.range-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.priceRange = parseInt(btn.dataset.days);
+        if (state.profileData && state.profileData.metrics && state.profileData.metrics.price_usd) {
+          renderPriceChart(state.profileData.metrics.price_usd.data, state.priceRange);
+        }
+      });
+    });
+  } catch (e) {
+    console.error('[Dashboard] Init error:', e);
+  }
 
   // Initial load
+  console.log('[Dashboard] Loading market data...');
   loadMarket();
 
   // Auto refresh every 5 minutes
