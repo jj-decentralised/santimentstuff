@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class SantimentRateLimiter:
-    """Rate limiter respecting Santiment Pro limits: 600/min, 30K/hour."""
+    """Rate limiter for Santiment API. Conservative to avoid 429s."""
 
-    def __init__(self, requests_per_minute: int = 180):
+    def __init__(self, requests_per_minute: int = 60):
         self._rpm = requests_per_minute
         self._interval = 60.0 / requests_per_minute
         self._last_request = 0.0
@@ -67,7 +67,7 @@ class SantimentClient:
         self,
         api_key: Optional[str] = None,
         cache: Optional[CacheManager] = None,
-        requests_per_minute: int = 180,
+        requests_per_minute: int = 60,
     ):
         self._api_key = api_key or os.environ.get("SANTIMENT_API_KEY")
         if not self._api_key:
@@ -103,13 +103,23 @@ class SantimentClient:
     def stats(self) -> dict:
         return dict(self._stats)
 
+    @staticmethod
+    def _parse_retry_seconds(response_text: str) -> int:
+        """Extract retry wait time from Santiment 429 response body."""
+        import re
+        # Look for patterns like "Try again in 24 seconds"
+        match = re.search(r'Try again in (\d+) seconds?', response_text)
+        if match:
+            return int(match.group(1))
+        return 30  # Default: wait 30s if we can't parse
+
     async def _execute_graphql(
         self,
         query: str,
         variables: Optional[dict] = None,
         cache_key: Optional[str] = None,
         cache_ttl: Optional[int] = None,
-        retries: int = 3,
+        retries: int = 5,
     ) -> dict:
         """Execute a GraphQL query with caching, rate limiting, and retries."""
         # Check cache
@@ -144,8 +154,11 @@ class SantimentClient:
                     self._stats["last_error"] = f"HTTP {response.status_code}: {body_preview[:200]}"
 
                 if response.status_code == 429:
-                    wait = 2 ** (attempt + 1)
-                    logger.warning(f"Rate limited (429). Waiting {wait}s...")
+                    # Parse the actual wait time from the response
+                    wait = self._parse_retry_seconds(response.text)
+                    # Add buffer and increase on each attempt
+                    wait = wait + (attempt * 10)
+                    logger.warning(f"Rate limited (429). Waiting {wait}s (attempt {attempt+1}/{retries})...")
                     self._stats["errors"] += 1
                     self._stats["retries"] += 1
                     await asyncio.sleep(wait)
@@ -196,7 +209,7 @@ class SantimentClient:
                 await asyncio.sleep(wait)
                 continue
 
-        error_msg = f"All retries exhausted. Last error: {last_error}"
+        error_msg = f"All retries exhausted after {retries} attempts. Last error: {last_error}"
         self._stats["last_error"] = str(error_msg)[:300]
         raise RuntimeError(error_msg)
 
