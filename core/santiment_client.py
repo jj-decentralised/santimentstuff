@@ -86,7 +86,7 @@ class SantimentClient:
 
     async def __aenter__(self) -> "SantimentClient":
         self._client = httpx.AsyncClient(
-            timeout=60.0,
+            timeout=httpx.Timeout(120.0, connect=30.0),
             headers={
                 "Authorization": f"Apikey {self._api_key}",
                 "Content-Type": "application/json",
@@ -306,7 +306,17 @@ class SantimentClient:
         cache_key = self._cache.make_key("san:ts", metric, slug, from_date, to_date, interval)
         result = await self._execute_graphql(query, cache_key=cache_key, cache_ttl=CacheManager.TTL_LONG)
 
-        data = result.get("getMetric", {}).get("timeseriesData", [])
+        # Handle GraphQL-level errors (metric not available for slug, etc.)
+        if "errors" in result:
+            error_msg = result["errors"][0].get("message", "Unknown error")
+            logger.warning(f"GraphQL error for {metric}/{slug}: {error_msg}")
+            return []
+
+        get_metric = result.get("getMetric")
+        if get_metric is None:
+            return []
+
+        data = get_metric.get("timeseriesData", [])
         if data:
             self._stats["total_data_points"] += len(data)
         return data or []
@@ -448,6 +458,12 @@ class SantimentClient:
 
         cache_key = self._cache.make_key("san:ohlcv", slug, from_date, to_date, interval)
         result = await self._execute_graphql(query, cache_key=cache_key, cache_ttl=CacheManager.TTL_LONG)
+
+        if "errors" in result:
+            error_msg = result["errors"][0].get("message", "Unknown error")
+            logger.warning(f"GraphQL error for OHLCV/{slug}: {error_msg}")
+            return []
+
         data = result.get("ohlcv", [])
         self._stats["total_data_points"] += len(data) if data else 0
         return data or []

@@ -237,19 +237,30 @@ class SantimentDataPuller:
         return slug_counts
 
     async def run_full_discovery(self) -> dict:
-        """Run complete API discovery."""
+        """Run complete API discovery. Each step is resilient — failures are logged but don't crash."""
         logger.info("=" * 60)
         logger.info("STARTING FULL API DISCOVERY")
         logger.info("=" * 60)
         start = time.time()
 
-        # Step 1: Get all metrics
-        all_metrics = await self.discover_all_metrics()
+        # Step 1: Get all metrics (optional — we have hardcoded lists as fallback)
+        all_metrics = []
+        try:
+            all_metrics = await self.discover_all_metrics()
+        except Exception as e:
+            logger.error(f"DISCOVERY: Failed to get metrics list (non-fatal): {e}")
+            # Use our hardcoded lists as fallback
+            all_metrics = list(ALL_PROFILE_METRICS)
 
-        # Step 2: Get all projects
-        await self.discover_all_projects()
+        # Step 2: Get all projects (optional — validates slugs but not required)
+        try:
+            await self.discover_all_projects()
+        except Exception as e:
+            logger.error(f"DISCOVERY: Failed to get projects list (non-fatal): {e}")
+            # Without project validation, we'll use TOP_TOKENS as-is
+            self._valid_slugs = set(TOP_TOKENS)
 
-        # Step 3: Get metadata for our target metrics
+        # Step 3: Get metadata (optional — nice for catalog but not required for pulling)
         target_metrics = [m for m in ALL_PROFILE_METRICS if m in all_metrics]
         missing = [m for m in ALL_PROFILE_METRICS if m not in all_metrics]
         if missing:
@@ -257,16 +268,47 @@ class SantimentDataPuller:
         self._results["discovery"]["target_metrics_available"] = len(target_metrics)
         self._results["discovery"]["target_metrics_missing"] = missing
 
-        await self.discover_metric_metadata(target_metrics)
+        try:
+            await self.discover_metric_metadata(target_metrics)
+        except Exception as e:
+            logger.error(f"DISCOVERY: Failed to get metric metadata (non-fatal): {e}")
 
-        # Step 4: Get slug availability for tier 1 metrics
-        tier1_available = [m for m in TIER1_METRICS if m in all_metrics]
-        await self.discover_slugs_per_metric(tier1_available)
+        # Step 4: Get slug availability for tier 1 metrics (optional)
+        try:
+            tier1_available = [m for m in TIER1_METRICS if m in all_metrics]
+            await self.discover_slugs_per_metric(tier1_available)
+        except Exception as e:
+            logger.error(f"DISCOVERY: Failed to get slug availability (non-fatal): {e}")
 
         elapsed = time.time() - start
         self._results["discovery"]["elapsed_seconds"] = round(elapsed, 1)
         self._results["discovery"]["api_calls_used"] = self._client.stats["total_requests"]
         logger.info(f"DISCOVERY COMPLETE in {elapsed:.1f}s using {self._client.stats['total_requests']} API calls")
+        return self._results["discovery"]
+
+    async def run_lightweight_discovery(self) -> dict:
+        """
+        Minimal discovery — just validate slugs by fetching projects.
+        Falls back gracefully if even that fails.
+        """
+        logger.info("LIGHTWEIGHT DISCOVERY: Validating slugs...")
+        start = time.time()
+
+        try:
+            projects = await self._client.get_all_projects()
+            self._valid_slugs = {p["slug"] for p in projects if p.get("slug")}
+            stored = self._cache.store_projects(projects)
+            valid_top = [s for s in TOP_TOKENS if s in self._valid_slugs]
+            invalid_top = [s for s in TOP_TOKENS if s not in self._valid_slugs]
+            if invalid_top:
+                logger.warning(f"  Invalid slugs (will skip): {invalid_top}")
+            logger.info(f"  Validated {len(valid_top)}/{len(TOP_TOKENS)} slugs, stored {stored} projects")
+        except Exception as e:
+            logger.error(f"  Project discovery failed (using TOP_TOKENS as-is): {e}")
+            self._valid_slugs = set(TOP_TOKENS)
+
+        elapsed = time.time() - start
+        self._results["discovery"]["elapsed_seconds"] = round(elapsed, 1)
         return self._results["discovery"]
 
     # ================================================================
@@ -625,23 +667,35 @@ class SantimentDataPuller:
 
         # Pull OHLCV first (most important for charts)
         logger.info("\n--- PHASE A: OHLCV Price Data ---")
-        all_stats["ohlcv"] = await self.pull_ohlcv_for_tokens(target_slugs, years_back)
+        try:
+            all_stats["ohlcv"] = await self.pull_ohlcv_for_tokens(target_slugs, years_back)
+        except Exception as e:
+            logger.error(f"OHLCV phase failed (non-fatal): {e}")
+            all_stats["ohlcv"] = {"error": str(e)}
 
         # Pull fundamentals
         logger.info("\n--- PHASE B: Project Fundamentals ---")
-        all_stats["fundamentals"] = await self.pull_fundamentals_for_tokens(target_slugs)
+        try:
+            all_stats["fundamentals"] = await self.pull_fundamentals_for_tokens(target_slugs)
+        except Exception as e:
+            logger.error(f"Fundamentals phase failed (non-fatal): {e}")
+            all_stats["fundamentals"] = {"error": str(e)}
 
-        # Pull each metric
+        # Pull each metric (each metric is independent)
         logger.info("\n--- PHASE C: Metric Timeseries ---")
         for mi, metric in enumerate(target_metrics):
             logger.info(f"\nMetric [{mi+1}/{len(target_metrics)}]: {metric}")
-            metric_stats = await self.pull_metric_for_tokens(
-                metric, target_slugs, years_back
-            )
-            all_stats["metrics"][metric] = metric_stats
-            logger.info(f"  Done: {metric_stats['success']} success, "
-                       f"{metric_stats['failed']} failed, "
-                       f"{metric_stats['total_points']} points")
+            try:
+                metric_stats = await self.pull_metric_for_tokens(
+                    metric, target_slugs, years_back
+                )
+                all_stats["metrics"][metric] = metric_stats
+                logger.info(f"  Done: {metric_stats['success']} success, "
+                           f"{metric_stats['failed']} failed, "
+                           f"{metric_stats['total_points']} points")
+            except Exception as e:
+                logger.error(f"  Metric {metric} failed entirely (non-fatal): {e}")
+                all_stats["metrics"][metric] = {"error": str(e)}
 
         elapsed = time.time() - start
         all_stats["total_elapsed_seconds"] = round(elapsed, 1)
@@ -657,6 +711,89 @@ class SantimentDataPuller:
         logger.info(f"  Data points: {self._client.stats['total_data_points']}")
         logger.info(f"  Cache: {json.dumps(all_stats['cache_stats'], indent=2)}")
         return all_stats
+
+    # ================================================================
+    # LIGHTWEIGHT PULL: Fast startup with core data
+    # ================================================================
+
+    async def run_lightweight_pull(
+        self,
+        slugs: Optional[list[str]] = None,
+        years_back: int = 1,
+    ) -> dict:
+        """
+        Quick pull of core data for fast startup.
+        Pulls Tier 1 metrics + OHLCV for top 10 tokens, 1 year.
+        Individual failures are logged but don't crash the pull.
+        """
+        target_slugs = (slugs or TOP_TOKENS)[:10]  # Only top 10 for speed
+
+        # Filter to valid slugs if we have validation data
+        if self._valid_slugs:
+            target_slugs = [s for s in target_slugs if s in self._valid_slugs]
+
+        logger.info("=" * 60)
+        logger.info(f"LIGHTWEIGHT PULL: {len(target_slugs)} tokens, Tier 1, {years_back}y")
+        logger.info("=" * 60)
+        start = time.time()
+
+        stats = {"ohlcv": {"success": 0, "failed": 0}, "metrics": {}, "total_points": 0}
+
+        # Pull OHLCV for each token
+        for slug in target_slugs:
+            try:
+                to_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+                from_date = (datetime.now(timezone.utc) - timedelta(days=years_back * 365)).strftime("%Y-%m-%dT00:00:00Z")
+
+                if not self._cache.was_pulled("ohlcv", slug, from_date, to_date):
+                    data = await self._client.get_ohlcv(slug, from_date, to_date, "1d")
+                    points = self._cache.store_ohlcv(slug, data)
+                    self._cache.log_pull("ohlcv", slug, from_date, to_date, points)
+                    stats["total_points"] += points
+                    logger.info(f"  OHLCV {slug}: {points} points")
+                stats["ohlcv"]["success"] += 1
+            except Exception as e:
+                stats["ohlcv"]["failed"] += 1
+                logger.warning(f"  OHLCV {slug}: FAILED - {e}")
+
+        # Pull Tier 1 metrics (one at a time to avoid rate limits)
+        for metric in TIER1_METRICS:
+            metric_stats = {"success": 0, "failed": 0, "points": 0}
+            for slug in target_slugs:
+                try:
+                    to_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+                    from_date = (datetime.now(timezone.utc) - timedelta(days=years_back * 365)).strftime("%Y-%m-%dT00:00:00Z")
+
+                    if not self._cache.was_pulled(metric, slug, from_date, to_date):
+                        data = await self._client.get_metric_timeseries(
+                            metric, slug, from_date, to_date, "1d"
+                        )
+                        points = self._cache.store_timeseries(metric, slug, data)
+                        self._cache.log_pull(metric, slug, from_date, to_date, points)
+                        metric_stats["points"] += points
+                        stats["total_points"] += points
+                    metric_stats["success"] += 1
+                except Exception as e:
+                    metric_stats["failed"] += 1
+                    logger.warning(f"  {metric}/{slug}: FAILED - {e}")
+
+            stats["metrics"][metric] = metric_stats
+            logger.info(f"  {metric}: {metric_stats['success']} ok, {metric_stats['failed']} fail, {metric_stats['points']} pts")
+
+        # Pull fundamentals
+        for slug in target_slugs:
+            try:
+                data = await self._client.get_project_fundamentals(slug)
+                if data:
+                    self._cache.store_projects([data])
+            except Exception as e:
+                logger.warning(f"  Fundamentals {slug}: FAILED - {e}")
+
+        elapsed = time.time() - start
+        stats["elapsed_seconds"] = round(elapsed, 1)
+        stats["cache_stats"] = self._cache.get_pull_stats()
+        logger.info(f"LIGHTWEIGHT PULL COMPLETE: {stats['total_points']} points in {elapsed:.1f}s")
+        return stats
 
     # ================================================================
     # DAILY REFRESH: Incremental update

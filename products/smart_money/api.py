@@ -43,61 +43,90 @@ _san_pull_status: dict = {"status": "idle", "last_pull": None, "error": None}
 
 
 async def _santiment_background_pull():
-    """Background task: pull Santiment data on startup and refresh periodically."""
+    """
+    Background task: pull Santiment data in phases.
+
+    Phase 1: Lightweight discovery + pull (10 tokens, Tier 1, 1 year)
+             → Gets data visible to users within ~2 minutes
+    Phase 2: Full bulk pull (all tokens, Tier 1+2, 3 years)
+             → Fills out the complete dataset in the background
+    Phase 3: Periodic refresh every 4 hours
+    """
     global _san_pull_status
     if not _san_client or not _san_cache or not _san_puller:
         logger.warning("Santiment not configured, skipping background pull")
         _san_pull_status = {"status": "skipped", "reason": "SANTIMENT_API_KEY not set"}
         return
 
-    # Wait for app to fully start before hitting the API
-    logger.info("Santiment: Waiting 10s for app startup to complete...")
-    await asyncio.sleep(10)
+    # Wait for app to fully start
+    logger.info("Santiment: Waiting 5s for app startup...")
+    await asyncio.sleep(5)
 
-    # Retry the entire pull up to 3 times if it fails
-    for pull_attempt in range(3):
-        try:
-            _san_pull_status = {
-                "status": "discovering",
-                "started_at": datetime.now(timezone.utc).isoformat(),
-                "attempt": pull_attempt + 1,
-            }
-            logger.info(f"Santiment: Starting discovery (attempt {pull_attempt + 1}/3)...")
-            await _san_puller.run_full_discovery()
+    # ---- PHASE 1: Lightweight pull (fast, resilient) ----
+    try:
+        _san_pull_status = {
+            "status": "phase1_discovery",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "phase": 1,
+        }
+        logger.info("Santiment Phase 1: Lightweight discovery...")
+        await _san_puller.run_lightweight_discovery()
 
-            _san_pull_status["status"] = "pulling"
-            logger.info("Santiment: Starting bulk pull (Tier 1+2, 50 tokens, 3 years)...")
-            await _san_puller.run_bulk_pull(
-                slugs=TOP_TOKENS,
-                years_back=3,
-                tiers=[1, 2],
-            )
+        _san_pull_status["status"] = "phase1_pulling"
+        logger.info("Santiment Phase 1: Pulling core data (10 tokens, Tier 1, 1 year)...")
+        phase1_stats = await _san_puller.run_lightweight_pull()
 
-            _san_pull_status = {
-                "status": "ready",
-                "last_pull": datetime.now(timezone.utc).isoformat(),
-                "cache_stats": _san_cache.get_pull_stats(),
-            }
-            logger.info(f"Santiment: Initial pull complete. Cache: {_san_cache.get_pull_stats()}")
-            break  # Success — exit retry loop
+        _san_pull_status = {
+            "status": "phase1_complete",
+            "phase": 1,
+            "last_pull": datetime.now(timezone.utc).isoformat(),
+            "cache_stats": _san_cache.get_pull_stats(),
+            "phase1_stats": phase1_stats,
+        }
+        logger.info(f"Santiment Phase 1 complete: {phase1_stats.get('total_points', 0)} data points cached")
 
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            logger.error(f"Santiment: Pull attempt {pull_attempt + 1}/3 failed: {e}\n{tb}")
-            _san_pull_status = {
-                "status": "error",
-                "error": str(e),
-                "attempt": pull_attempt + 1,
-                "traceback": tb[-500:],
-                "client_stats": _san_client.stats if _san_client else None,
-            }
-            if pull_attempt < 2:
-                wait = 30 * (pull_attempt + 1)
-                logger.info(f"Santiment: Retrying in {wait}s...")
-                await asyncio.sleep(wait)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Santiment Phase 1 failed: {e}\n{tb}")
+        _san_pull_status = {
+            "status": "phase1_error",
+            "error": str(e),
+            "traceback": tb[-500:],
+            "client_stats": _san_client.stats if _san_client else None,
+        }
+        # Don't return — still try phase 2 after a delay
+        await asyncio.sleep(30)
 
-    # Periodic refresh every 4 hours
+    # ---- PHASE 2: Full bulk pull (all tokens, deeper history) ----
+    try:
+        _san_pull_status["status"] = "phase2_pulling"
+        _san_pull_status["phase"] = 2
+        logger.info("Santiment Phase 2: Full bulk pull (all tokens, Tier 1+2, 3 years)...")
+        await _san_puller.run_bulk_pull(
+            slugs=TOP_TOKENS,
+            years_back=3,
+            tiers=[1, 2],
+        )
+
+        _san_pull_status = {
+            "status": "ready",
+            "phase": "complete",
+            "last_pull": datetime.now(timezone.utc).isoformat(),
+            "cache_stats": _san_cache.get_pull_stats(),
+        }
+        logger.info(f"Santiment Phase 2 complete. Cache: {_san_cache.get_pull_stats()}")
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Santiment Phase 2 failed: {e}\n{tb}")
+        # Phase 1 data is still available, so mark as partial
+        _san_pull_status["status"] = "partial"
+        _san_pull_status["phase2_error"] = str(e)
+        _san_pull_status["cache_stats"] = _san_cache.get_pull_stats()
+
+    # ---- PHASE 3: Periodic refresh every 4 hours ----
     while True:
         try:
             await asyncio.sleep(4 * 3600)
