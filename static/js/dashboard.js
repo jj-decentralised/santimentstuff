@@ -1,1135 +1,547 @@
 /**
- * Smart Money Dashboard
- *
- * WSJ-inspired dashboard for tracking smart money activity.
+ * On-Chain Analytics Dashboard
  */
 
-// Chart instances
-let netflowChart = null;
-let holdingsChart = null;
-let trendsChart = null;
-let sectorChart = null;
-let historyChart = null;
-let transferChart = null;
-
-// WSJ-inspired chart colors
-const CHART_COLORS = {
-    positive: '#00A86B',
-    negative: '#C41E3A',
-    neutral: '#666666',
-    text: '#1A1A1A',
-    textMuted: '#999999',
-    border: '#E5E5E5',
-    sectors: ['#1A1A1A', '#333333', '#4D4D4D', '#666666', '#808080', '#999999', '#B3B3B3', '#CCCCCC'],
-};
-
-// Chart.js defaults
-Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
-Chart.defaults.font.size = 11;
-Chart.defaults.color = CHART_COLORS.textMuted;
-
-// State
+// ============================================================
+// STATE
+// ============================================================
 const state = {
-    selectedChains: ['ethereum'],
-    currentView: 'purchases',
-    currentToken: null,
+  currentView: 'market',
+  currentSlug: null,
+  marketData: null,
+  profileData: null,
+  charts: {},
+  priceRange: 365,
 };
 
-// API helpers
-const api = {
-    async get(endpoint) {
-        const response = await fetch(endpoint);
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
-        }
-        return response.json();
-    },
-};
-
-// Formatting helpers
+// ============================================================
+// FORMATTING
+// ============================================================
 const fmt = {
-    usd(value) {
-        if (value === null || value === undefined) return '--';
-        const abs = Math.abs(value);
-        const sign = value < 0 ? '-' : '';
-        if (abs >= 1_000_000_000) {
-            return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`;
-        } else if (abs >= 1_000_000) {
-            return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-        } else if (abs >= 1_000) {
-            return `${sign}$${(abs / 1_000).toFixed(0)}K`;
-        }
-        return `${sign}$${abs.toFixed(0)}`;
-    },
-
-    usdSigned(value) {
-        if (value === null || value === undefined) return '--';
-        const prefix = value > 0 ? '+' : '';
-        return prefix + this.usd(value);
-    },
-
-    number(value) {
-        if (value === null || value === undefined) return '--';
-        return value.toLocaleString();
-    },
-
-    percent(value) {
-        if (value === null || value === undefined) return '--';
-        const prefix = value > 0 ? '+' : '';
-        return `${prefix}${value.toFixed(2)}%`;
-    },
-
-    // Format balance change as token amount (not percentage)
-    balanceChange(value) {
-        if (value === null || value === undefined) return '--';
-        const abs = Math.abs(value);
-        const sign = value > 0 ? '+' : value < 0 ? '' : '';
-        if (abs >= 1_000_000_000) {
-            return `${sign}${(value / 1_000_000_000).toFixed(1)}B`;
-        } else if (abs >= 1_000_000) {
-            return `${sign}${(value / 1_000_000).toFixed(1)}M`;
-        } else if (abs >= 1_000) {
-            return `${sign}${(value / 1_000).toFixed(1)}K`;
-        } else if (abs >= 1) {
-            return `${sign}${value.toFixed(0)}`;
-        }
-        return `${sign}${value.toFixed(2)}`;
-    },
-
-    time(isoString) {
-        if (!isoString) return '--';
-        const date = new Date(isoString);
-        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    },
-
-    address(addr) {
-        if (!addr) return '--';
-        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-    },
+  usd(n) {
+    if (n == null) return '\u2014';
+    const abs = Math.abs(n);
+    if (abs >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
+    if (abs >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+    if (abs >= 1) return '$' + n.toFixed(2);
+    if (abs >= 0.01) return '$' + n.toFixed(4);
+    return '$' + n.toFixed(6);
+  },
+  num(n) {
+    if (n == null) return '\u2014';
+    const abs = Math.abs(n);
+    if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    if (abs >= 100) return n.toFixed(0);
+    if (abs >= 1) return n.toFixed(2);
+    return n.toFixed(4);
+  },
+  pct(n) {
+    if (n == null) return '\u2014';
+    const sign = n > 0 ? '+' : '';
+    return sign + n.toFixed(2) + '%';
+  },
+  pctClass(n) {
+    if (n == null) return 'num-neutral';
+    if (n > 0) return 'num-positive';
+    if (n < 0) return 'num-negative';
+    return 'num-neutral';
+  },
+  metricName(key) {
+    const names = {
+      price_usd: 'Price',
+      marketcap_usd: 'Market Cap',
+      volume_usd: 'Volume',
+      daily_active_addresses: 'Active Addresses',
+      transaction_volume: 'Tx Volume',
+      mvrv_usd: 'MVRV',
+      nvt: 'NVT',
+      exchange_balance: 'Exchange Balance',
+      dev_activity: 'Dev Activity',
+      network_growth: 'Network Growth',
+      exchange_inflow: 'Exchange Inflow',
+      exchange_outflow: 'Exchange Outflow',
+      circulation: 'Circulation',
+      velocity: 'Velocity',
+      mean_age: 'Mean Coin Age',
+      realized_value_usd: 'Realized Value',
+      mean_realized_price_usd: 'Mean Realized Price',
+      age_consumed: 'Age Consumed',
+      whale_transaction_count_100k_usd_to_inf: 'Whale Txs (>100K)',
+      supply_on_exchanges: 'Supply on Exchanges',
+      supply_outside_exchanges: 'Supply off Exchanges',
+      percent_of_total_supply_on_exchanges: '% Supply on Exchanges',
+      sentiment_balance_total: 'Sentiment Balance',
+      weighted_sentiment_total: 'Weighted Sentiment',
+      social_volume_total: 'Social Volume',
+      social_dominance_total: 'Social Dominance',
+      dev_activity_contributors_count: 'Dev Contributors',
+      active_addresses_24h: 'Active Addr 24h',
+    };
+    return names[key] || key.replace(/_/g, ' ');
+  },
+  metricVal(key, val) {
+    if (val == null) return '\u2014';
+    if (key.includes('usd') && !key.includes('mvrv') && !key.includes('nvt'))
+      return fmt.usd(val);
+    return fmt.num(val);
+  },
 };
 
-// DOM helpers
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => document.querySelectorAll(selector);
+// ============================================================
+// API
+// ============================================================
+async function api(path) {
+  const res = await fetch('/api/v1' + path);
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+}
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    initChainSelector();
-    initTabs();
-    initBackButton();
-    loadOverview();
-    loadData();
-});
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view' + name.charAt(0).toUpperCase() + name.slice(1));
+  if (el) el.classList.add('active');
 
-function initChainSelector() {
-    const container = $('#chain-selector');
-    const chains = [
-        { id: 'ethereum', name: 'ETH' },
-        { id: 'solana', name: 'SOL' },
-        { id: 'base', name: 'BASE' },
-        { id: 'arbitrum', name: 'ARB' },
-    ];
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  const navLink = document.querySelector(`.nav-link[data-view="${name}"]`);
+  if (navLink) navLink.classList.add('active');
 
-    container.innerHTML = chains.map(chain => `
-        <button class="chain-btn ${state.selectedChains.includes(chain.id) ? 'active' : ''}"
-                data-chain="${chain.id}">
-            ${chain.name}
-        </button>
+  state.currentView = name;
+}
+
+function openProfile(slug) {
+  state.currentSlug = slug;
+  showView('profile');
+  loadProfile(slug);
+}
+
+// ============================================================
+// MARKET VIEW
+// ============================================================
+async function loadMarket() {
+  try {
+    const data = await api('/market');
+    state.marketData = data;
+
+    // Update status
+    const dot = document.getElementById('statusDot');
+    const status = data.pull_status;
+    dot.className = 'status-indicator';
+    if (status === 'ready' || status === 'partial' || status === 'phase1_complete' || status === 'phase2_pulling') {
+      dot.classList.add('live');
+    } else if (status === 'phase1_pulling' || status === 'phase1_discovery') {
+      dot.classList.add('loading');
+    } else {
+      dot.classList.add('error');
+    }
+
+    if (data.last_pull) {
+      const d = new Date(data.last_pull);
+      document.getElementById('lastUpdate').textContent = d.toLocaleTimeString();
+    }
+
+    document.getElementById('tokenCount').textContent =
+      data.count + ' tokens tracked';
+
+    // Summary stats
+    const tokens = data.tokens;
+    const totalMcap = tokens.reduce((s, t) => s + (t.marketcap_usd || 0), 0);
+    const totalVol = tokens.reduce((s, t) => s + (t.volume_usd || 0), 0);
+    const mvrValues = tokens.filter(t => t.mvrv_usd != null).map(t => t.mvrv_usd);
+    const nvtValues = tokens.filter(t => t.nvt != null).map(t => t.nvt);
+    const avgMvrv = mvrValues.length ? mvrValues.reduce((s, v) => s + v, 0) / mvrValues.length : null;
+    const avgNvt = nvtValues.length ? nvtValues.reduce((s, v) => s + v, 0) / nvtValues.length : null;
+
+    document.getElementById('statMcap').textContent = fmt.usd(totalMcap);
+    document.getElementById('statVolume').textContent = fmt.usd(totalVol);
+    document.getElementById('statMvrv').textContent = avgMvrv != null ? avgMvrv.toFixed(2) : '\u2014';
+    document.getElementById('statNvt').textContent = avgNvt != null ? avgNvt.toFixed(1) : '\u2014';
+
+    // Render table
+    const tbody = document.getElementById('marketBody');
+    if (!tokens.length) {
+      tbody.innerHTML = '<tr><td colspan="10" class="empty-cell">No data yet. Data is being pulled in the background...</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = tokens.map((t, i) => `
+      <tr data-slug="${t.slug}">
+        <td class="col-rank">${i + 1}</td>
+        <td class="col-name">
+          <div class="token-name">
+            <strong>${t.name}</strong>
+            <span class="ticker">${t.ticker}</span>
+          </div>
+        </td>
+        <td class="col-num num-bold">${fmt.usd(t.price_usd)}</td>
+        <td class="col-num ${fmt.pctClass(t.price_usd_change)}">${fmt.pct(t.price_usd_change)}</td>
+        <td class="col-num">${fmt.usd(t.marketcap_usd)}</td>
+        <td class="col-num">${fmt.usd(t.volume_usd)}</td>
+        <td class="col-num">${t.mvrv_usd != null ? t.mvrv_usd.toFixed(2) : '\u2014'}</td>
+        <td class="col-num">${t.nvt != null ? t.nvt.toFixed(1) : '\u2014'}</td>
+        <td class="col-num hide-mobile">${fmt.num(t.daily_active_addresses)}</td>
+        <td class="col-num hide-mobile">${t.dev_activity != null ? t.dev_activity.toFixed(0) : '\u2014'}</td>
+      </tr>
     `).join('');
 
-    container.addEventListener('click', (e) => {
-        const btn = e.target.closest('.chain-btn');
-        if (!btn) return;
-
-        const chain = btn.dataset.chain;
-
-        // Toggle chain selection
-        if (state.selectedChains.includes(chain)) {
-            if (state.selectedChains.length > 1) {
-                state.selectedChains = state.selectedChains.filter(c => c !== chain);
-            }
-        } else {
-            state.selectedChains.push(chain);
-        }
-
-        // Update UI
-        container.querySelectorAll('.chain-btn').forEach(b => {
-            b.classList.toggle('active', state.selectedChains.includes(b.dataset.chain));
-        });
-
-        loadOverview();
-        loadData();
+    // Click handlers
+    tbody.querySelectorAll('tr[data-slug]').forEach(row => {
+      row.addEventListener('click', () => openProfile(row.dataset.slug));
     });
+  } catch (e) {
+    console.error('Market load error:', e);
+    document.getElementById('marketBody').innerHTML =
+      '<tr><td colspan="10" class="empty-cell">Error loading data. Retrying...</td></tr>';
+  }
 }
 
-function initTabs() {
-    const tabs = $('#main-tabs');
+// ============================================================
+// VALUATION VIEW
+// ============================================================
+async function loadValuation() {
+  try {
+    const data = state.marketData || await api('/market');
+    const tokens = data.tokens.filter(t => t.mvrv_usd != null);
 
-    tabs.addEventListener('click', (e) => {
-        const tab = e.target.closest('.tab');
-        if (!tab) return;
-
-        const view = tab.dataset.view;
-
-        // Update tabs
-        tabs.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        // Update views
-        state.currentView = view;
-        showView(view);
-        loadData();
-    });
-}
-
-function initBackButton() {
-    $('#back-btn').addEventListener('click', () => {
-        state.currentToken = null;
-        showView('purchases');
-
-        // Reset tab state
-        $$('.tab').forEach(t => t.classList.remove('active'));
-        $('[data-view="purchases"]').classList.add('active');
-    });
-}
-
-function showView(viewId) {
-    $$('.view').forEach(v => v.classList.remove('active'));
-    $(`#${viewId}-view`).classList.add('active');
-}
-
-// === Market Overview ===
-
-async function loadOverview() {
-    const chains = state.selectedChains.join(',');
-
-    try {
-        const data = await api.get(`/api/v1/overview?chains=${chains}`);
-
-        // Update stat cards
-        $('#total-value').textContent = fmt.usd(data.summary?.total_value_usd);
-        $('#accumulating').textContent = fmt.number(data.summary?.tokens_accumulating);
-        $('#distributing').textContent = fmt.number(data.summary?.tokens_distributing);
-        $('#buy-vol').textContent = fmt.usd(data.trade_summary?.buy_volume_usd);
-        $('#sell-vol').textContent = fmt.usd(data.trade_summary?.sell_volume_usd);
-
-        // Enhanced Net Flow card with breakdown
-        const breakdown = data.net_flow_breakdown;
-        if (breakdown) {
-            const netFlowEl = $('#net-flow');
-            netFlowEl.textContent = fmt.usdSigned(breakdown.net);
-            netFlowEl.className = `stat-value ${breakdown.net > 0 ? 'positive' : 'negative'}`;
-
-            // Update net flow details if element exists
-            const detailsEl = $('#net-flow-details');
-            if (detailsEl) {
-                const topInflows = breakdown.top_inflows?.slice(0, 3) || [];
-                const topOutflows = breakdown.top_outflows?.slice(0, 3) || [];
-
-                detailsEl.innerHTML = `
-                    <div class="flow-breakdown">
-                        <span class="positive">+${fmt.usd(breakdown.inflow)}</span>
-                        <span class="neutral"> / </span>
-                        <span class="negative">-${fmt.usd(breakdown.outflow)}</span>
-                    </div>
-                    <div class="flow-sentiment ${breakdown.sentiment}">${breakdown.sentiment.toUpperCase()}</div>
-                    ${topInflows.length > 0 ? `
-                    <div class="top-movers">
-                        <span class="movers-label">Top inflows:</span>
-                        ${topInflows.map(t => `<span class="mover positive">${t.token}</span>`).join(' ')}
-                    </div>
-                    ` : ''}
-                `;
-            }
-        } else {
-            // Fallback to old format
-            $('#net-flow').textContent = fmt.usdSigned(data.summary?.net_flow_24h);
-            $('#net-flow').className = `stat-value ${data.summary?.net_flow_24h > 0 ? 'positive' : 'negative'}`;
-        }
-
-        // Render charts
-        renderNetflowChart(data.charts?.top_by_inflow || []);
-        renderHoldingsChart(data.charts?.top_by_value || []);
-        renderTrendsChart(data.charts?.netflow_by_token || []);
-        renderSectorChart(data.charts?.sectors || []);
-
-    } catch (error) {
-        console.error('Error loading overview:', error);
-    }
-}
-
-function renderNetflowChart(data) {
-    const ctx = document.getElementById('netflow-chart');
-    if (!ctx) return;
-
-    // Destroy existing chart
-    if (netflowChart) {
-        netflowChart.destroy();
+    const tbody = document.getElementById('valuationBody');
+    if (!tokens.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">No valuation data yet</td></tr>';
+      return;
     }
 
-    const labels = data.slice(0, 10).map(d => d.token);
-    const values = data.slice(0, 10).map(d => d.inflow);
-    const colors = values.map(v => v >= 0 ? CHART_COLORS.positive : CHART_COLORS.negative);
+    // Fetch valuation details for each token with MVRV
+    const rows = [];
+    for (const t of tokens) {
+      let val = {};
+      try {
+        const resp = await api('/valuation/' + t.slug);
+        val = resp.valuation || {};
+      } catch (e) { /* skip */ }
 
-    netflowChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values,
-                backgroundColor: colors,
-                borderWidth: 0,
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => fmt.usdSigned(context.raw)
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { color: CHART_COLORS.border },
-                    ticks: {
-                        callback: (value) => fmt.usd(value)
-                    }
-                },
-                y: {
-                    grid: { display: false },
-                }
-            }
-        }
-    });
-}
+      const mvrv = t.mvrv_usd;
+      let zone = 'fair', zoneLabel = 'Fair', zoneClass = 'zone-fair';
+      if (mvrv > 3.5) { zone = 'extreme'; zoneLabel = 'Extremely High'; zoneClass = 'zone-extreme'; }
+      else if (mvrv > 2.5) { zone = 'overvalued'; zoneLabel = 'Overvalued'; zoneClass = 'zone-overvalued'; }
+      else if (mvrv > 1.5) { zone = 'fair'; zoneLabel = 'Fair-High'; zoneClass = 'zone-fair'; }
+      else if (mvrv > 1.0) { zone = 'fair'; zoneLabel = 'Fair'; zoneClass = 'zone-fair'; }
+      else if (mvrv > 0.5) { zone = 'undervalued'; zoneLabel = 'Undervalued'; zoneClass = 'zone-undervalued'; }
+      else { zone = 'extreme'; zoneLabel = 'Extremely Low'; zoneClass = 'zone-extreme'; }
 
-function renderHoldingsChart(data) {
-    const ctx = document.getElementById('holdings-chart');
-    if (!ctx) return;
+      const mvrv90 = val.mvrv_usd?.avg_90d;
+      const mvrv365 = val.mvrv_usd?.avg_365d;
 
-    if (holdingsChart) {
-        holdingsChart.destroy();
+      rows.push(`
+        <tr data-slug="${t.slug}">
+          <td class="col-name">
+            <div class="token-name"><strong>${t.name}</strong><span class="ticker">${t.ticker}</span></div>
+          </td>
+          <td class="col-num num-bold">${fmt.usd(t.price_usd)}</td>
+          <td class="col-num num-bold">${mvrv.toFixed(2)}</td>
+          <td class="col-tag"><span class="zone-tag ${zoneClass}">${zoneLabel}</span></td>
+          <td class="col-num">${t.nvt != null ? t.nvt.toFixed(1) : '\u2014'}</td>
+          <td class="col-num hide-mobile">${mvrv90 != null ? mvrv90.toFixed(2) : '\u2014'}</td>
+          <td class="col-num hide-mobile">${mvrv365 != null ? mvrv365.toFixed(2) : '\u2014'}</td>
+        </tr>
+      `);
     }
 
-    const labels = data.slice(0, 10).map(d => d.token);
-    const values = data.slice(0, 10).map(d => d.value);
-
-    holdingsChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values,
-                backgroundColor: CHART_COLORS.neutral,
-                borderWidth: 0,
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => fmt.usd(context.raw)
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { color: CHART_COLORS.border },
-                    ticks: {
-                        callback: (value) => fmt.usd(value)
-                    }
-                },
-                y: {
-                    grid: { display: false },
-                }
-            }
-        }
+    tbody.innerHTML = rows.join('');
+    tbody.querySelectorAll('tr[data-slug]').forEach(row => {
+      row.addEventListener('click', () => openProfile(row.dataset.slug));
     });
+  } catch (e) {
+    console.error('Valuation load error:', e);
+  }
 }
 
-function renderTrendsChart(data) {
-    const ctx = document.getElementById('trends-chart');
-    if (!ctx) return;
+// ============================================================
+// PROFILE VIEW
+// ============================================================
+async function loadProfile(slug) {
+  try {
+    const data = await api('/profile/' + slug);
+    state.profileData = data;
+    const project = data.project;
+    const metrics = data.metrics;
 
-    if (trendsChart) {
-        trendsChart.destroy();
+    // Header
+    document.getElementById('profileName').textContent = project.name || slug;
+    document.getElementById('profileTicker').textContent = project.ticker || '';
+    document.getElementById('profileInfra').textContent = project.infrastructure ? `(${project.infrastructure})` : '';
+
+    const priceData = metrics.price_usd;
+    if (priceData) {
+      document.getElementById('profilePrice').textContent = fmt.usd(priceData.latest);
+      const change = metrics.price_usd?.data;
+      if (change && change.length >= 2) {
+        const prev = change[change.length - 2].value;
+        const curr = change[change.length - 1].value;
+        const pct = prev ? ((curr - prev) / prev * 100) : 0;
+        const el = document.getElementById('profileChange');
+        el.textContent = fmt.pct(pct);
+        el.className = 'profile-change ' + fmt.pctClass(pct);
+      }
     }
 
-    // Take top 8 tokens for readability
-    const topData = data.slice(0, 8);
-    const labels = topData.map(d => d.token);
+    // Key Metrics Grid
+    const keyMetrics = [
+      'marketcap_usd', 'volume_usd', 'mvrv_usd', 'nvt',
+      'daily_active_addresses', 'transaction_volume',
+      'exchange_balance', 'dev_activity', 'network_growth',
+      'social_volume_total', 'sentiment_balance_total', 'whale_transaction_count_100k_usd_to_inf',
+    ];
 
-    trendsChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: '1h',
-                    data: topData.map(d => d['1h'] || 0),
-                    backgroundColor: '#B3B3B3',
-                },
-                {
-                    label: '24h',
-                    data: topData.map(d => d['24h'] || 0),
-                    backgroundColor: '#666666',
-                },
-                {
-                    label: '7d',
-                    data: topData.map(d => d['7d'] || 0),
-                    backgroundColor: '#1A1A1A',
-                },
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        boxWidth: 12,
-                        padding: 8,
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => `${context.dataset.label}: ${fmt.usdSigned(context.raw)}`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                },
-                y: {
-                    grid: { color: CHART_COLORS.border },
-                    ticks: {
-                        callback: (value) => fmt.usd(value)
-                    }
-                }
-            }
-        }
-    });
+    const grid = document.getElementById('profileMetrics');
+    grid.innerHTML = keyMetrics.map(key => {
+      const m = metrics[key];
+      if (!m) return '';
+      return `
+        <div class="metric-card">
+          <div class="metric-card-label">${fmt.metricName(key)}</div>
+          <div class="metric-card-value">${fmt.metricVal(key, m.latest)}</div>
+        </div>
+      `;
+    }).join('');
+
+    // Valuation Bars
+    renderValuationBars(metrics);
+
+    // Charts
+    renderPriceChart(metrics.price_usd?.data, state.priceRange);
+    renderMetricChart('daaChart', metrics.daily_active_addresses?.data, 'Active Addresses');
+    renderMetricChart('exchangeChart', metrics.exchange_balance?.data, 'Exchange Balance');
+    renderMetricChart('devChart', metrics.dev_activity?.data, 'Dev Activity');
+    renderMetricChart('networkChart', metrics.network_growth?.data, 'Network Growth');
+
+    // All Metrics Table
+    const allBody = document.getElementById('allMetricsBody');
+    const metricKeys = Object.keys(metrics).sort();
+    allBody.innerHTML = metricKeys.map(key => {
+      const m = metrics[key];
+      return `
+        <tr>
+          <td class="col-name">${fmt.metricName(key)}</td>
+          <td class="col-num num-bold">${fmt.metricVal(key, m.latest)}</td>
+          <td class="col-num">${fmt.metricVal(key, m.avg_30d)}</td>
+          <td class="col-num hide-mobile">${fmt.metricVal(key, m.min_365d)}</td>
+          <td class="col-num hide-mobile">${fmt.metricVal(key, m.max_365d)}</td>
+          <td class="col-num hide-mobile">${m.count}</td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (e) {
+    console.error('Profile load error:', e);
+    document.getElementById('profileName').textContent = 'Error loading profile';
+  }
 }
 
-function renderSectorChart(data) {
-    const ctx = document.getElementById('sector-chart');
-    if (!ctx) return;
+// ============================================================
+// VALUATION BARS
+// ============================================================
+function renderValuationBars(metrics) {
+  const container = document.getElementById('valuationBars');
+  const items = [
+    { key: 'mvrv_usd', label: 'MVRV' },
+    { key: 'nvt', label: 'NVT' },
+  ];
 
-    if (sectorChart) {
-        sectorChart.destroy();
-    }
+  container.innerHTML = items.map(item => {
+    const m = metrics[item.key];
+    if (!m || m.min_365d == null || m.max_365d == null || m.latest == null) return '';
 
-    const labels = data.map(d => d.name);
-    const values = data.map(d => d.count);
-
-    sectorChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values,
-                backgroundColor: CHART_COLORS.sectors.slice(0, labels.length),
-                borderWidth: 0,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        boxWidth: 12,
-                        padding: 6,
-                        font: { size: 10 }
-                    }
-                },
-            },
-        }
-    });
-}
-
-// === Sparkline Rendering ===
-
-function renderSparkline(data, momentum) {
-    if (!data || data.length < 2) return '';
-
-    // Normalize data to fit in a small SVG
-    const width = 60;
-    const height = 16;
-    const padding = 2;
-
-    const values = data.filter(v => v !== null && v !== undefined);
-    if (values.length < 2) return '';
-
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
-
-    // Generate path points
-    const points = values.map((v, i) => {
-        const x = padding + (i / (values.length - 1)) * (width - padding * 2);
-        const y = height - padding - ((v - min) / range) * (height - padding * 2);
-        return `${x},${y}`;
-    });
-
-    const color = momentum === 'accelerating' ? CHART_COLORS.positive :
-                  momentum === 'decelerating' ? CHART_COLORS.negative :
-                  CHART_COLORS.neutral;
+    const min = m.min_365d;
+    const max = m.max_365d;
+    const range = max - min;
+    const pct = range > 0 ? Math.max(0, Math.min(100, ((m.latest - min) / range) * 100)) : 50;
 
     return `
-        <svg class="sparkline" width="${width}" height="${height}" style="vertical-align: middle; margin-left: 4px;">
-            <polyline
-                fill="none"
-                stroke="${color}"
-                stroke-width="1.5"
-                points="${points.join(' ')}"
-            />
-        </svg>
+      <div class="val-bar-row">
+        <span class="val-bar-label">${item.label}</span>
+        <div class="val-bar-track">
+          <div class="val-bar-fill" style="width:${pct}%"></div>
+          <div class="val-bar-marker" style="left:${pct}%"></div>
+        </div>
+        <span class="val-bar-value">${fmt.num(m.latest)}</span>
+      </div>
     `;
+  }).join('');
 }
 
-// === Data Loading ===
+// ============================================================
+// CHART HELPERS
+// ============================================================
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 300 },
+  interaction: { intersect: false, mode: 'index' },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#000',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      cornerRadius: 4,
+      padding: 10,
+      titleFont: { weight: 700, size: 12 },
+      bodyFont: { size: 12 },
+    },
+  },
+  scales: {
+    x: {
+      type: 'time',
+      grid: { display: false },
+      ticks: { font: { size: 11, weight: 500 }, color: '#737373', maxTicksLimit: 8 },
+      border: { display: false },
+    },
+    y: {
+      grid: { color: '#F5F5F5' },
+      ticks: { font: { size: 11, weight: 500 }, color: '#737373', maxTicksLimit: 6 },
+      border: { display: false },
+    },
+  },
+};
 
-async function loadData() {
-    const chains = state.selectedChains.join(',');
-
-    if (state.currentView === 'purchases') {
-        await loadPurchases(chains);
-    } else if (state.currentView === 'funds') {
-        await loadFunds(chains);
-    } else if (state.currentView === 'trades') {
-        await loadTrades(chains);
-    } else if (state.currentView === 'perps') {
-        await loadPerps();
-    }
-
-    updateLastUpdated();
+function destroyChart(id) {
+  if (state.charts[id]) {
+    state.charts[id].destroy();
+    delete state.charts[id];
+  }
 }
 
-async function loadPurchases(chains) {
-    const body = $('#purchases-body');
-    body.innerHTML = '<tr><td colspan="6" class="loading">Loading data...</td></tr>';
-
-    try {
-        const data = await api.get(`/api/v1/purchases?chains=${chains}&limit=50`);
-
-        // Render table
-        if (!data.tokens || data.tokens.length === 0) {
-            body.innerHTML = '<tr><td colspan="6">No data available</td></tr>';
-            return;
-        }
-
-        body.innerHTML = data.tokens.map(token => `
-            <tr class="token-row" data-chain="${token.chain}" data-address="${token.token_address}">
-                <td>
-                    <strong>${token.token_symbol}</strong>
-                    ${token.sectors && token.sectors.length ? `<br><small style="color: var(--color-text-muted)">${token.sectors[0]}</small>` : ''}
-                </td>
-                <td>${token.chain}</td>
-                <td class="numeric">${fmt.number(token.smart_money_holders)}</td>
-                <td class="numeric ${token.net_flow_24h_usd > 0 ? 'positive' : 'negative'}">
-                    ${fmt.usdSigned(token.net_flow_24h_usd)}
-                    ${renderSparkline(token.netflow_trend, token.momentum)}
-                </td>
-                <td class="numeric">${fmt.usd(token.total_value_usd)}</td>
-                <td>
-                    <span class="signal signal-${token.signal}">${token.signal}</span>
-                    <span class="signal-strength">${token.signal_strength}</span>
-                    ${token.momentum !== 'steady' ? `<span class="momentum momentum-${token.momentum}">${token.momentum === 'accelerating' ? '↑' : '↓'}</span>` : ''}
-                </td>
-            </tr>
-        `).join('');
-
-        // Add click handlers for drilldown
-        body.querySelectorAll('.token-row').forEach(row => {
-            row.addEventListener('click', () => {
-                const chain = row.dataset.chain;
-                const address = row.dataset.address;
-                loadDrilldown(chain, address);
-            });
-        });
-
-    } catch (error) {
-        console.error('Error loading purchases:', error);
-        body.innerHTML = `<tr><td colspan="6">Error loading data: ${error.message}</td></tr>`;
-    }
+function filterByDays(data, days) {
+  if (!data || !days) return data;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return data.filter(d => new Date(d.datetime) >= cutoff);
 }
 
-async function loadTrades(chains) {
-    const body = $('#trades-body');
-    body.innerHTML = '<tr><td colspan="7" class="loading">Loading data...</td></tr>';
+function renderPriceChart(data, days) {
+  if (!data) return;
+  const filtered = filterByDays(data, days);
+  destroyChart('priceChart');
 
-    try {
-        const data = await api.get(`/api/v1/trades?chains=${chains}&limit=50`);
-
-        // Update stats
-        $('#total-trades').textContent = fmt.number(data.total_trades);
-        $('#buy-count').textContent = fmt.number(data.buy_count);
-        $('#sell-count').textContent = fmt.number(data.sell_count);
-
-        // Update narrative
-        $('#trades-narrative').textContent = data.narrative || 'No narrative available.';
-
-        // Render table
-        if (!data.trades || data.trades.length === 0) {
-            body.innerHTML = '<tr><td colspan="7">No trades available</td></tr>';
-            return;
-        }
-
-        body.innerHTML = data.trades.map(trade => `
-            <tr>
-                <td>${fmt.time(trade.timestamp)}</td>
-                <td title="${trade.wallet_label}">${trade.wallet_label}</td>
-                <td>
-                    <span class="signal signal-${trade.action === 'BUY' ? 'accumulating' : 'distributing'}">
-                        ${trade.action}
-                    </span>
-                </td>
-                <td>${trade.token_bought}</td>
-                <td>${trade.token_sold}</td>
-                <td class="numeric">${fmt.usd(trade.amount_usd)}</td>
-                <td>${trade.chain}</td>
-            </tr>
-        `).join('');
-
-    } catch (error) {
-        console.error('Error loading trades:', error);
-        body.innerHTML = `<tr><td colspan="7">Error loading data: ${error.message}</td></tr>`;
-    }
-}
-
-async function loadPerps() {
-    const body = $('#perps-body');
-    body.innerHTML = '<tr><td colspan="7" class="loading">Loading data...</td></tr>';
-
-    try {
-        const data = await api.get('/api/v1/perps?limit=50');
-
-        // Update stats
-        $('#perp-total').textContent = fmt.number(data.total_trades);
-        $('#long-count').textContent = fmt.number(data.long_count);
-        $('#short-count').textContent = fmt.number(data.short_count);
-
-        const sentiment = data.sentiment || 'neutral';
-        const sentimentEl = $('#perp-sentiment');
-        sentimentEl.textContent = sentiment.toUpperCase();
-        sentimentEl.className = `stat-value ${sentiment === 'bullish' ? 'positive' : sentiment === 'bearish' ? 'negative' : ''}`;
-
-        // Render table
-        if (!data.trades || data.trades.length === 0) {
-            body.innerHTML = '<tr><td colspan="7">No perp trades available</td></tr>';
-            return;
-        }
-
-        body.innerHTML = data.trades.map(trade => `
-            <tr>
-                <td>${fmt.time(trade.timestamp)}</td>
-                <td title="${trade.trader}">${trade.trader}</td>
-                <td>${trade.token}</td>
-                <td>
-                    <span class="signal signal-${trade.side === 'LONG' ? 'accumulating' : 'distributing'}">
-                        ${trade.side}
-                    </span>
-                </td>
-                <td>${trade.action}</td>
-                <td class="numeric">${fmt.usd(trade.value_usd)}</td>
-                <td class="numeric">${trade.price ? '$' + trade.price.toLocaleString() : '--'}</td>
-            </tr>
-        `).join('');
-
-    } catch (error) {
-        console.error('Error loading perps:', error);
-        body.innerHTML = `<tr><td colspan="7">Error loading data: ${error.message}</td></tr>`;
-    }
-}
-
-// Store funds data for detail view
-let currentFundsData = null;
-
-async function loadFunds(chains) {
-    const body = $('#funds-body');
-    const tradesBody = $('#fund-trades-body');
-    body.innerHTML = '<tr><td colspan="3" class="loading">Loading data...</td></tr>';
-    tradesBody.innerHTML = '<tr><td colspan="7" class="loading">Loading data...</td></tr>';
-
-    // Hide detail view
-    const detailCard = document.getElementById('fund-detail-card');
-    if (detailCard) detailCard.style.display = 'none';
-
-    try {
-        const data = await api.get(`/api/v1/funds?chains=${chains}`);
-        currentFundsData = data;
-
-        // Update stats
-        $('#total-funds').textContent = fmt.number(data.summary?.total_funds || 0);
-        $('#funds-total-value').textContent = fmt.usd(data.summary?.total_fund_value_usd);
-        $('#funds-positions').textContent = fmt.number(data.summary?.total_positions || 0);
-        $('#funds-buy-count').textContent = fmt.number(data.summary?.recent_buy_count || 0);
-        $('#funds-sell-count').textContent = fmt.number(data.summary?.recent_sell_count || 0);
-
-        // Render funds table
-        if (!data.funds || data.funds.length === 0) {
-            body.innerHTML = '<tr><td colspan="3">No fund holdings detected</td></tr>';
-        } else {
-            body.innerHTML = data.funds.map((fund, idx) => `
-                <tr class="fund-row" data-fund-index="${idx}" style="cursor: pointer;">
-                    <td><strong>${fund.name}</strong></td>
-                    <td class="numeric">${fmt.usd(fund.total_value_usd)}</td>
-                    <td class="numeric">${fund.total_tokens_held}</td>
-                </tr>
-            `).join('');
-
-            // Add click handlers for fund detail
-            body.querySelectorAll('.fund-row').forEach(row => {
-                row.addEventListener('click', () => {
-                    const idx = parseInt(row.dataset.fundIndex);
-                    showFundDetail(data.funds[idx]);
-                });
-            });
-        }
-
-        // Render fund trades table
-        if (!data.recent_trades || data.recent_trades.length === 0) {
-            tradesBody.innerHTML = '<tr><td colspan="7">No recent fund trades</td></tr>';
-        } else {
-            tradesBody.innerHTML = data.recent_trades.map(trade => `
-                <tr>
-                    <td>${fmt.time(trade.timestamp)}</td>
-                    <td title="${trade.fund}">${trade.fund}</td>
-                    <td>
-                        <span class="signal signal-${trade.action === 'BUY' ? 'accumulating' : 'distributing'}">
-                            ${trade.action}
-                        </span>
-                    </td>
-                    <td>${trade.token_bought}</td>
-                    <td>${trade.token_sold}</td>
-                    <td class="numeric">${fmt.usd(trade.value_usd)}</td>
-                    <td>${trade.chain}</td>
-                </tr>
-            `).join('');
-        }
-
-    } catch (error) {
-        console.error('Error loading funds:', error);
-        body.innerHTML = `<tr><td colspan="3">Error loading data: ${error.message}</td></tr>`;
-    }
-}
-
-function showFundDetail(fund) {
-    const detailCard = document.getElementById('fund-detail-card');
-    const fundsCard = document.querySelector('#funds-view .card:first-of-type');
-
-    if (!detailCard || !fund) return;
-
-    // Update header
-    document.getElementById('fund-detail-name').textContent = `${fund.name} Positions`;
-
-    // Render positions table
-    const positionsBody = document.getElementById('fund-positions-body');
-    if (fund.positions && fund.positions.length > 0) {
-        positionsBody.innerHTML = fund.positions.map(pos => `
-            <tr>
-                <td><strong>${pos.token_symbol}</strong></td>
-                <td>${pos.chain}</td>
-                <td class="numeric">${fmt.usd(pos.value_usd)}</td>
-                <td class="numeric">${fmt.number(Math.round(pos.token_amount || 0))}</td>
-                <td class="numeric ${pos.balance_change_24h > 0 ? 'positive' : pos.balance_change_24h < 0 ? 'negative' : ''}">
-                    ${fmt.balanceChange(pos.balance_change_24h)}
-                </td>
-                <td class="numeric ${pos.balance_change_30d > 0 ? 'positive' : pos.balance_change_30d < 0 ? 'negative' : ''}">
-                    ${fmt.balanceChange(pos.balance_change_30d)}
-                </td>
-                <td class="numeric">${fmt.number(Math.round(pos.total_inflow || 0))}</td>
-                <td class="numeric">${fmt.number(Math.round(pos.total_outflow || 0))}</td>
-            </tr>
-        `).join('');
-    } else {
-        positionsBody.innerHTML = '<tr><td colspan="8">No positions found</td></tr>';
-    }
-
-    // Show detail card
-    detailCard.style.display = 'block';
-
-    // Add back button handler
-    document.getElementById('fund-back-btn').onclick = () => {
-        detailCard.style.display = 'none';
-    };
-
-    // Scroll to detail
-    detailCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-async function loadDrilldown(chain, tokenAddress) {
-    state.currentToken = { chain, address: tokenAddress };
-    showView('drilldown');
-
-    // Restore chart canvases (in case they were replaced with no-data message)
-    const drilldownView = document.getElementById('drilldown-view');
-    const chartContainers = drilldownView?.querySelectorAll('.chart-container');
-    if (chartContainers) {
-        chartContainers.forEach((container, idx) => {
-            const canvasId = idx === 0 ? 'history-chart' : 'transfer-chart';
-            if (!container.querySelector('canvas')) {
-                container.innerHTML = `<canvas id="${canvasId}"></canvas>`;
-            }
-        });
-    }
-
-    // Destroy existing charts
-    if (historyChart) {
-        historyChart.destroy();
-        historyChart = null;
-    }
-    if (transferChart) {
-        transferChart.destroy();
-        transferChart = null;
-    }
-
-    // Show loading state
-    $('#drilldown-title').textContent = 'Loading...';
-    $('#drilldown-narrative').textContent = 'Loading analysis...';
-    $('#flow-intelligence').innerHTML = '<div class="loading">Loading...</div>';
-    $('#holders-body').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
-    $('#fund-holdings-body').innerHTML = '<tr><td colspan="9" class="loading">Loading...</td></tr>';
-    $('#most-active-body').innerHTML = '<tr><td colspan="4" class="loading">Loading...</td></tr>';
-
-    try {
-        // Load drilldown data (now includes netflow_trend, buyer_seller_summary, fund_holdings, most_active)
-        const data = await api.get(`/api/v1/token/${chain}/${tokenAddress}`);
-
-        // Update title
-        $('#drilldown-title').textContent = `${data.token_symbol} Analysis`;
-
-        // Update stats
-        $('#total-holders').textContent = fmt.number(data.holder_breakdown?.total || 0);
-        const fundHoldersEl = $('#fund-holders');
-        if (fundHoldersEl) {
-            fundHoldersEl.textContent = fmt.number(data.holder_summary?.total_funds || 0);
-        }
-        $('#sm-holders').textContent = fmt.number(data.holder_breakdown?.smart_money || 0);
-        $('#whale-holders').textContent = fmt.number(data.holder_breakdown?.whale || 0);
-        $('#exchange-holders').textContent = fmt.number(data.holder_breakdown?.exchange || 0);
-
-        // Update narrative with flow context
-        let narrative = data.narrative?.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') || 'No analysis available.';
-        if (data.netflow_trend) {
-            const momentum = data.netflow_trend.momentum;
-            const flow30d = data.netflow_trend.values[3];
-            narrative += `<br><br><strong>30-Day Flow:</strong> ${fmt.usdSigned(flow30d)} (${momentum})`;
-        }
-        if (data.buyer_seller_summary) {
-            const sentiment = data.buyer_seller_summary.sentiment;
-            narrative += `<br><strong>Recent Activity:</strong> ${sentiment} (${data.buyer_seller_summary.buyer_count} buyers, ${data.buyer_seller_summary.seller_count} sellers)`;
-        }
-        $('#drilldown-narrative').innerHTML = narrative;
-
-        // Render flow intelligence
-        const flows = data.flow_intelligence;
-        if (flows) {
-            $('#flow-intelligence').innerHTML = `
-                <div class="flow-segment">
-                    <span class="flow-label">Smart Money</span>
-                    <span class="flow-value ${flows.smart_money?.net_flow_usd > 0 ? 'positive' : 'negative'}">
-                        ${fmt.usdSigned(flows.smart_money?.net_flow_usd)}
-                    </span>
-                </div>
-                <div class="flow-segment">
-                    <span class="flow-label">Whales</span>
-                    <span class="flow-value ${flows.whale?.net_flow_usd > 0 ? 'positive' : 'negative'}">
-                        ${fmt.usdSigned(flows.whale?.net_flow_usd)}
-                    </span>
-                </div>
-                <div class="flow-segment">
-                    <span class="flow-label">Exchanges</span>
-                    <span class="flow-value ${flows.exchange?.net_flow_usd > 0 ? 'positive' : 'negative'}">
-                        ${fmt.usdSigned(flows.exchange?.net_flow_usd)}
-                    </span>
-                </div>
-                <div class="flow-segment">
-                    <span class="flow-label">Fresh Wallets</span>
-                    <span class="flow-value ${flows.fresh_wallets?.net_flow_usd > 0 ? 'positive' : 'negative'}">
-                        ${fmt.usdSigned(flows.fresh_wallets?.net_flow_usd)}
-                    </span>
-                </div>
-                <div class="flow-segment">
-                    <span class="flow-label">Top PnL Traders</span>
-                    <span class="flow-value ${flows.top_pnl?.net_flow_usd > 0 ? 'positive' : 'negative'}">
-                        ${fmt.usdSigned(flows.top_pnl?.net_flow_usd)}
-                    </span>
-                </div>
-            `;
-        }
-
-        // Render fund holdings table
-        renderFundHoldingsTable(data.fund_holdings || []);
-
-        // Render most active holders table
-        renderActivityTable(data.most_active || []);
-
-        // Render top holders
-        if (data.top_holders && data.top_holders.length > 0) {
-            $('#holders-body').innerHTML = data.top_holders.map(h => `
-                <tr>
-                    <td title="${h.label || h.address}">${h.label || fmt.address(h.address)}</td>
-                    <td><span class="holder-type-badge holder-type-${h.type || 'other'}">${h.type || 'other'}</span></td>
-                    <td class="numeric">${fmt.usd(h.value_usd)}</td>
-                    <td class="numeric ${h.balance_change_24h > 0 ? 'positive' : h.balance_change_24h < 0 ? 'negative' : ''}">
-                        ${fmt.balanceChange(h.balance_change_24h)}
-                    </td>
-                    <td class="numeric ${h.balance_change_7d > 0 ? 'positive' : h.balance_change_7d < 0 ? 'negative' : ''}">
-                        ${fmt.balanceChange(h.balance_change_7d)}
-                    </td>
-                </tr>
-            `).join('');
-        } else {
-            $('#holders-body').innerHTML = '<tr><td colspan="5">No holder data</td></tr>';
-        }
-
-        // Render historical chart using netflow trend
-        if (data.netflow_trend?.values) {
-            const hasData = data.netflow_trend.values.some(v => v !== 0);
-            if (hasData) {
-                renderHistoricalChart(data.netflow_trend);
-            } else {
-                renderNoDataChart('history-chart', 'No netflow data available for this token');
-            }
-        } else {
-            renderNoDataChart('history-chart', 'No netflow data available');
-        }
-
-        // Render buyer/seller activity chart
-        if (data.buyer_seller_summary) {
-            const hasActivity = data.buyer_seller_summary.buyer_volume > 0 || data.buyer_seller_summary.seller_volume > 0;
-            if (hasActivity) {
-                renderTransferChart(data.buyer_seller_summary);
-            } else {
-                renderNoDataChart('transfer-chart', 'No recent buyer/seller activity');
-            }
-        } else {
-            renderNoDataChart('transfer-chart', 'No activity data available');
-        }
-
-    } catch (error) {
-        console.error('Error loading drilldown:', error);
-        $('#drilldown-narrative').textContent = `Error loading data: ${error.message}`;
-    }
-}
-
-// === Fund Holdings & Activity Tables ===
-
-function renderFundHoldingsTable(fundHoldings) {
-    const body = $('#fund-holdings-body');
-    if (!body) return;
-
-    if (!fundHoldings || fundHoldings.length === 0) {
-        body.innerHTML = '<tr><td colspan="9" class="no-data">No institutional/fund holdings detected</td></tr>';
-        // Hide the card if no data
-        const card = document.getElementById('fund-holdings-card');
-        if (card) card.style.display = 'none';
-        return;
-    }
-
-    // Show the card
-    const card = document.getElementById('fund-holdings-card');
-    if (card) card.style.display = 'block';
-
-    body.innerHTML = fundHoldings.map(h => `
-        <tr>
-            <td title="${h.label || h.address}">${h.label || fmt.address(h.address)}</td>
-            <td><span class="holder-type-badge holder-type-${h.type || 'fund'}">${h.type || 'fund'}</span></td>
-            <td class="numeric">${fmt.usd(h.value_usd)}</td>
-            <td class="numeric">${fmt.number(Math.round(h.token_amount || 0))}</td>
-            <td class="numeric ${h.balance_change_24h > 0 ? 'positive' : h.balance_change_24h < 0 ? 'negative' : ''}">
-                ${fmt.balanceChange(h.balance_change_24h)}
-            </td>
-            <td class="numeric ${h.balance_change_7d > 0 ? 'positive' : h.balance_change_7d < 0 ? 'negative' : ''}">
-                ${fmt.balanceChange(h.balance_change_7d)}
-            </td>
-            <td class="numeric ${h.balance_change_30d > 0 ? 'positive' : h.balance_change_30d < 0 ? 'negative' : ''}">
-                ${fmt.balanceChange(h.balance_change_30d)}
-            </td>
-            <td class="numeric">${fmt.number(Math.round(h.total_inflow || 0))}</td>
-            <td class="numeric">${fmt.number(Math.round(h.total_outflow || 0))}</td>
-        </tr>
-    `).join('');
-}
-
-function renderActivityTable(mostActive) {
-    const body = $('#most-active-body');
-    if (!body) return;
-
-    if (!mostActive || mostActive.length === 0) {
-        body.innerHTML = '<tr><td colspan="4" class="no-data">No activity data available</td></tr>';
-        return;
-    }
-
-    body.innerHTML = mostActive.map(h => `
-        <tr>
-            <td title="${h.label || h.address}">${h.label || fmt.address(h.address)}</td>
-            <td><span class="holder-type-badge holder-type-${h.type || 'other'}">${h.type || 'other'}</span></td>
-            <td class="numeric">${fmt.usd(h.value_usd)}</td>
-            <td class="numeric ${h.balance_change_30d > 0 ? 'positive' : h.balance_change_30d < 0 ? 'negative' : ''}">
-                ${fmt.balanceChange(h.balance_change_30d)}
-            </td>
-        </tr>
-    `).join('');
-}
-
-// === Historical Charts ===
-
-function renderNoDataChart(canvasId, message) {
-    const container = document.getElementById(canvasId);
-    if (!container) return;
-
-    // Get the parent container and replace canvas with message
-    const parent = container.parentElement;
-    if (parent) {
-        parent.innerHTML = `
-            <div class="no-data-message">
-                <span>${message}</span>
-            </div>
-        `;
-    }
-}
-
-function renderHistoricalChart(netflowTrend) {
-    const container = document.getElementById('history-chart');
-    if (!container) return;
-
-    if (historyChart) {
-        historyChart.destroy();
-    }
-
-    // Use netflow trend data: [1h, 24h, 7d, 30d]
-    const labels = netflowTrend.periods || ['1h', '24h', '7d', '30d'];
-    const values = netflowTrend.values || [0, 0, 0, 0];
-    const momentum = netflowTrend.momentum || 'steady';
-
-    // Color based on momentum
-    const lineColor = momentum === 'accelerating' ? CHART_COLORS.positive :
-                      momentum === 'decelerating' ? CHART_COLORS.negative :
-                      CHART_COLORS.neutral;
-
-    historyChart = new Chart(container, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Net Flow',
-                data: values,
-                borderColor: lineColor,
-                backgroundColor: lineColor + '20',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                pointBackgroundColor: lineColor,
-            }]
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  state.charts.priceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: filtered.map(d => d.datetime),
+      datasets: [{
+        data: filtered.map(d => d.value),
+        borderColor: '#000',
+        backgroundColor: 'rgba(0,0,0,0.04)',
+        borderWidth: 1.5,
+        fill: true,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: '#000',
+        tension: 0.1,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        ...chartDefaults.scales,
+        y: {
+          ...chartDefaults.scales.y,
+          ticks: {
+            ...chartDefaults.scales.y.ticks,
+            callback: v => fmt.usd(v),
+          },
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => fmt.usdSigned(context.raw)
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                },
-                y: {
-                    grid: { color: CHART_COLORS.border },
-                    ticks: {
-                        callback: (value) => fmt.usd(value)
-                    }
-                }
-            }
-        }
-    });
+      },
+    },
+  });
 }
 
-function renderTransferChart(buyerSellerSummary) {
-    const container = document.getElementById('transfer-chart');
-    if (!container) return;
+function renderMetricChart(canvasId, data, label) {
+  if (!data) return;
+  const filtered = filterByDays(data, 365);
+  destroyChart(canvasId);
 
-    if (transferChart) {
-        transferChart.destroy();
-    }
-
-    // Use buyer/seller data from drilldown
-    const labels = ['Buyers', 'Sellers'];
-    const values = [
-        buyerSellerSummary.buyer_volume || 0,
-        buyerSellerSummary.seller_volume || 0,
-    ];
-    const colors = [
-        CHART_COLORS.positive,  // Buyers = bullish
-        CHART_COLORS.negative,  // Sellers = bearish
-    ];
-
-    transferChart = new Chart(container, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: values,
-                backgroundColor: colors,
-                borderWidth: 0,
-            }]
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  state.charts[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: filtered.map(d => d.datetime),
+      datasets: [{
+        data: filtered.map(d => d.value),
+        borderColor: '#000',
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        borderWidth: 1.2,
+        fill: true,
+        pointRadius: 0,
+        tension: 0.2,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        ...chartDefaults.scales,
+        y: {
+          ...chartDefaults.scales.y,
+          ticks: {
+            ...chartDefaults.scales.y.ticks,
+            callback: v => fmt.num(v),
+          },
         },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => `${fmt.usd(context.raw)} (${context.label === 'Buyers' ? buyerSellerSummary.buyer_count : buyerSellerSummary.seller_count} wallets)`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { color: CHART_COLORS.border },
-                    ticks: {
-                        callback: (value) => fmt.usd(value)
-                    }
-                },
-                y: {
-                    grid: { display: false },
-                }
-            }
-        }
+      },
+    },
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Nav links
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const view = link.dataset.view;
+      showView(view);
+      if (view === 'market') loadMarket();
+      if (view === 'valuation') loadValuation();
     });
-}
+  });
 
-function updateLastUpdated() {
-    const now = new Date();
-    $('#last-updated').textContent = `Updated: ${now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-    })}`;
-}
+  // Logo goes to market
+  document.getElementById('logoLink').addEventListener('click', e => {
+    e.preventDefault();
+    showView('market');
+    loadMarket();
+  });
 
-// Auto-refresh every 5 minutes
-setInterval(() => {
-    loadOverview();
-    loadData();
-}, 5 * 60 * 1000);
+  // Back button
+  document.getElementById('backBtn').addEventListener('click', () => {
+    showView('market');
+  });
+
+  // Chart range buttons
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.priceRange = parseInt(btn.dataset.days);
+      if (state.profileData?.metrics?.price_usd?.data) {
+        renderPriceChart(state.profileData.metrics.price_usd.data, state.priceRange);
+      }
+    });
+  });
+
+  // Initial load
+  loadMarket();
+
+  // Auto refresh every 5 minutes
+  setInterval(() => {
+    if (state.currentView === 'market') loadMarket();
+    else if (state.currentView === 'valuation') loadValuation();
+  }, 5 * 60 * 1000);
+});
