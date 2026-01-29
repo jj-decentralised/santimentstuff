@@ -476,6 +476,21 @@ def create_app() -> FastAPI:
         asyncio.create_task(_santiment_background_pull())
         return {"message": "Pull retry triggered"}
 
+    @app.get("/debug/render", response_class=HTMLResponse)
+    async def debug_render():
+        """Debug: server-rendered market table to verify data + rendering."""
+        if not _san_cache:
+            return "<html><body><p>Santiment not configured</p></body></html>"
+        rows = []
+        for slug in TOP_TOKENS[:10]:
+            data = _san_cache.get_timeseries("price_usd", slug)
+            project = _san_cache.get_project(slug)
+            name = project.get("name", slug) if project else slug
+            price = data[-1]["value"] if data else "N/A"
+            rows.append(f"<tr><td>{name}</td><td>{price}</td><td>{len(data) if data else 0} pts</td></tr>")
+        table = "<table border=1><tr><th>Name</th><th>Price</th><th>Data</th></tr>" + "".join(rows) + "</table>"
+        return f"<html><body><h2>Debug Render ({len(rows)} tokens)</h2>{table}<p>Status: {_san_pull_status.get('status')}</p></body></html>"
+
     @app.get("/health")
     async def health_check():
         """Health check endpoint."""
