@@ -44,3 +44,11 @@ htmlcov/
 
 # Logs
 *.log
+
+# Santiment data cache
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Stress test results
+results/
