@@ -42,6 +42,7 @@ from core.ssr_renderer import (
     render_sectors_page,
     render_developers_page,
     set_ticker_data_fn,
+    set_theme,
     fmt_usd,
     fmt_pct,
     pct_class,
@@ -1196,6 +1197,18 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Theme middleware — reads ?theme= param
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request
+
+    class ThemeMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: Request, call_next):
+            theme = request.query_params.get("theme", "auto")
+            set_theme(theme)
+            return await call_next(request)
+
+    app.add_middleware(ThemeMiddleware)
 
     # Mount static files
     static_path = os.path.join(os.path.dirname(__file__), "..", "..", "static")

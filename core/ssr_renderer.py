@@ -98,14 +98,20 @@ def _esc(s):
 
 # Module-level ticker data getter — set by api.py at startup
 _ticker_data_fn = None
+_current_theme = "auto"
 
 def set_ticker_data_fn(fn):
     """Set the function that provides ticker data for the header strip."""
     global _ticker_data_fn
     _ticker_data_fn = fn
 
+def set_theme(theme: str):
+    """Set the current theme for rendering."""
+    global _current_theme
+    _current_theme = theme if theme in ("dark", "light") else "auto"
 
-def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0) -> str:
+
+def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0, theme: str = "auto") -> str:
     nav_items = [
         ("briefing", "/", "Briefing"),
         ("explore", "/explore", "Explore"),
@@ -145,8 +151,10 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             )
         ticker_html = f'<div class="ticker-strip"><div class="ticker-strip-inner">{ticker_items}</div></div>'
 
+    effective_theme = theme if theme != "auto" else _current_theme
+    html_class = f' class="{effective_theme}"' if effective_theme in ('dark', 'light') else ''
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en"{html_class}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -169,6 +177,10 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
             <label for="nav-toggle" class="nav-toggle-label"><span></span></label>
             <nav class="header-nav">{nav_html}</nav>
+            <div class="header-right">
+                <a href="?theme=dark" class="theme-toggle" title="Dark mode">&#9790;</a>
+                <a href="?theme=light" class="theme-toggle" title="Light mode">&#9788;</a>
+            </div>
         </div>
     </header>
     <main class="main">{body}</main>
