@@ -1518,6 +1518,45 @@ def _performance_table(price_data: list, vol_data: list = None) -> str:
     </div>"""
 
 
+def _sparkline_grid(_data_fn, token_name: str) -> str:
+    """Compact sparkline grid showing all metrics with time-series data."""
+    spark_defs = [
+        ("price_usd", "Price"), ("volume_usd", "Volume"),
+        ("daily_active_addresses", "Active Addr"), ("dev_activity", "Dev Activity"),
+        ("exchange_balance", "Exch Balance"), ("network_growth", "Net Growth"),
+        ("transaction_volume", "Tx Volume"), ("mvrv_usd", "MVRV"),
+        ("social_volume_total", "Social Vol"),
+    ]
+    cells = []
+    for key, label in spark_defs:
+        data = _data_fn(key)
+        if data and len(data) >= 5:
+            svg = sparkline_svg(data, width=110, height=28)
+            vals = [d.get("value") for d in data if d.get("value") is not None]
+            if vals:
+                latest = vals[-1]
+                first = vals[0]
+                if first and first != 0:
+                    chg = (latest - first) / first * 100
+                    chg_cls = "up" if chg > 0 else "down" if chg < 0 else "flat"
+                    chg_html = f'<span class="spark-grid-chg {chg_cls}">{fmt_pct(chg)}</span>'
+                else:
+                    chg_html = ""
+            else:
+                chg_html = ""
+            cells.append(f"""<div class="spark-grid-cell">
+                <div class="spark-grid-label">{_esc(label)}</div>
+                <div class="spark-grid-chart">{svg}</div>
+                {chg_html}
+            </div>""")
+    if len(cells) < 3:
+        return ""
+    return f"""<div class="spark-grid-section">
+        <div class="spark-grid-title">Metric Trends</div>
+        <div class="spark-grid">{"".join(cells)}</div>
+    </div>"""
+
+
 def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None, mcap_rank: int = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
@@ -1967,6 +2006,8 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {_onchain_narrative(name, ticker, price, mvrv, _latest, _data)}
 
     {f'<div class="metrics-grid">{"".join(metric_cards)}</div>' if metric_cards else ''}
+
+    {_sparkline_grid(_data, name)}
 
     {_performance_table(price_data, _data("volume_usd"))}
 
