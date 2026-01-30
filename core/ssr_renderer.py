@@ -3413,6 +3413,30 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
         </div>
     </div>""")
 
+    # Weighted performance + best/worst
+    if len(tokens) >= 2:
+        weighted_chg = 0
+        for t in tokens:
+            w = (t.get("marketcap_usd") or 0) / total_mcap if total_mcap > 0 else 1 / len(tokens)
+            weighted_chg += w * (t.get("price_usd_change") or 0)
+        best = max(tokens, key=lambda t: t.get("price_usd_change") or -999)
+        worst = min(tokens, key=lambda t: t.get("price_usd_change") or 999)
+        parts.append(f"""
+    <div class="watchlist-perf">
+        <div class="watchlist-perf-item">
+            <span class="watchlist-perf-label">Weighted 24h</span>
+            <span class="watchlist-perf-val {css_class(weighted_chg)}">{fmt_pct(weighted_chg)}</span>
+        </div>
+        <div class="watchlist-perf-item">
+            <span class="watchlist-perf-label">Best</span>
+            <a href="/token/{best.get('slug','')}" class="watchlist-perf-val up">{_esc(best.get('ticker',''))} {fmt_pct(best.get('price_usd_change'))}</a>
+        </div>
+        <div class="watchlist-perf-item">
+            <span class="watchlist-perf-label">Worst</span>
+            <a href="/token/{worst.get('slug','')}" class="watchlist-perf-val down">{_esc(worst.get('ticker',''))} {fmt_pct(worst.get('price_usd_change'))}</a>
+        </div>
+    </div>""")
+
     # Portfolio allocation donut
     if len(tokens) >= 2:
         parts.append(f"""
