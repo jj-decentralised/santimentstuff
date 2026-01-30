@@ -3348,8 +3348,10 @@ def render_sector_detail_page(tokens: list, sector_key: str, sector_label: str, 
     <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Market Cap</div><div class="stat-value">{fmt_usd(total_mcap)}</div></div>
         <div class="stat-card"><div class="stat-label">Volume 24h</div><div class="stat-value">{fmt_usd(total_vol)}</div></div>
+        <div class="stat-card"><div class="stat-label">Vol/MCap</div><div class="stat-value">{f"{total_vol / total_mcap:.4f}" if total_mcap > 0 else "&mdash;"}</div></div>
         <div class="stat-card"><div class="stat-label">Avg 24h Change</div><div class="stat-value {ch_cls}">{fmt_pct(avg_change)}</div></div>
         <div class="stat-card"><div class="stat-label">Breadth</div><div class="stat-value"><span class="up">{up_count}</span> / <span class="down">{down_count}</span></div></div>
+        <div class="stat-card"><div class="stat-label">Tokens</div><div class="stat-value">{len(tokens)}</div></div>
     </div>
 
     <div class="zone-distribution">
