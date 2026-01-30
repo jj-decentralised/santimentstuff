@@ -1580,8 +1580,11 @@ def render_screener_page(
         arrow = " &darr;" if sort_by == col and order == "desc" else " &uarr;" if sort_by == col else ""
         return f'<a href="/screener?{_qs(sort=col, order=new_order)}" class="sort-link">{label}{arrow}</a>'
 
+    displayed = tokens[:200]
+    max_vol = max((t.get("volume_usd") or 0 for t in displayed), default=1) or 1
+
     rows = []
-    for i, t in enumerate(tokens[:200]):
+    for i, t in enumerate(displayed):
         slug = t.get("slug", "")
         pct = t.get("price_usd_change")
         mvrv = t.get("mvrv_usd")
@@ -1592,6 +1595,9 @@ def render_screener_page(
         cat_label = _categories.get(cat, cat.replace("_", " ").title())
         spark = t.get("sparkline_7d", [])
         spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
+        vol = t.get("volume_usd") or 0
+        vol_pct = min(100, vol / max_vol * 100) if max_vol else 0
+        vol_bar = f'<div class="vol-bar-wrap"><div class="vol-bar-fill" style="width:{vol_pct:.0f}%"></div><span class="vol-bar-val">{fmt_usd(vol)}</span></div>'
         rows.append(f"""<tr>
             <td class="col-rank">{i+1}</td>
             <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
@@ -1600,7 +1606,7 @@ def render_screener_page(
             <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
             <td class="col-spark hide-mobile">{spark_html}</td>
             <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
-            <td class="col-num hide-mobile">{fmt_usd(t.get("volume_usd"))}</td>
+            <td class="hide-mobile" style="min-width:130px">{vol_bar}</td>
             <td class="col-num hide-mobile">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td>
             <td class="col-tag hide-mobile">{zone_html}</td>
         </tr>""")
