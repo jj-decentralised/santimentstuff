@@ -2396,8 +2396,13 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
     parts = []
     parts.append(_breadcrumbs(("Watchlist",)))
     parts.append(f"""
-    <h1 class="page-title">Watchlist</h1>
-    <p class="page-subtitle">Track your favorite tokens &middot; Bookmark this URL to save your list</p>""")
+    <div class="page-title-row">
+        <div>
+            <h1 class="page-title">Watchlist</h1>
+            <p class="page-subtitle">Track your favorite tokens &middot; Bookmark this URL to save your list</p>
+        </div>
+        {f'<a href="/watchlist/export.csv?tokens={_esc(slugs_str)}" class="export-btn">&#8681; Export CSV</a>' if slugs_str else ''}
+    </div>""")
 
     # Add token form
     parts.append(f"""
@@ -2452,6 +2457,14 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
             <div class="stat-label">Tokens</div>
             <div class="stat-value">{len(tokens)}</div>
         </div>
+    </div>""")
+
+    # Portfolio allocation donut
+    if len(tokens) >= 2:
+        parts.append(f"""
+    <div class="section">
+        <div class="section-title">Allocation by Market Cap</div>
+        <div class="radar-wrap">{donut_chart_svg(tokens, width=300, height=300, max_slices=10)}</div>
     </div>""")
 
     # Token table

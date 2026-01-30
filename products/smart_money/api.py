@@ -1487,6 +1487,26 @@ def create_app() -> FastAPI:
                 t["sparkline_7d"] = sparkline_data.get(t["slug"], [])
         return render_watchlist_page(matched, slug_list)
 
+    @app.get("/watchlist/export.csv")
+    async def get_watchlist_csv(
+        tokens: str = Query(default="", description="Comma-separated slugs"),
+    ):
+        """Export watchlist as CSV."""
+        slug_list = [s.strip() for s in tokens.split(",") if s.strip()][:50]
+        all_tokens = _get_all_tokens()
+        slug_map = {t["slug"]: t for t in all_tokens}
+        matched = [slug_map[s] for s in slug_list if s in slug_map]
+        lines = ["Name,Ticker,Slug,Sector,Price USD,24h Change %,Market Cap,Volume 24h,MVRV"]
+        for t in matched:
+            name = t.get("name", "").replace(",", "")
+            lines.append(f"{name},{t.get('ticker','')},{t.get('slug','')},{t.get('sector','')},{t.get('price_usd',0):.4f},{t.get('price_usd_change',0) or 0:.2f},{t.get('marketcap_usd',0) or 0:.0f},{t.get('volume_usd',0) or 0:.0f},{t.get('mvrv_usd',0) or 0:.4f}")
+        csv_data = "\n".join(lines)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=watchlist_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"},
+        )
+
     @app.get("/token/{slug}", response_class=HTMLResponse)
     async def get_token_page(
         slug: str,
