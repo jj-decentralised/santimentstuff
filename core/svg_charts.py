@@ -543,6 +543,13 @@ def line_chart_svg(
             )
             leg_x += len(label) * 6.5 + 30
 
+    # Watermark
+    elements.append(
+        f'<text x="{pad_left + chart_w - 4}" y="{pad_top + chart_h - 6}" text-anchor="end" '
+        f'font-size="8" font-weight="600" fill="#D1D5DB" '
+        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
+    )
+
     # Insert defs
     if defs:
         elements.insert(1, f'<defs>{"".join(defs)}</defs>')
@@ -707,6 +714,13 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
 
         idx = row_end
 
+    # Watermark
+    elements.append(
+        f'<text x="{width - 8}" y="{height - 6}" text-anchor="end" '
+        f'font-size="8" font-weight="600" fill="#D1D5DB" '
+        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
+    )
+
     elements.append('</svg>')
     return "\n".join(elements)
 
@@ -864,6 +878,13 @@ def sentiment_gauge_svg(
     elements.append(
         f'<text x="{cx + r + 5:.1f}" y="{cy + 4:.1f}" text-anchor="start" '
         f'font-size="9" fill="#9CA3AF" font-family="Inter,system-ui,sans-serif">Overvalued</text>'
+    )
+
+    # Watermark
+    elements.append(
+        f'<text x="{width - 6}" y="{height - 4}" text-anchor="end" '
+        f'font-size="7" font-weight="600" fill="#D1D5DB" '
+        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
     )
 
     elements.append('</svg>')
@@ -1112,6 +1133,13 @@ def scatter_plot_svg(
                 f'font-size="8" font-weight="600" fill="{color}" '
                 f'font-family="Inter,system-ui,sans-serif">{ticker}</text>'
             )
+
+    # Watermark
+    elements.append(
+        f'<text x="{pad_left + chart_w - 4}" y="{pad_top + chart_h - 6}" text-anchor="end" '
+        f'font-size="8" font-weight="600" fill="#D1D5DB" '
+        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
+    )
 
     elements.append('</svg>')
     return "\n".join(elements)
