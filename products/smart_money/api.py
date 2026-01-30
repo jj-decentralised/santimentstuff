@@ -1373,15 +1373,19 @@ def create_app() -> FastAPI:
                 if isinstance(mdata, dict) and mdata.get("data"):
                     mdata["data"] = mdata["data"][-tf_days:]
 
-        # Find sector info for this token
+        # Find sector info and related tokens
         token_info = None
+        related_tokens = []
         all_tokens = _get_all_tokens()
         for t in all_tokens:
             if t.get("slug") == slug:
                 token_info = t
                 break
+        if token_info:
+            sec = token_info.get("sector", "other")
+            related_tokens = [t for t in all_tokens if t.get("sector") == sec and t.get("slug") != slug][:8]
 
-        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info)
+        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens)
 
     # ============================================================
     # JSON API ENDPOINTS (for programmatic access)

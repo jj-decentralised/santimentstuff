@@ -760,6 +760,48 @@ a { color: inherit; text-decoration: none; }
 .tf-btn:hover { border-color: var(--text-muted); color: var(--text-secondary); }
 .tf-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
 
+/* Related tokens */
+.related-tokens-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.related-token-card {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all 0.12s;
+}
+.related-token-card:hover {
+  border-color: var(--text-muted);
+  background: var(--bg-alt);
+}
+.related-token-card strong {
+  font-size: 0.82rem;
+  font-family: var(--mono);
+}
+.related-token-name {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+.related-token-price {
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+.related-token-pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
 /* ================================================================
    EXPLORE SUMMARY BAR
    ================================================================ */
@@ -1880,9 +1922,28 @@ a { color: inherit; text-decoration: none; }
 .footer {
   max-width: var(--max-w);
   margin: 0 auto;
-  padding: 12px 20px;
+  padding: 20px 20px 24px;
   border-top: 1px solid var(--border);
-  font-size: 0.7rem;
+}
+.footer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.footer-links a {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 0.1s;
+}
+.footer-links a:hover { color: var(--text); }
+.footer-meta {
+  font-size: 0.68rem;
   color: var(--text-faint);
 }
 

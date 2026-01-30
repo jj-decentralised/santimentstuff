@@ -171,7 +171,22 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     </header>
     <main class="main">{body}</main>
     <footer class="footer">
-        On-chain data via <strong>Santiment</strong>. Refreshed daily. Not financial advice.
+        <div class="footer-inner">
+            <div class="footer-links">
+                <a href="/">Briefing</a>
+                <a href="/explore">Explore</a>
+                <a href="/sectors">Sectors</a>
+                <a href="/screener">Screener</a>
+                <a href="/insights">Insights</a>
+                <a href="/valuation">Valuation</a>
+                <a href="/compare?tokens=bitcoin,ethereum,solana">Compare</a>
+                <a href="/watchlist?tokens=bitcoin,ethereum,solana">Watchlist</a>
+                <a href="/sync">Sync Status</a>
+            </div>
+            <div class="footer-meta">
+                On-chain data via <strong>Santiment</strong>. Refreshed daily. Not financial advice.
+            </div>
+        </div>
     </footer>
 </body>
 </html>"""
@@ -954,7 +969,7 @@ def render_explore_page(
 # TOKEN PROFILE
 # ================================================================
 
-def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None) -> str:
+def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
     ticker = _esc(token.get("ticker", ""))
@@ -1108,6 +1123,30 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         {charts_html if charts_html else '<p class="chart-empty">Chart data is still loading...</p>'}
     </div>
     """
+
+    # Related tokens section
+    if related_tokens:
+        sec = (token_info or {}).get("sector", "other")
+        sec_label = sec.replace("_", " ").title()
+        rel_cards = ""
+        for rt in related_tokens:
+            rt_pct = rt.get("price_usd_change")
+            rt_cls = css_class(rt_pct)
+            rel_cards += (
+                f'<a href="/token/{rt["slug"]}" class="related-token-card">'
+                f'<strong>{_esc(rt.get("ticker", ""))}</strong>'
+                f'<span class="related-token-name">{_esc(rt.get("name", ""))}</span>'
+                f'<span class="related-token-price">{fmt_usd(rt.get("price_usd"))}</span>'
+                f'<span class="related-token-pct {rt_cls}">{fmt_pct(rt_pct)}</span>'
+                f'</a>'
+            )
+        body += f"""
+    <div class="profile-section">
+        <div class="profile-section-title">Related — {_esc(sec_label)}</div>
+        <div class="related-tokens-grid">{rel_cards}</div>
+        <div class="card-footer"><a href="/explore?sector={sec}">View all {_esc(sec_label)} tokens &rarr;</a></div>
+    </div>"""
+
     return page_shell(f"{name} ({ticker})", body)
 
 
