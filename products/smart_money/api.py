@@ -1144,6 +1144,7 @@ def _build_screener_tokens(
     sort_by="marketcap_usd", order="desc",
     sector="all", category="all",
     search: str = "",
+    min_mvrv: float = -999, max_mvrv: float = 999,
 ):
     tokens = _get_all_tokens()
     if search:
@@ -1161,6 +1162,13 @@ def _build_screener_tokens(
             continue
         if category != "all" and t.get("category") != category:
             continue
+        # MVRV range filter
+        if min_mvrv > -999 or max_mvrv < 999:
+            mvrv = t.get("mvrv_usd")
+            if mvrv is None:
+                continue
+            if mvrv < min_mvrv or mvrv > max_mvrv:
+                continue
         filtered.append(t)
     filtered.sort(key=lambda x: x.get(sort_by) or 0, reverse=(order == "desc"))
     return filtered
@@ -1481,6 +1489,8 @@ def create_app() -> FastAPI:
         sector: str = Query(default="all"),
         category: str = Query(default="all"),
         q: str = Query(default=""),
+        min_mvrv: float = Query(default=-999, description="Min MVRV filter"),
+        max_mvrv: float = Query(default=999, description="Max MVRV filter"),
     ):
         """Token screener with filters and search."""
         tier_ranges = {
@@ -1492,7 +1502,7 @@ def create_app() -> FastAPI:
             "all": (0, float("inf")),
         }
         min_mcap, max_mcap = tier_ranges.get(tier, (0, float("inf")))
-        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order, sector, category, search=q)
+        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order, sector, category, search=q, min_mvrv=min_mvrv, max_mvrv=max_mvrv)
         # Add sparklines for visible tokens (top 200)
         visible_slugs = [t["slug"] for t in tokens[:200]]
         if visible_slugs and _san_cache:
@@ -1503,6 +1513,7 @@ def create_app() -> FastAPI:
             tokens, tier=tier, min_change=min_change, max_change=max_change,
             sort_by=sort, order=order, sector=sector, category=category,
             sectors=SECTORS, categories=CATEGORIES, search=q,
+            min_mvrv=min_mvrv, max_mvrv=max_mvrv,
         )
 
     @app.get("/screener/export.csv")

@@ -2189,6 +2189,7 @@ def render_screener_page(
     sector: str = "all", category: str = "all",
     sectors: dict = None, categories: dict = None,
     search: str = "",
+    min_mvrv: float = -999, max_mvrv: float = 999,
 ) -> str:
     _sectors = sectors or {}
     _categories = categories or {}
@@ -2196,6 +2197,10 @@ def render_screener_page(
     # Build query string base for filter links
     def _qs(**overrides):
         params = {"tier": tier, "sort": sort_by, "order": order, "sector": sector, "category": category}
+        if min_mvrv > -999:
+            params["min_mvrv"] = min_mvrv
+        if max_mvrv < 999:
+            params["max_mvrv"] = max_mvrv
         params.update(overrides)
         return "&".join(f"{k}={v}" for k, v in params.items() if v not in ("all", None, -999, 999) or k in ("tier",))
 
@@ -2309,6 +2314,17 @@ def render_screener_page(
             <a href="/screener?sort=price_usd_change&order=asc" class="filter-btn preset-btn">Top Losers</a>
             <a href="/screener?sort=volume_usd&order=desc" class="filter-btn preset-btn">High Volume</a>
             <a href="/screener?sort=dev_activity&order=desc" class="filter-btn preset-btn">Active Dev</a>
+        </div>
+    </div>
+    <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">MVRV:</span>
+            <a href="/screener?{_qs(min_mvrv=-999, max_mvrv=999)}" class="filter-btn{' active' if min_mvrv <= -999 and max_mvrv >= 999 else ''}">All</a>
+            <a href="/screener?{_qs(min_mvrv=-999, max_mvrv=0.7)}" class="filter-btn{' active' if max_mvrv == 0.7 else ''}">Deep Value (&lt;0.7)</a>
+            <a href="/screener?{_qs(min_mvrv=0.7, max_mvrv=1.0)}" class="filter-btn{' active' if min_mvrv == 0.7 and max_mvrv == 1.0 else ''}">Undervalued (0.7-1.0)</a>
+            <a href="/screener?{_qs(min_mvrv=1.0, max_mvrv=2.0)}" class="filter-btn{' active' if min_mvrv == 1.0 and max_mvrv == 2.0 else ''}">Fair (1.0-2.0)</a>
+            <a href="/screener?{_qs(min_mvrv=2.0, max_mvrv=3.5)}" class="filter-btn{' active' if min_mvrv == 2.0 and max_mvrv == 3.5 else ''}">Overvalued (2.0-3.5)</a>
+            <a href="/screener?{_qs(min_mvrv=3.5, max_mvrv=999)}" class="filter-btn{' active' if min_mvrv == 3.5 else ''}">Euphoria (&gt;3.5)</a>
         </div>
     </div>
     <div class="table-wrap">
