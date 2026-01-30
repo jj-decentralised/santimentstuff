@@ -1884,6 +1884,52 @@ a { color: inherit; text-decoration: none; }
   margin-top: 8px;
   font-style: italic;
 }
+.composite-score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--bg-alt);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.composite-score-num {
+  font-size: 1.6rem;
+  font-weight: 900;
+  font-family: var(--mono);
+  min-width: 48px;
+  text-align: center;
+}
+.score-greed { color: #059669; }
+.score-greed-mild { color: #10B981; }
+.score-neutral { color: #6B7280; }
+.score-fear-mild { color: #F59E0B; }
+.score-fear { color: #DC2626; }
+.composite-score-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  min-width: 90px;
+}
+.composite-score-bar {
+  flex: 1;
+  height: 8px;
+  background: linear-gradient(90deg, #DC2626, #F59E0B 40%, #10B981 70%, #059669);
+  border-radius: 4px;
+  position: relative;
+}
+.composite-score-fill {
+  position: absolute;
+  top: -3px;
+  height: 14px;
+  width: 4px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+}
 .regime-badge {
   font-size: 0.68rem;
   font-weight: 800;

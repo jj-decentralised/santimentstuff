@@ -408,6 +408,38 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
 
     regime_narrative = ". ".join(narrative_parts) + "." if narrative_parts else ""
 
+    # Composite Market Score (0-100, fear→greed style)
+    score_parts = []
+    if avg_mvrv is not None:
+        # MVRV component: 0-4 range mapped to 0-100 (inverted — low MVRV = fear)
+        mvrv_score = min(100, max(0, (avg_mvrv / 3.0) * 100))
+        score_parts.append(mvrv_score)
+    if total_bd > 0:
+        score_parts.append(breadth_pct)
+    if vol_conc > 0:
+        # High concentration = lower score
+        score_parts.append(max(0, 100 - vol_conc))
+    composite_score = int(sum(score_parts) / len(score_parts)) if score_parts else 50
+    if composite_score >= 75:
+        score_label, score_cls = "Extreme Greed", "score-greed"
+    elif composite_score >= 55:
+        score_label, score_cls = "Greed", "score-greed-mild"
+    elif composite_score >= 45:
+        score_label, score_cls = "Neutral", "score-neutral"
+    elif composite_score >= 25:
+        score_label, score_cls = "Fear", "score-fear-mild"
+    else:
+        score_label, score_cls = "Extreme Fear", "score-fear"
+
+    score_html = f"""
+        <div class="composite-score">
+            <div class="composite-score-num {score_cls}">{composite_score}</div>
+            <div class="composite-score-label">{score_label}</div>
+            <div class="composite-score-bar">
+                <div class="composite-score-fill" style="left:{composite_score}%"></div>
+            </div>
+        </div>"""
+
     parts.append(f"""
     <section class="card regime-card" id="regime">
         <div class="card-header">
@@ -451,6 +483,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         </div>
         <p class="regime-desc">{zone_desc}</p>
         {f'<p class="regime-narrative">{regime_narrative}</p>' if regime_narrative else ''}
+        {score_html}
     </section>""")
 
     # ── Section 2: Valuation Landscape ──
