@@ -31,7 +31,7 @@ def fmt_usd(v) -> str:
     if a >= 1e6:
         return f"{sign}${a/1e6:.2f}M"
     if a >= 1e3:
-        return f"{sign}${a/1e3:,.0f}"
+        return f"{sign}${a:,.0f}"
     if a >= 1:
         return f"{sign}${a:,.2f}"
     if a >= 0.01:
