@@ -254,8 +254,8 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
                     <input type="text" name="q" placeholder="Search..." class="header-search-input" accesskey="s" autocomplete="off">
                 </form>
                 {_freshness_badge()}
-                <a href="?theme=dark" class="theme-toggle" title="Dark mode">&#9790;</a>
-                <a href="?theme=light" class="theme-toggle" title="Light mode">&#9788;</a>
+                {f'<a href="?theme=light" class="theme-toggle" title="Switch to light mode">&#9788;</a>' if effective_theme == 'dark' else f'<a href="?theme=dark" class="theme-toggle" title="Switch to dark mode">&#9790;</a>'}
+                {f'<a href="?theme=auto" class="theme-toggle theme-auto-link" title="Use system theme">Auto</a>' if effective_theme in ('dark', 'light') else ''}
             </div>
         </div>
     </header>

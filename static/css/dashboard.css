@@ -3592,6 +3592,12 @@ html.dark .screener-table tbody tr:hover { background: #161B22; }
   cursor: pointer;
 }
 .theme-toggle:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.theme-auto-link {
+  font-size: 0.55rem;
+  font-weight: 700;
+  width: auto;
+  padding: 0 6px;
+}
 .freshness-badge {
   font-size: 0.62rem;
   padding: 2px 8px;
