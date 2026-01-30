@@ -9,7 +9,7 @@ Open it once, understand the entire crypto economy in 30 seconds.
 """
 
 import html as html_mod
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from .svg_charts import (
@@ -22,6 +22,26 @@ from .svg_charts import (
 # ================================================================
 # FORMAT HELPERS
 # ================================================================
+
+def _relative_time(iso_str: str) -> str:
+    """Convert ISO datetime string to relative time like '3m ago', '2h ago'."""
+    try:
+        if "T" in iso_str:
+            dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00").replace("+00:00", ""))
+        else:
+            dt = datetime.strptime(iso_str[:19], "%Y-%m-%d %H:%M:%S")
+        delta = datetime.utcnow() - dt
+        secs = int(delta.total_seconds())
+        if secs < 60:
+            return "just now"
+        if secs < 3600:
+            return f"{secs // 60}m ago"
+        if secs < 86400:
+            return f"{secs // 3600}h ago"
+        return f"{secs // 86400}d ago"
+    except Exception:
+        return iso_str[:16]
+
 
 def fmt_usd(v) -> str:
     if v is None:
@@ -142,7 +162,8 @@ def _freshness_badge() -> str:
         if status in ("pulling_phase1", "pulling_phase2"):
             return '<a href="/sync" class="freshness-badge syncing" title="Data sync in progress">&#8634; Syncing</a>'
         if last_pull:
-            return f'<a href="/sync" class="freshness-badge" title="Last sync: {_esc(last_pull)}">&#10003; Live</a>'
+            rel = _relative_time(last_pull)
+            return f'<a href="/sync" class="freshness-badge" title="Last sync: {_esc(last_pull)}">&#10003; {rel}</a>'
         return '<a href="/sync" class="freshness-badge stale" title="No data yet">&#9679; Loading</a>'
     except Exception:
         return ""
