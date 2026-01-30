@@ -917,6 +917,9 @@ def render_insights_page(
             narrative = ". ".join(insight_parts) + "."
             parts.append(f'<div class="onchain-narrative"><p>{narrative}</p></div>')
 
+    sec_qs = f"&sector={sector}" if sector != "all" else ""
+    parts.append(f'<div class="export-bar"><a href="/insights/export.csv?view={view_id}{sec_qs}" class="export-btn">&#8681; Export CSV</a></div>')
+
     # ── Scatter plot ──
     current_view = None
     if scatter_views:
@@ -1967,6 +1970,7 @@ def render_compare_page(tokens: list) -> str:
     <div class="compare-summary-grid">{summary_cards}</div>
     <div class="compare-actions">
         <a href="/watchlist?tokens={_esc(slug_list)}" class="filter-btn">Save as Watchlist</a>
+        <a href="/compare/export.csv?tokens={_esc(slug_list)}" class="export-btn">&#8681; Export CSV</a>
     </div>
     <div class="section">
         <div class="section-title">Metrics</div>

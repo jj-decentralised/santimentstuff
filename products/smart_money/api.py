@@ -1320,6 +1320,34 @@ def create_app() -> FastAPI:
         return render_insights_page(insights, view_id=view, scatter_views=SCATTER_VIEWS,
                                     sector=sector, sectors=SECTORS)
 
+    @app.get("/insights/export.csv")
+    async def get_insights_csv(
+        view: str = Query(default="mvrv_nvt"),
+        sector: str = Query(default="all"),
+    ):
+        """Export insights scatter data as CSV."""
+        insights = _build_insights_data(view)
+        points = insights.get("points", [])
+        if sector != "all":
+            points = [p for p in points if p.get("sector") == sector]
+        # Find view axes labels
+        x_label, y_label = "X", "Y"
+        for v in SCATTER_VIEWS:
+            if v[0] == view:
+                x_label = v[4] if len(v) > 4 else "X"
+                y_label = v[5] if len(v) > 5 else "Y"
+                break
+        lines = [f"Name,Ticker,Slug,Sector,Thesis,{x_label},{y_label},Market Cap"]
+        for p in points[:500]:
+            name = p.get("name", "").replace(",", "")
+            lines.append(f"{name},{p.get('ticker','')},{p.get('slug','')},{p.get('sector','')},{p.get('thesis','')},{p.get('x',0):.4f},{p.get('y',0):.4f},{p.get('marketcap_usd',0):.0f}")
+        csv_data = "\n".join(lines)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=insights_{view}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"},
+        )
+
     @app.get("/valuation", response_class=HTMLResponse)
     async def get_valuation_page(
         sector: str = Query(default="all"),
@@ -1387,6 +1415,31 @@ def create_app() -> FastAPI:
         slug_list = [s.strip() for s in tokens.split(",") if s.strip()][:5]
         comparison_data = _build_comparison_data(slug_list)
         return render_compare_page(comparison_data)
+
+    @app.get("/compare/export.csv")
+    async def get_compare_csv(
+        tokens: str = Query(default="bitcoin,ethereum,solana"),
+    ):
+        """Export comparison data as CSV."""
+        slug_list = [s.strip() for s in tokens.split(",") if s.strip()][:5]
+        comparison_data = _build_comparison_data(slug_list)
+        compare_metrics = ["price_usd", "marketcap_usd", "volume_usd", "mvrv_usd", "nvt",
+                          "daily_active_addresses", "dev_activity", "exchange_balance"]
+        header = "Metric," + ",".join(d.get("name", d["slug"]).replace(",", "") for d in comparison_data)
+        lines = [header]
+        for mk in compare_metrics:
+            row = mk.replace("_", " ").title()
+            for d in comparison_data:
+                m = d.get("metrics", {}).get(mk)
+                val = m.get("latest") if isinstance(m, dict) else None
+                row += f",{val:.4f}" if val is not None else ",N/A"
+            lines.append(row)
+        csv_data = "\n".join(lines)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=compare_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"},
+        )
 
     @app.get("/screener", response_class=HTMLResponse)
     async def get_screener_page(
