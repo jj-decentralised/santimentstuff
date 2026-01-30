@@ -202,6 +202,31 @@ a { color: inherit; text-decoration: none; }
 .bc-sep { margin: 0 5px; opacity: 0.5; }
 .bc-current { color: var(--text-primary); font-weight: 500; }
 
+/* Page title row with export */
+.page-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.export-btn {
+  font-size: 0.72rem;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.export-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: var(--card-bg);
+}
+
 /* Token quick nav (prev/next) */
 .token-quick-nav {
   display: flex;

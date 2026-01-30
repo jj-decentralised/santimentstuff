@@ -15,7 +15,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from core.cache import CacheManager
@@ -1248,6 +1248,39 @@ def create_app() -> FastAPI:
         return render_explore_page(tokens, page=page, per_page=per_page, total=total,
                                    sector=sector, category=category, sectors=SECTORS, categories=CATEGORIES,
                                    search=q, briefing=briefing, sort_by=sort, order=order)
+
+    @app.get("/explore/csv")
+    async def get_explore_csv(
+        sector: str = Query(default="all"),
+        category: str = Query(default="all"),
+        q: str = Query(default=""),
+        sort: str = Query(default="marketcap_usd"),
+        order: str = Query(default="desc"),
+    ):
+        """Export explore data as CSV."""
+        tokens, _ = _build_token_list(1, 500, sector=sector, category=category, search=q, sort_by=sort, order=order)
+        import csv, io
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["Rank", "Name", "Ticker", "Slug", "Sector", "Price (USD)", "Change 24h %", "Market Cap", "Volume 24h", "MVRV"])
+        for i, t in enumerate(tokens):
+            writer.writerow([
+                i + 1,
+                t.get("name", ""),
+                t.get("ticker", ""),
+                t.get("slug", ""),
+                t.get("sector", ""),
+                t.get("price_usd", ""),
+                f"{t.get('price_usd_change', ''):.2f}" if t.get("price_usd_change") is not None else "",
+                t.get("marketcap_usd", ""),
+                t.get("volume_usd", ""),
+                f"{t.get('mvrv_usd', ''):.2f}" if t.get("mvrv_usd") is not None else "",
+            ])
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=onchain_pulse_tokens.csv"},
+        )
 
     @app.get("/insights", response_class=HTMLResponse)
     async def get_insights_page(

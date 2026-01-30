@@ -889,9 +889,26 @@ def render_explore_page(
     subtitle = f"{total} tokens" + (f" in {sector_label}" if sector_label else "") + search_note + " ranked by market cap"
     bc_crumbs = [("Explore",)] if sector == "all" else [("Explore", "/explore"), (sector_label,)]
     parts.append(_breadcrumbs(*bc_crumbs))
+    csv_qs_parts = []
+    if sector != "all":
+        csv_qs_parts.append(f"sector={sector}")
+    if category != "all":
+        csv_qs_parts.append(f"category={category}")
+    if search:
+        csv_qs_parts.append(f"q={_esc(search)}")
+    if sort_by != "marketcap_usd":
+        csv_qs_parts.append(f"sort={sort_by}")
+    if order != "desc":
+        csv_qs_parts.append(f"order={order}")
+    csv_url = "/explore/csv" + ("?" + "&".join(csv_qs_parts) if csv_qs_parts else "")
     parts.append(f"""
-    <h1 class="page-title">Explore</h1>
-    <p class="page-subtitle">{subtitle}</p>""")
+    <div class="page-title-row">
+        <div>
+            <h1 class="page-title">Explore</h1>
+            <p class="page-subtitle">{subtitle}</p>
+        </div>
+        <a href="{csv_url}" class="export-btn" download>&#8681; Export CSV</a>
+    </div>""")
 
     # Market summary bar (from briefing data)
     if briefing and page == 1 and not search:
