@@ -111,6 +111,7 @@ def _breadcrumbs(*crumbs: tuple) -> str:
 # Module-level ticker data getter — set by api.py at startup
 _ticker_data_fn = None
 _current_theme = "auto"
+_freshness_fn = None
 
 def set_ticker_data_fn(fn):
     """Set the function that provides ticker data for the header strip."""
@@ -121,6 +122,30 @@ def set_theme(theme: str):
     """Set the current theme for rendering."""
     global _current_theme
     _current_theme = theme if theme in ("dark", "light") else "auto"
+
+def set_freshness_fn(fn):
+    """Set the function that returns the last sync time string."""
+    global _freshness_fn
+    _freshness_fn = fn
+
+
+def _freshness_badge() -> str:
+    """Return a small badge showing data freshness."""
+    if not _freshness_fn:
+        return ""
+    try:
+        info = _freshness_fn()
+        if not info:
+            return ""
+        status = info.get("status", "unknown")
+        last_pull = info.get("last_pull", "")
+        if status in ("pulling_phase1", "pulling_phase2"):
+            return '<a href="/sync" class="freshness-badge syncing" title="Data sync in progress">&#8634; Syncing</a>'
+        if last_pull:
+            return f'<a href="/sync" class="freshness-badge" title="Last sync: {_esc(last_pull)}">&#10003; Live</a>'
+        return '<a href="/sync" class="freshness-badge stale" title="No data yet">&#9679; Loading</a>'
+    except Exception:
+        return ""
 
 
 def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0, theme: str = "auto") -> str:
@@ -192,6 +217,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             <label for="nav-toggle" class="nav-toggle-label"><span></span></label>
             <nav class="header-nav">{nav_html}</nav>
             <div class="header-right">
+                {_freshness_badge()}
                 <a href="?theme=dark" class="theme-toggle" title="Dark mode">&#9790;</a>
                 <a href="?theme=light" class="theme-toggle" title="Light mode">&#9788;</a>
             </div>

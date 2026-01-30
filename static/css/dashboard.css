@@ -2243,6 +2243,23 @@ html.dark .sector-exchange { background: #78350F; color: #FCD34D; border-color: 
   cursor: pointer;
 }
 .theme-toggle:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.freshness-badge {
+  font-size: 0.62rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  background: rgba(16,185,129,0.15);
+  color: #10B981;
+}
+.freshness-badge.syncing {
+  background: rgba(59,130,246,0.15);
+  color: #3B82F6;
+}
+.freshness-badge.stale {
+  background: rgba(245,158,11,0.15);
+  color: #F59E0B;
+}
 
 /* ================================================================
    FOOTER

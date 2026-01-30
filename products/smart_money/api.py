@@ -42,6 +42,7 @@ from core.ssr_renderer import (
     render_sectors_page,
     render_developers_page,
     set_ticker_data_fn,
+    set_freshness_fn,
     set_theme,
     fmt_usd,
     fmt_pct,
@@ -1217,6 +1218,7 @@ def create_app() -> FastAPI:
 
     # Register ticker data function for header strip
     set_ticker_data_fn(_get_ticker_data)
+    set_freshness_fn(lambda: _san_pull_status)
 
     # Custom 404 page
     from starlette.exceptions import HTTPException as StarletteHTTPException
