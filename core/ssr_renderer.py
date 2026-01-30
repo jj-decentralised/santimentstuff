@@ -1401,6 +1401,68 @@ def render_compare_page(tokens: list) -> str:
     # Current slugs for watchlist link
     slug_list = ",".join(t.get("slug", "") for t in tokens)
 
+    # Correlation matrix (price returns)
+    corr_html = ""
+    if len(tokens) >= 2:
+        # Extract daily returns for each token
+        returns = {}
+        for t in tokens:
+            price_data = t.get("metrics", {}).get("price_usd", {}).get("data", [])
+            vals = [d.get("value") for d in price_data if d.get("value") is not None]
+            if len(vals) >= 10:
+                rets = [(vals[i] - vals[i-1]) / vals[i-1] for i in range(1, len(vals)) if vals[i-1] != 0]
+                returns[t.get("ticker", t.get("slug", ""))] = rets
+
+        if len(returns) >= 2:
+            tickers = list(returns.keys())
+            # Compute Pearson correlation
+            def _corr(a, b):
+                n = min(len(a), len(b))
+                if n < 5:
+                    return None
+                a, b = a[-n:], b[-n:]
+                ma = sum(a) / n
+                mb = sum(b) / n
+                cov = sum((a[i] - ma) * (b[i] - mb) for i in range(n))
+                sa = sum((x - ma) ** 2 for x in a) ** 0.5
+                sb = sum((x - mb) ** 2 for x in b) ** 0.5
+                if sa == 0 or sb == 0:
+                    return None
+                return cov / (sa * sb)
+
+            header = "<th></th>" + "".join(f"<th>{_esc(t)}</th>" for t in tickers)
+            rows = ""
+            for i, ti in enumerate(tickers):
+                cells = f"<td class='col-name'><strong>{_esc(ti)}</strong></td>"
+                for j, tj in enumerate(tickers):
+                    if i == j:
+                        cells += '<td class="corr-cell corr-1">1.00</td>'
+                    else:
+                        r = _corr(returns[ti], returns[tj])
+                        if r is not None:
+                            # Color: green for high positive, red for negative
+                            if r > 0.7:
+                                cls = "corr-high"
+                            elif r > 0.3:
+                                cls = "corr-med"
+                            elif r > -0.3:
+                                cls = "corr-low"
+                            else:
+                                cls = "corr-neg"
+                            cells += f'<td class="corr-cell {cls}">{r:.2f}</td>'
+                        else:
+                            cells += '<td class="corr-cell">&mdash;</td>'
+                rows += f"<tr>{cells}</tr>"
+            corr_html = f"""
+    <div class="section">
+        <div class="section-title">Price Correlation Matrix</div>
+        <p class="section-subtitle">Based on daily return correlation</p>
+        <div class="table-wrap"><table class="data-table corr-table">
+            <thead><tr>{header}</tr></thead>
+            <tbody>{rows}</tbody>
+        </table></div>
+    </div>"""
+
     body = f"""
     {_breadcrumbs(("Compare",))}
     <h1 class="page-title">Compare Tokens</h1>
@@ -1417,6 +1479,7 @@ def render_compare_page(tokens: list) -> str:
         <div class="section-title">Metrics</div>
         {comp_table}
     </div>
+    {corr_html}
     <div class="section">
         <div class="section-title">Charts</div>
         <div class="chart-grid chart-grid-2">
