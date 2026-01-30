@@ -213,6 +213,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             </div>
             <div class="footer-meta">
                 On-chain data via <strong>Santiment</strong>. Refreshed daily. Not financial advice.
+                <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC</span>
             </div>
         </div>
     </footer>
