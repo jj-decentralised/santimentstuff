@@ -1990,13 +1990,27 @@ def render_developers_page(tokens: list, sector: str = "all", sectors: dict = No
         with_change = [t for t in tokens if t.get("dev_activity_change") is not None]
         growing = sum(1 for t in with_change if (t.get("dev_activity_change") or 0) > 5)
         declining = sum(1 for t in with_change if (t.get("dev_activity_change") or 0) < -5)
+        # Narrative
+        dev_narrative_parts = []
+        if growing > declining * 2:
+            dev_narrative_parts.append(f"Strong builder momentum — {growing} projects with growing dev activity vs {declining} declining")
+        elif declining > growing * 2:
+            dev_narrative_parts.append(f"Cooling development — {declining} projects losing dev momentum vs {growing} growing")
+        else:
+            dev_narrative_parts.append(f"Mixed developer trends — {growing} growing, {declining} declining")
+        top3 = [t.get("name", "") for t in tokens[:3] if t.get("dev_activity")]
+        if top3:
+            dev_narrative_parts.append(f"Most active: {', '.join(top3)}")
+        dev_narrative = ". ".join(dev_narrative_parts) + "." if dev_narrative_parts else ""
+
         parts.append(f"""
     <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Total Dev Activity</div><div class="stat-value">{total_dev:,.0f}</div></div>
         <div class="stat-card"><div class="stat-label">Average</div><div class="stat-value">{avg_dev:,.1f}</div></div>
-        <div class="stat-card"><div class="stat-label">Growing (>5%)</div><div class="stat-value up">{growing}</div></div>
-        <div class="stat-card"><div class="stat-label">Declining (<-5%)</div><div class="stat-value down">{declining}</div></div>
-    </div>""")
+        <div class="stat-card"><div class="stat-label">Growing (&gt;5%)</div><div class="stat-value up">{growing}</div></div>
+        <div class="stat-card"><div class="stat-label">Declining (&lt;-5%)</div><div class="stat-value down">{declining}</div></div>
+    </div>
+    {f'<p class="regime-narrative">{dev_narrative}</p>' if dev_narrative else ''}""")
 
     # Leaderboard table
     rows = ""
