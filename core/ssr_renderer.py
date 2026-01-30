@@ -1289,6 +1289,64 @@ def _render_token_description(token: dict) -> str:
     return f'<div class="token-desc-block">{"".join(parts)}</div>'
 
 
+def _onchain_narrative(name: str, ticker: str, price, mvrv, _latest, _data) -> str:
+    """Generate a short narrative paragraph summarizing on-chain state."""
+    parts = []
+
+    # Price direction
+    price_ts = _data("price_usd")
+    if price_ts and len(price_ts) >= 7:
+        p_now = price_ts[-1].get("value") or 0
+        p_7d = price_ts[-7].get("value") or 0
+        if p_7d and p_7d > 0:
+            chg = (p_now - p_7d) / p_7d * 100
+            if chg > 5:
+                parts.append(f"{name} is up {chg:.1f}% over the past 7 days")
+            elif chg < -5:
+                parts.append(f"{name} has declined {abs(chg):.1f}% over the past 7 days")
+            else:
+                parts.append(f"{name} has been relatively flat over the past 7 days ({chg:+.1f}%)")
+
+    # MVRV assessment
+    if mvrv is not None:
+        if mvrv < 0.7:
+            parts.append("trading in a deep value zone (MVRV well below realized value)")
+        elif mvrv < 1.0:
+            parts.append("currently undervalued relative to its realized value")
+        elif mvrv > 3.5:
+            parts.append("in euphoria territory — historically a distribution zone")
+        elif mvrv > 2.0:
+            parts.append("showing elevated MVRV suggesting caution")
+
+    # Exchange balance trend
+    exch_ts = _data("exchange_balance")
+    if exch_ts and len(exch_ts) >= 7:
+        ex_now = exch_ts[-1].get("value") or 0
+        ex_7d = exch_ts[-7].get("value") or 0
+        if ex_7d and ex_7d > 0:
+            ex_chg = (ex_now - ex_7d) / ex_7d * 100
+            if ex_chg < -3:
+                parts.append("with notable exchange outflows suggesting accumulation")
+            elif ex_chg > 3:
+                parts.append("with exchange inflows indicating potential distribution pressure")
+
+    # Dev activity
+    dev = _latest("dev_activity")
+    if dev is not None:
+        if dev > 100:
+            parts.append("Strong developer activity signals ongoing project commitment")
+        elif dev > 30:
+            parts.append("Moderate developer activity detected")
+
+    if not parts:
+        return ""
+
+    narrative = ". ".join(parts) + "."
+    # Capitalize first letter after joining
+    narrative = narrative[0].upper() + narrative[1:] if narrative else ""
+    return f'<div class="onchain-narrative"><p>{narrative}</p></div>'
+
+
 def _performance_table(price_data: list, vol_data: list = None) -> str:
     """Render a historical performance summary table (7d/30d/90d/1y)."""
     if not price_data or len(price_data) < 7:
@@ -1614,6 +1672,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {health_score_html}
 
     {_render_token_description(token)}
+    {_onchain_narrative(name, ticker, price, mvrv, _latest, _data)}
 
     {f'<div class="metrics-grid">{"".join(metric_cards)}</div>' if metric_cards else ''}
 

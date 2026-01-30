@@ -1087,6 +1087,17 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-muted);
 }
 
+.onchain-narrative {
+  padding: 10px 14px;
+  background: var(--bg-alt);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin-bottom: 14px;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.onchain-narrative p { margin: 0; }
 .profile-section { margin-bottom: 24px; }
 .profile-section-header {
   display: flex;
