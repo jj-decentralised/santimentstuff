@@ -1014,7 +1014,7 @@ def _render_token_description(token: dict) -> str:
     return f'<div class="token-desc-block">{"".join(parts)}</div>'
 
 
-def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None) -> str:
+def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
     ticker = _esc(token.get("ticker", ""))
@@ -1139,8 +1139,11 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         mvrv_html = f'<div class="profile-mvrv"><span class="zone {zone_css}">{zone_label}</span> <span class="profile-mvrv-val">MVRV {mvrv:.2f}</span></div>'
 
     _bc = _breadcrumbs(("Explore", "/explore"), (f"{name} ({ticker})",))
+    prev_link = f'<a href="/token/{prev_token["slug"]}" class="token-nav-link" title="{_esc(prev_token.get("name",""))}">&larr; {_esc(prev_token.get("name","")[:20])}</a>' if prev_token else '<span></span>'
+    next_link = f'<a href="/token/{next_token["slug"]}" class="token-nav-link" title="{_esc(next_token.get("name",""))}">{_esc(next_token.get("name","")[:20])} &rarr;</a>' if next_token else '<span></span>'
     body = f"""
     {_bc}
+    <div class="token-quick-nav">{prev_link}{next_link}</div>
 
     <div class="profile-hero">
         <div>

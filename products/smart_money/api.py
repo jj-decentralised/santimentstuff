@@ -1415,7 +1415,18 @@ def create_app() -> FastAPI:
             sec = token_info.get("sector", "other")
             related_tokens = [t for t in all_tokens if t.get("sector") == sec and t.get("slug") != slug][:8]
 
-        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens)
+        # Prev/next token navigation (by market cap rank)
+        prev_token = None
+        next_token = None
+        for i, t in enumerate(all_tokens):
+            if t.get("slug") == slug:
+                if i > 0:
+                    prev_token = {"slug": all_tokens[i-1]["slug"], "name": all_tokens[i-1].get("name", "")}
+                if i < len(all_tokens) - 1:
+                    next_token = {"slug": all_tokens[i+1]["slug"], "name": all_tokens[i+1].get("name", "")}
+                break
+
+        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens, prev_token=prev_token, next_token=next_token)
 
     # ============================================================
     # JSON API ENDPOINTS (for programmatic access)
