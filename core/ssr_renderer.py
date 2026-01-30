@@ -884,7 +884,7 @@ def render_explore_page(
 # TOKEN PROFILE
 # ================================================================
 
-def render_token_profile(token: dict, metrics: dict, slug: str = "") -> str:
+def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
     ticker = _esc(token.get("ticker", ""))
@@ -985,25 +985,56 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "") -> str:
     if secondary_charts:
         charts_html += chart_panel(secondary_charts, columns=2)
 
+    # Sector / category tags
+    sector_html = ""
+    if token_info:
+        sec = token_info.get("sector", "other")
+        cat = token_info.get("category", "other")
+        sec_label = sec.replace("_", " ").title()
+        cat_label = cat.replace("_", " ").title()
+        sector_html = f'<a href="/explore?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a>'
+        if cat != "other" and cat != sec:
+            sector_html += f' <span class="profile-cat">{_esc(cat_label)}</span>'
+
+    # Timeframe selector
+    tf_btns = ""
+    for tf_key, tf_label in [("7d", "7D"), ("30d", "30D"), ("90d", "90D"), ("1y", "1Y"), ("all", "All")]:
+        active = " active" if tf_key == timeframe else ""
+        tf_btns += f'<a href="/token/{slug}?tf={tf_key}" class="tf-btn{active}">{tf_label}</a>'
+
+    # MVRV zone
+    mvrv_html = ""
+    if mvrv is not None:
+        zone_label, zone_css, zone_desc = mvrv_zone(mvrv)
+        mvrv_html = f'<div class="profile-mvrv"><span class="zone {zone_css}">{zone_label}</span> <span class="profile-mvrv-val">MVRV {mvrv:.2f}</span></div>'
+
     body = f"""
-    <a href="/" class="back-link">&larr; Briefing</a>
+    <div class="profile-nav-row">
+        <a href="/" class="back-link">&larr; Briefing</a>
+        <a href="/explore" class="back-link">Explore</a>
+    </div>
 
     <div class="profile-hero">
         <div>
             <span class="profile-name">{name}</span>
             <span class="profile-ticker">{ticker}</span>
             {f'<span class="profile-infra">{infra}</span>' if infra else ''}
+            <div class="profile-tags">{sector_html}</div>
         </div>
         <div class="profile-price-block">
             <span class="profile-price">{fmt_usd(price)}</span>
             <div class="profile-changes">{"".join(changes)}</div>
+            {mvrv_html}
         </div>
     </div>
 
     {f'<div class="metrics-grid">{"".join(metric_cards)}</div>' if metric_cards else ''}
 
     <div class="profile-section">
-        <div class="profile-section-title">Charts</div>
+        <div class="profile-section-header">
+            <div class="profile-section-title">Charts</div>
+            <div class="tf-selector">{tf_btns}</div>
+        </div>
         {charts_html if charts_html else '<p class="chart-empty">Chart data is still loading...</p>'}
     </div>
     """
@@ -1135,12 +1166,15 @@ def render_screener_page(
         cat = t.get("category", "other")
         sec_label = _sectors.get(sec, sec.replace("_", " ").title())
         cat_label = _categories.get(cat, cat.replace("_", " ").title())
+        spark = t.get("sparkline_7d", [])
+        spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
         rows.append(f"""<tr>
             <td class="col-rank">{i+1}</td>
             <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
             <td class="col-tag hide-mobile"><span class="sector-tag sector-{sec}">{_esc(sec_label)}</span></td>
             <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
             <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
+            <td class="col-spark hide-mobile">{spark_html}</td>
             <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
             <td class="col-num hide-mobile">{fmt_usd(t.get("volume_usd"))}</td>
             <td class="col-num hide-mobile">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td>
@@ -1172,12 +1206,13 @@ def render_screener_page(
                 <th class="col-tag hide-mobile">Sector</th>
                 <th class="col-num">{sort_link("price_usd", "Price")}</th>
                 <th class="col-num">{sort_link("price_usd_change", "24h")}</th>
+                <th class="col-spark hide-mobile">7d</th>
                 <th class="col-num">{sort_link("marketcap_usd", "Mkt Cap")}</th>
                 <th class="col-num hide-mobile">{sort_link("volume_usd", "Volume")}</th>
                 <th class="col-num hide-mobile">{sort_link("mvrv_usd", "MVRV")}</th>
                 <th class="col-tag hide-mobile">Zone</th>
             </tr></thead>
-            <tbody>{"".join(rows) if rows else '<tr><td colspan="9" class="empty-cell">No tokens match.</td></tr>'}</tbody>
+            <tbody>{"".join(rows) if rows else '<tr><td colspan="10" class="empty-cell">No tokens match.</td></tr>'}</tbody>
         </table>
     </div>
     """

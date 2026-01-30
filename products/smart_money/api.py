@@ -1282,6 +1282,12 @@ def create_app() -> FastAPI:
         }
         min_mcap, max_mcap = tier_ranges.get(tier, (0, float("inf")))
         tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order, sector, category, search=q)
+        # Add sparklines for visible tokens (top 200)
+        visible_slugs = [t["slug"] for t in tokens[:200]]
+        if visible_slugs and _san_cache:
+            sparkline_data = _san_cache.get_timeseries_multi_slugs("price_usd", visible_slugs, limit_per_slug=7)
+            for t in tokens[:200]:
+                t["sparkline_7d"] = sparkline_data.get(t["slug"], [])
         return render_screener_page(
             tokens, tier=tier, min_change=min_change, max_change=max_change,
             sort_by=sort, order=order, sector=sector, category=category,
@@ -1289,7 +1295,10 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/token/{slug}", response_class=HTMLResponse)
-    async def get_token_page(slug: str):
+    async def get_token_page(
+        slug: str,
+        tf: str = Query(default="all", description="Timeframe: 7d, 30d, 90d, 1y, all"),
+    ):
         """Token profile — fully server-rendered with deep metrics."""
         if not _san_cache:
             return HTMLResponse("<html><body><h1>Data not available yet</h1><a href='/'>Back</a></body></html>")
@@ -1302,7 +1311,22 @@ def create_app() -> FastAPI:
         if not metrics:
             return HTMLResponse(f"<html><body><h1>No data for {slug}</h1><p>Data may still be loading.</p><a href='/'>Back</a></body></html>")
 
-        return render_token_profile(project, metrics, slug)
+        # Trim timeseries to requested timeframe
+        tf_days = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": 0}.get(tf, 0)
+        if tf_days > 0:
+            for key, mdata in metrics.items():
+                if isinstance(mdata, dict) and mdata.get("data"):
+                    mdata["data"] = mdata["data"][-tf_days:]
+
+        # Find sector info for this token
+        token_info = None
+        all_tokens = _get_all_tokens()
+        for t in all_tokens:
+            if t.get("slug") == slug:
+                token_info = t
+                break
+
+        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info)
 
     # ============================================================
     # JSON API ENDPOINTS (for programmatic access)
