@@ -1287,6 +1287,59 @@ def _render_token_description(token: dict) -> str:
     return f'<div class="token-desc-block">{"".join(parts)}</div>'
 
 
+def _performance_table(price_data: list, vol_data: list = None) -> str:
+    """Render a historical performance summary table (7d/30d/90d/1y)."""
+    if not price_data or len(price_data) < 7:
+        return ""
+    curr = price_data[-1].get("value")
+    if curr is None or curr == 0:
+        return ""
+
+    periods = [("7d", 7), ("30d", 30), ("90d", 90), ("1y", 365)]
+    rows = ""
+    for label, days in periods:
+        if len(price_data) < days + 1:
+            continue
+        prev = price_data[-(days + 1)].get("value")
+        if prev is None or prev == 0:
+            continue
+        ret = (curr - prev) / prev * 100
+        cls = css_class(ret)
+        # High/low in period
+        period_vals = [d.get("value") for d in price_data[-days:] if d.get("value") is not None]
+        hi = max(period_vals) if period_vals else curr
+        lo = min(period_vals) if period_vals else curr
+        # Avg volume if available
+        avg_vol = ""
+        if vol_data and len(vol_data) >= days:
+            vols = [d.get("value") for d in vol_data[-days:] if d.get("value") is not None]
+            if vols:
+                avg_vol = fmt_usd(sum(vols) / len(vols))
+        rows += f"""<tr>
+            <td class="col-name">{label}</td>
+            <td class="{cls}">{fmt_pct(ret)}</td>
+            <td>{fmt_usd(hi)}</td>
+            <td>{fmt_usd(lo)}</td>
+            <td>{avg_vol or '&mdash;'}</td>
+        </tr>"""
+
+    if not rows:
+        return ""
+
+    return f"""
+    <div class="profile-section">
+        <div class="profile-section-title">Performance Summary</div>
+        <div class="table-wrap">
+            <table class="data-table perf-table">
+                <thead><tr>
+                    <th>Period</th><th>Return</th><th>High</th><th>Low</th><th>Avg Vol</th>
+                </tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+    </div>"""
+
+
 def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None, mcap_rank: int = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
@@ -1509,6 +1562,8 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {_render_token_description(token)}
 
     {f'<div class="metrics-grid">{"".join(metric_cards)}</div>' if metric_cards else ''}
+
+    {_performance_table(price_data, _data("volume_usd"))}
 
     <div class="profile-section">
         <div class="profile-section-header">

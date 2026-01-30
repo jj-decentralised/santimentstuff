@@ -654,6 +654,8 @@ a { color: inherit; text-decoration: none; }
 .col-tag { text-align: center; }
 .col-spark { padding: 4px 6px; text-align: center; min-width: 86px; }
 .col-name { min-width: 140px; }
+.perf-table td { font-family: var(--mono); font-size: 0.78rem; }
+.perf-table td:first-child { font-family: var(--sans); font-weight: 700; }
 .token-link {
   display: flex;
   align-items: center;
