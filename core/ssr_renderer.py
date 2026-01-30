@@ -365,11 +365,29 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
 
     # ── Header ──
     now_str = datetime.utcnow().strftime("%B %d, %Y")
+    # Data freshness from cache stats
+    cs = cache_stats or {}
+    last_pull = cs.get("last_pull_at")
+    freshness_html = ""
+    if last_pull:
+        from datetime import timezone as _tz
+        try:
+            last_dt = datetime.fromtimestamp(last_pull)
+            delta_mins = int((datetime.utcnow() - last_dt).total_seconds() / 60)
+            if delta_mins < 1:
+                fresh_text = "just now"
+            elif delta_mins < 60:
+                fresh_text = f"{delta_mins}m ago"
+            else:
+                fresh_text = f"{delta_mins // 60}h ago"
+            freshness_html = f' &middot; <span class="data-freshness" title="Last data pull">Data: {fresh_text}</span>'
+        except Exception:
+            pass
     parts.append(f"""
     <div class="briefing-header">
         <div>
             <h1 class="briefing-title">Daily Economy Briefing</h1>
-            <p class="briefing-date">{now_str} &middot; {b.get("total_tokens", 0)} tokens tracked &middot; <span class="regime-badge {regime[1]}">{regime[0]}</span></p>
+            <p class="briefing-date">{now_str} &middot; {b.get("total_tokens", 0)} tokens tracked &middot; <span class="regime-badge {regime[1]}">{regime[0]}</span>{freshness_html}</p>
         </div>
     </div>""")
 

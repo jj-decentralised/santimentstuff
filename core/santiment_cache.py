@@ -508,6 +508,12 @@ class SantimentCache:
         # DB file size
         db_size_mb = os.path.getsize(self._db_path) / (1024 * 1024) if os.path.exists(self._db_path) else 0
 
+        # Last successful pull timestamp
+        last_pull_row = self._conn.execute(
+            "SELECT MAX(pulled_at) as t FROM pull_log WHERE status = 'success'"
+        ).fetchone()
+        last_pull_at = last_pull_row["t"] if last_pull_row else None
+
         return {
             "total_pulls": total,
             "successful_pulls": success,
@@ -518,6 +524,7 @@ class SantimentCache:
             "projects_cached": project_count,
             "metrics_cataloged": metrics_count,
             "db_size_mb": round(db_size_mb, 2),
+            "last_pull_at": last_pull_at,
         }
 
     # ================================================================

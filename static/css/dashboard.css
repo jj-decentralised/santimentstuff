@@ -2205,6 +2205,10 @@ html.dark .val-heatmap-wrap { border-color: #30363D; }
   color: var(--text-muted);
   margin-top: 2px;
 }
+.data-freshness {
+  font-family: var(--mono); font-size: 0.68rem;
+  color: var(--text-faint); font-weight: 600;
+}
 
 /* Regime card */
 .regime-card { border-width: 2px; }
