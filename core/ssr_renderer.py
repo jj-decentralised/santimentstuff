@@ -2138,6 +2138,14 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         <a href="https://coinmarketcap.com/currencies/{slug}/" class="profile-ext-link" target="_blank" rel="noopener">CoinMarketCap</a>
         <a href="https://messari.io/asset/{slug}" class="profile-ext-link" target="_blank" rel="noopener">Messari</a>
         <a href="https://dexscreener.com/search?q={_esc(ticker)}" class="profile-ext-link" target="_blank" rel="noopener">DexScreener</a>
+    </div>
+    <div class="profile-news-links">
+        <span class="profile-external-label">News &amp; Research:</span>
+        <a href="https://www.google.com/search?q={_esc(name)}+crypto+news&tbm=nws" class="profile-news-link" target="_blank" rel="noopener">&#128240; Google News</a>
+        <a href="https://twitter.com/search?q=%24{_esc(ticker)}&src=typed_query&f=live" class="profile-news-link" target="_blank" rel="noopener">&#120143; Twitter/X</a>
+        <a href="https://www.reddit.com/search/?q={_esc(name)}+crypto&sort=new" class="profile-news-link" target="_blank" rel="noopener">&#9673; Reddit</a>
+        <a href="https://www.theblock.co/search?query={_esc(name)}" class="profile-news-link" target="_blank" rel="noopener">&#9632; The Block</a>
+        <a href="https://decrypt.co/search?query={_esc(name)}" class="profile-news-link" target="_blank" rel="noopener">&#9671; Decrypt</a>
     </div>"""
 
     og_parts = [f"{name} ({ticker})"]

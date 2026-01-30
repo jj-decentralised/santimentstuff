@@ -1155,6 +1155,32 @@ html.dark .spark-grid-cell { background: #161B22; border-color: #30363D; }
 }
 .profile-ext-link:hover { color: var(--accent); text-decoration: underline; }
 
+.profile-news-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.profile-news-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: background 0.12s, color 0.12s;
+}
+.profile-news-link:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 /* Alert badges */
 .alert-badges {
   display: flex;
