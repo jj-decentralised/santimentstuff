@@ -1580,6 +1580,35 @@ def create_app() -> FastAPI:
             data["all_tokens"] = sorted_tokens[:20]
         return render_sectors_page(sector_details, SECTORS)
 
+    @app.get("/sectors/export.csv")
+    async def get_sectors_csv():
+        """Export sector data as CSV."""
+        tokens = _get_all_tokens()
+        sector_agg = {}
+        for t in tokens:
+            sec = t.get("sector", "other")
+            if sec not in sector_agg:
+                sector_agg[sec] = {"count": 0, "mcap": 0, "vol": 0, "pct_sum": 0, "pct_count": 0}
+            sector_agg[sec]["count"] += 1
+            sector_agg[sec]["mcap"] += t.get("marketcap_usd") or 0
+            sector_agg[sec]["vol"] += t.get("volume_usd") or 0
+            pct = t.get("price_usd_change")
+            if pct is not None:
+                sector_agg[sec]["pct_sum"] += pct
+                sector_agg[sec]["pct_count"] += 1
+        lines = ["Sector,Token Count,Market Cap,Volume 24h,Avg 24h Change %"]
+        for sec in sorted(sector_agg, key=lambda s: sector_agg[s]["mcap"], reverse=True):
+            d = sector_agg[sec]
+            avg_ch = d["pct_sum"] / d["pct_count"] if d["pct_count"] > 0 else 0
+            sec_label = SECTORS.get(sec, sec.replace("_", " ").title())
+            lines.append(f"{sec_label},{d['count']},{d['mcap']:.0f},{d['vol']:.0f},{avg_ch:.2f}")
+        csv_data = "\n".join(lines)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=sectors_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"},
+        )
+
     @app.get("/watchlist", response_class=HTMLResponse)
     async def get_watchlist_page(
         tokens: str = Query(default="", description="Comma-separated slugs"),
@@ -1798,6 +1827,50 @@ curl https://santimentstuff-production-2305.up.railway.app/api/v1/metric/mvrv_us
                     "max_365d": max(values[-365:]) if len(values) >= 365 else None,
                 }
         return {"slug": slug, "valuation": result}
+
+    # ============================================================
+    # SEO — SITEMAP + ROBOTS
+    # ============================================================
+
+    @app.get("/sitemap.xml", response_class=Response)
+    async def sitemap():
+        """Dynamic sitemap for SEO."""
+        base = "https://santimentstuff-production-2305.up.railway.app"
+        urls = [
+            (f"{base}/", "daily", "1.0"),
+            (f"{base}/explore", "daily", "0.8"),
+            (f"{base}/screener", "daily", "0.8"),
+            (f"{base}/valuation", "daily", "0.8"),
+            (f"{base}/insights", "daily", "0.7"),
+            (f"{base}/sectors", "daily", "0.7"),
+            (f"{base}/developers", "daily", "0.7"),
+            (f"{base}/compare", "weekly", "0.6"),
+            (f"{base}/sync", "always", "0.3"),
+        ]
+        # Add individual token pages
+        all_tokens = _get_all_tokens()
+        for t in sorted(all_tokens, key=lambda x: x.get("marketcap_usd") or 0, reverse=True)[:200]:
+            slug = t.get("slug", "")
+            if slug:
+                urls.append((f"{base}/token/{slug}", "daily", "0.6"))
+        entries = "\n".join(
+            f"  <url><loc>{loc}</loc><changefreq>{freq}</changefreq><priority>{pri}</priority></url>"
+            for loc, freq, pri in urls
+        )
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{entries}
+</urlset>"""
+        return Response(content=xml, media_type="application/xml")
+
+    @app.get("/robots.txt", response_class=Response)
+    async def robots():
+        """Robots.txt for SEO."""
+        base = "https://santimentstuff-production-2305.up.railway.app"
+        return Response(
+            content=f"User-agent: *\nAllow: /\nSitemap: {base}/sitemap.xml\n",
+            media_type="text/plain",
+        )
 
     # ============================================================
     # SYSTEM ENDPOINTS

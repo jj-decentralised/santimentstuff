@@ -2605,9 +2605,10 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
 
     parts = []
     parts.append(_breadcrumbs(("Sectors",)))
-    parts.append("""
+    parts.append(f"""
     <h1 class="page-title">Sector Overview</h1>
-    <p class="page-subtitle">Performance breakdown by sector</p>""")
+    <p class="page-subtitle">Performance breakdown by sector</p>
+    <div class="export-bar"><a href="/sectors/export.csv" class="export-btn">&#8681; Export CSV</a></div>""")
 
     # Sector cards grid
     cards = ""
