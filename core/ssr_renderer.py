@@ -1132,7 +1132,7 @@ def _render_token_description(token: dict) -> str:
     return f'<div class="token-desc-block">{"".join(parts)}</div>'
 
 
-def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None) -> str:
+def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None, mcap_rank: int = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
     ticker = _esc(token.get("ticker", ""))
@@ -1295,6 +1295,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
 
     <div class="profile-hero">
         <div>
+            {f'<span class="rank-badge">#{mcap_rank}</span>' if mcap_rank else ''}
             <span class="profile-name">{name}</span>
             <span class="profile-ticker">{ticker}</span>
             {f'<span class="profile-infra">{infra}</span>' if infra else ''}

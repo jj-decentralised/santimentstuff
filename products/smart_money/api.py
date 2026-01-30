@@ -1473,15 +1473,17 @@ def create_app() -> FastAPI:
         # Prev/next token navigation (by market cap rank)
         prev_token = None
         next_token = None
+        mcap_rank = None
         for i, t in enumerate(all_tokens):
             if t.get("slug") == slug:
+                mcap_rank = i + 1
                 if i > 0:
                     prev_token = {"slug": all_tokens[i-1]["slug"], "name": all_tokens[i-1].get("name", "")}
                 if i < len(all_tokens) - 1:
                     next_token = {"slug": all_tokens[i+1]["slug"], "name": all_tokens[i+1].get("name", "")}
                 break
 
-        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens, prev_token=prev_token, next_token=next_token)
+        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens, prev_token=prev_token, next_token=next_token, mcap_rank=mcap_rank)
 
     @app.get("/glossary", response_class=HTMLResponse)
     async def get_glossary_page():
