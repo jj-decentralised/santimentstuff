@@ -1312,10 +1312,19 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         val_str = fmt_usd(latest) if is_usd else f"{latest:,.2f}" if latest < 1000 else fmt_num(latest)
         tip = _metric_tips.get(key, "")
         label_html = f'<abbr title="{_esc(tip)}" class="metric-abbr">{_esc(label)}</abbr>' if tip else _esc(label)
+        # 24h delta
+        delta_html = ""
+        ts = _data(key)
+        if ts and len(ts) >= 2:
+            prev_val = ts[-2].get("value")
+            if prev_val is not None and prev_val != 0:
+                delta_pct = (latest - prev_val) / abs(prev_val) * 100
+                d_cls = "up" if delta_pct > 0 else "down" if delta_pct < 0 else "muted"
+                delta_html = f'<span class="metric-delta {d_cls}">{delta_pct:+.1f}%</span>'
         metric_cards.append(f"""
         <div class="metric-card">
             <div class="metric-label">{label_html}</div>
-            <div class="metric-value">{val_str}</div>
+            <div class="metric-value">{val_str}{delta_html}</div>
         </div>""")
 
     # Charts
