@@ -53,6 +53,27 @@ HEATMAP_COLORS = {
 # FORMATTING — Clean, human-readable labels
 # ============================================================
 
+def _fmt_compact(v: float) -> str:
+    """Compact number for tooltips."""
+    if v is None:
+        return "–"
+    a = abs(v)
+    sign = "-" if v < 0 else ""
+    if a >= 1e12:
+        return f"{sign}{a/1e12:.1f}T"
+    if a >= 1e9:
+        return f"{sign}{a/1e9:.1f}B"
+    if a >= 1e6:
+        return f"{sign}{a/1e6:.1f}M"
+    if a >= 1e3:
+        return f"{sign}{a/1e3:,.0f}"
+    if a >= 1:
+        return f"{sign}{a:,.2f}"
+    if a >= 0.01:
+        return f"{sign}{a:.4f}"
+    return f"{sign}{a:.6f}"
+
+
 def _fmt_val(v: float, key: str = "") -> str:
     """Format a value for axis labels — clean, human-readable numbers."""
     if v is None:
@@ -234,9 +255,19 @@ def sparkline_svg(
     line_d = _smooth_path(points, tension=0.25)
     area_d = line_d + f" L{points[-1][0]:.1f},{height} L{points[0][0]:.1f},{height} Z"
 
+    # Tooltip: show latest value, change, and range
+    first_v, last_v = values[0], values[-1]
+    if first_v and first_v != 0:
+        chg = (last_v - first_v) / first_v * 100
+        chg_str = f" ({chg:+.1f}%)"
+    else:
+        chg_str = ""
+    tooltip = f"{_fmt_compact(last_v)}{chg_str} | Range: {_fmt_compact(min_v)}–{_fmt_compact(max_v)}"
+
     return (
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'style="vertical-align:middle">'
+        f'<title>{tooltip}</title>'
         f'<defs>{_gradient_def(gid, color, 0.3, 0.0)}</defs>'
         f'<path d="{area_d}" fill="url(#{gid})"/>'
         f'<path d="{line_d}" fill="none" stroke="{color}" '
