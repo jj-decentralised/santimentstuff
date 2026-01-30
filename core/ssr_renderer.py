@@ -1857,7 +1857,7 @@ def render_screener_page(
 # VALUATION PAGE
 # ================================================================
 
-def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = None) -> str:
+def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = None, zone_filter: str = "all") -> str:
     zone_counts = {}
     for t in tokens:
         mvrv = t.get("mvrv_usd")
@@ -1865,14 +1865,25 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
             z = mvrv_zone(mvrv)
             zone_counts[z[0]] = zone_counts.get(z[0], 0) + 1
 
+    zone_defs_list = [
+        ("Deep Value", "zone-extreme-low", "deep_value"),
+        ("Undervalued", "zone-undervalued", "undervalued"),
+        ("Fair Value", "zone-fair", "fair"),
+        ("Elevated", "zone-fair-high", "elevated"),
+        ("Overvalued", "zone-overvalued", "overvalued"),
+        ("Euphoria", "zone-extreme-high", "euphoria"),
+    ]
     legend = "".join(
         f'<span class="legend-item"><span class="zone {cls}">{label}</span> {zone_counts.get(label, 0)}</span>'
-        for label, cls in [
-            ("Deep Value", "zone-extreme-low"), ("Undervalued", "zone-undervalued"),
-            ("Fair Value", "zone-fair"), ("Elevated", "zone-fair-high"),
-            ("Overvalued", "zone-overvalued"), ("Euphoria", "zone-extreme-high"),
-        ]
+        for label, cls, _ in zone_defs_list
     )
+
+    # Zone filter
+    sec_qs = f"&sector={sector}" if sector != "all" else ""
+    zone_btns = f'<a href="/valuation?{sec_qs[1:] if sec_qs else ""}" class="filter-btn{" active" if zone_filter == "all" else ""}">All Zones</a>'
+    for label, cls, key in zone_defs_list:
+        zone_btns += f'<a href="/valuation?zone={key}{sec_qs}" class="filter-btn{" active" if zone_filter == key else ""}"><span class="zone {cls}" style="font-size:0.68rem">{label}</span></a>'
+    zone_filter_html = f'<div class="filter-bar"><div class="filter-group"><span class="filter-label">Zone:</span>{zone_btns}</div></div>'
 
     # Sector filter
     sector_filter = ""
@@ -1908,6 +1919,7 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
     <h1 class="page-title">Valuation Scanner</h1>
     <p class="page-subtitle">MVRV zones across {len(tokens)} tokens{sector_note}</p>
     {sector_filter}
+    {zone_filter_html}
     <div class="val-legend">{legend}</div>
     <div class="table-wrap">
         <table class="data-table">

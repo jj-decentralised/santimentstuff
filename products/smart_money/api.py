@@ -1323,6 +1323,7 @@ def create_app() -> FastAPI:
     @app.get("/valuation", response_class=HTMLResponse)
     async def get_valuation_page(
         sector: str = Query(default="all"),
+        zone: str = Query(default="all"),
     ):
         """Valuation scanner — fully server-rendered."""
         if not _san_cache:
@@ -1330,7 +1331,14 @@ def create_app() -> FastAPI:
         enriched = _build_all_tokens_for_valuation()
         if sector != "all":
             enriched = [t for t in enriched if t.get("sector") == sector]
-        return render_valuation_page(enriched, sector=sector, sectors=SECTORS)
+        if zone != "all":
+            from core.ssr_renderer import mvrv_zone as _mz
+            zone_label_map = {"deep_value": "Deep Value", "undervalued": "Undervalued", "fair": "Fair Value",
+                             "elevated": "Elevated", "overvalued": "Overvalued", "euphoria": "Euphoria"}
+            target_label = zone_label_map.get(zone, "")
+            if target_label:
+                enriched = [t for t in enriched if t.get("mvrv_usd") is not None and _mz(t["mvrv_usd"])[0] == target_label]
+        return render_valuation_page(enriched, sector=sector, sectors=SECTORS, zone_filter=zone)
 
     @app.get("/sync", response_class=HTMLResponse)
     async def get_sync_page():
