@@ -289,12 +289,20 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Compact table mode */
-.compact-table { font-size: 0.72rem; }
+.compact-table { font-size: 0.70rem; border-collapse: collapse; }
 .compact-table th,
-.compact-table td { padding: 4px 8px; }
-.compact-table .col-name { max-width: 160px; }
-.compact-table .col-name a { font-size: 0.72rem; }
-.compact-table .ticker { font-size: 0.62rem; }
+.compact-table td { padding: 2px 6px; line-height: 1.25; }
+.compact-table th { padding: 4px 6px; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.compact-table tbody tr { border-bottom: 1px solid var(--border); }
+.compact-table tbody tr:hover { background: var(--hover); }
+.compact-table .col-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compact-table .col-name a { font-size: 0.70rem; }
+.compact-table .ticker { font-size: 0.60rem; }
+.compact-table .col-rank { width: 28px; padding-right: 2px; }
+.compact-table .col-num { font-variant-numeric: tabular-nums; }
+.compact-change-cell { position: relative; min-width: 52px; }
+.compact-change-bar { display: block; height: 3px; border-radius: 1px; margin-bottom: 1px; opacity: 0.5; }
+.compact-change-cell span { position: relative; z-index: 1; }
 
 /* Token quick nav (prev/next) */
 .token-quick-nav {

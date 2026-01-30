@@ -1353,12 +1353,17 @@ def render_explore_page(
             sec = t.get("sector", "other")
             sec_label = _sector_labels.get(sec, sec.replace("_", " ").title())
             if compact:
+                # Inline mini-bar for 24h change (max ±20%)
+                bar_w = min(abs(pct or 0), 20) / 20 * 100
+                bar_color = "var(--green)" if (pct or 0) >= 0 else "var(--red)"
+                bar_dir = "right" if (pct or 0) >= 0 else "left"
+                bar_html = f'<span class="compact-change-bar" style="width:{bar_w:.0f}%;background:{bar_color};float:{bar_dir}"></span>'
                 parts.append(f"""<tr>
                 <td class="col-rank">{rank}</td>
                 <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
                 <td class="col-tag hide-mobile"><a href="/explore?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
                 <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
-                <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
+                <td class="col-num {css_class(pct)}"><div class="compact-change-cell">{bar_html}<span>{fmt_pct(pct)}</span></div></td>
                 <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
                 <td class="col-num hide-mobile">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td>
                 <td class="col-tag hide-mobile">{zone_html}</td>
