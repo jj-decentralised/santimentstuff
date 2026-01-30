@@ -193,6 +193,35 @@ class SantimentCache:
         rows = self._conn.execute(query, params).fetchall()
         return [{"datetime": row["dt"], "value": row["value"]} for row in rows]
 
+    def get_latest_values(self, metric: str, interval: str = "1d") -> dict:
+        """
+        Bulk fetch the latest 2 values for ALL slugs for a given metric.
+        Returns {slug: {"latest": val, "prev": val}} — one query instead of N.
+        """
+        rows = self._conn.execute(
+            """SELECT slug, dt, value FROM timeseries
+               WHERE metric = ? AND interval = ?
+               ORDER BY slug, dt DESC""",
+            (metric, interval),
+        ).fetchall()
+
+        result = {}
+        prev_slug = None
+        count = 0
+        for row in rows:
+            s = row["slug"]
+            if s != prev_slug:
+                prev_slug = s
+                count = 0
+            count += 1
+            if count == 1:
+                result.setdefault(s, {})["latest"] = row["value"]
+                result[s]["latest_dt"] = row["dt"]
+            elif count == 2:
+                result[s]["prev"] = row["value"]
+            # skip rows beyond 2 per slug
+        return result
+
     def get_timeseries_date_range(self, metric: str, slug: str, interval: str = "1d") -> Optional[dict]:
         """Get the earliest and latest date we have for a metric/slug."""
         row = self._conn.execute(

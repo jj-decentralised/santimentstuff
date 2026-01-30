@@ -214,7 +214,7 @@ async def lifespan(app: FastAPI):
 
 
 # ============================================================
-# SHARED DATA HELPERS
+# SHARED DATA HELPERS — with in-memory TTL cache
 # ============================================================
 
 KEY_METRICS = [
@@ -224,57 +224,91 @@ KEY_METRICS = [
     "transaction_volume",
 ]
 
+# Lighter set for summary/heatmap (fewer queries)
+SUMMARY_METRICS = [
+    "price_usd", "marketcap_usd", "volume_usd",
+    "daily_active_addresses", "mvrv_usd", "nvt",
+]
+
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 500
+_CACHE_TTL = 120  # seconds — recompute at most every 2 minutes
+
+# In-memory result cache: {key: (timestamp, value)}
+_result_cache: dict = {}
 
 
-def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
-    """Build the market token list from cache with pagination."""
+def _cached(key: str, builder, ttl: int = _CACHE_TTL):
+    """Return cached result or compute and cache it."""
+    import time as _time
+    now = _time.time()
+    entry = _result_cache.get(key)
+    if entry and (now - entry[0]) < ttl:
+        return entry[1]
+    result = builder()
+    _result_cache[key] = (now, result)
+    return result
+
+
+def _build_bulk_token_data(metrics_list: list[str]) -> list[dict]:
+    """
+    Build token list using bulk queries — one SQL query per metric
+    instead of one per token×metric. This is the core performance fix.
+    """
     if not _san_cache:
-        return [], 0
+        return []
 
-    # Get all projects from cache sorted by market cap
     all_projects = _san_cache.get_all_projects()
-
-    tokens = []
+    slug_map = {}
     for project in all_projects:
         slug = project.get("slug")
         if not slug:
             continue
-
-        token_data = {
+        slug_map[slug] = {
             "slug": slug,
             "name": project.get("name", slug),
             "ticker": project.get("ticker", ""),
         }
 
-        for metric in KEY_METRICS:
-            data = _san_cache.get_timeseries(metric, slug)
-            if data and len(data) >= 2:
-                latest = data[-1]["value"]
-                prev = data[-2]["value"]
-                change_pct = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
-                token_data[metric] = latest
-                token_data[f"{metric}_change"] = round(change_pct, 2)
-            elif data and len(data) == 1:
-                token_data[metric] = data[-1]["value"]
-                token_data[f"{metric}_change"] = 0
+    # Bulk fetch: one query per metric (not per token!)
+    for metric in metrics_list:
+        bulk = _san_cache.get_latest_values(metric)
+        for slug, vals in bulk.items():
+            if slug not in slug_map:
+                continue
+            latest = vals.get("latest")
+            prev = vals.get("prev")
+            slug_map[slug][metric] = latest
+            if latest is not None and prev is not None and prev != 0:
+                slug_map[slug][f"{metric}_change"] = round((latest - prev) / prev * 100, 2)
             else:
-                token_data[metric] = None
-                token_data[f"{metric}_change"] = None
+                slug_map[slug][f"{metric}_change"] = 0 if latest is not None else None
 
-        if token_data.get("price_usd") is not None:
-            tokens.append(token_data)
-
+    tokens = [t for t in slug_map.values() if t.get("price_usd") is not None]
     tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
+    return tokens
+
+
+def _get_all_tokens() -> list[dict]:
+    """Cached full token list with all KEY_METRICS."""
+    return _cached("all_tokens", lambda: _build_bulk_token_data(KEY_METRICS))
+
+
+def _get_summary_tokens() -> list[dict]:
+    """Cached summary token list with SUMMARY_METRICS only."""
+    return _cached("summary_tokens", lambda: _build_bulk_token_data(SUMMARY_METRICS))
+
+
+def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
+    """Build the market token list from cache with pagination."""
+    tokens = _get_all_tokens()
     total = len(tokens)
 
-    # Apply pagination
     start = (page - 1) * per_page
     end = start + per_page
     page_tokens = tokens[start:end]
 
-    # Add 7-day sparkline data for page tokens only (expensive to compute for all)
+    # Add 7-day sparkline data only for the visible page (still per-token query, but only ~100)
     for t in page_tokens:
         price_data = _san_cache.get_timeseries("price_usd", t["slug"])
         if price_data and len(price_data) >= 7:
@@ -288,55 +322,16 @@ def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
 
 
 def _build_all_tokens_for_valuation():
-    """Build token list with valuation data (no pagination, limited to those with MVRV/NVT)."""
-    if not _san_cache:
-        return []
-
-    all_projects = _san_cache.get_all_projects()
-    tokens = []
-
-    for project in all_projects:
-        slug = project.get("slug")
-        if not slug:
+    """Build token list with valuation data (uses cached all-tokens)."""
+    tokens = _get_all_tokens()
+    result = []
+    for t in tokens:
+        if t.get("mvrv_usd") is None and t.get("nvt") is None:
             continue
-
-        token_data = {
-            "slug": slug,
-            "name": project.get("name", slug),
-            "ticker": project.get("ticker", ""),
-        }
-
-        for metric in KEY_METRICS:
-            data = _san_cache.get_timeseries(metric, slug)
-            if data and len(data) >= 2:
-                latest = data[-1]["value"]
-                prev = data[-2]["value"]
-                change_pct = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
-                token_data[metric] = latest
-                token_data[f"{metric}_change"] = round(change_pct, 2)
-            elif data and len(data) == 1:
-                token_data[metric] = data[-1]["value"]
-                token_data[f"{metric}_change"] = 0
-            else:
-                token_data[metric] = None
-                token_data[f"{metric}_change"] = None
-
-        if token_data.get("mvrv_usd") is None and token_data.get("nvt") is None:
+        if t.get("price_usd") is None:
             continue
-        if token_data.get("price_usd") is None:
-            continue
-
-        # Pull 90d and 365d averages for MVRV
-        mvrv_data = _san_cache.get_timeseries("mvrv_usd", slug)
-        if mvrv_data:
-            vals = [d["value"] for d in mvrv_data if d.get("value") is not None]
-            token_data["mvrv_90d"] = round(sum(vals[-90:]) / len(vals[-90:]), 4) if len(vals) >= 90 else None
-            token_data["mvrv_365d"] = round(sum(vals[-365:]) / len(vals[-365:]), 4) if len(vals) >= 365 else None
-
-        tokens.append(token_data)
-
-    tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
-    return tokens
+        result.append(t)
+    return result
 
 
 def _build_profile_metrics(slug: str):
@@ -359,85 +354,34 @@ def _build_profile_metrics(slug: str):
 
 
 def _build_all_tokens_summary():
-    """Build a lightweight summary of ALL tokens for dashboard charts (heatmap, dominance, etc.)."""
-    if not _san_cache:
-        return []
-
-    all_projects = _san_cache.get_all_projects()
-    tokens = []
-    for project in all_projects:
-        slug = project.get("slug")
-        if not slug:
-            continue
-        token_data = {
-            "slug": slug,
-            "name": project.get("name", slug),
-            "ticker": project.get("ticker", ""),
-        }
-        # Only pull price and market cap for efficiency
-        for metric in ["price_usd", "marketcap_usd", "volume_usd", "daily_active_addresses", "mvrv_usd", "nvt"]:
-            data = _san_cache.get_timeseries(metric, slug)
-            if data and len(data) >= 2:
-                latest = data[-1]["value"]
-                prev = data[-2]["value"]
-                change = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
-                token_data[metric] = latest
-                token_data[f"{metric}_change"] = round(change, 2)
-            elif data and len(data) == 1:
-                token_data[metric] = data[-1]["value"]
-                token_data[f"{metric}_change"] = 0
-            else:
-                token_data[metric] = None
-                token_data[f"{metric}_change"] = None
-
-        if token_data.get("price_usd") is not None:
-            tokens.append(token_data)
-
-    tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
-    return tokens
+    """Lightweight summary of ALL tokens for dashboard charts."""
+    return _get_summary_tokens()
 
 
 def _build_mcap_trend():
-    """Build total market cap trend data from BTC market cap (proxy for market trend)."""
-    if not _san_cache:
-        return []
-    data = _san_cache.get_timeseries("marketcap_usd", "bitcoin")
-    if data and len(data) > 30:
-        return data[-30:]
-    return data or []
+    """Build total market cap trend data from BTC market cap."""
+    def _compute():
+        if not _san_cache:
+            return []
+        data = _san_cache.get_timeseries("marketcap_usd", "bitcoin")
+        if data and len(data) > 30:
+            return data[-30:]
+        return data or []
+    return _cached("mcap_trend", _compute)
 
 
 def _build_gainers_losers(count: int = 10):
-    """Get top gainers and losers by 24h price change."""
-    if not _san_cache:
-        return [], []
-
-    all_projects = _san_cache.get_all_projects()
-    tokens = []
-    for project in all_projects:
-        slug = project.get("slug")
-        if not slug:
-            continue
-        data = _san_cache.get_timeseries("price_usd", slug)
-        if data and len(data) >= 2:
-            latest = data[-1]["value"]
-            prev = data[-2]["value"]
-            if prev and prev != 0 and latest:
-                change = ((latest - prev) / prev) * 100
-                tokens.append({
-                    "slug": slug,
-                    "name": project.get("name", slug),
-                    "ticker": project.get("ticker", ""),
-                    "price_usd": latest,
-                    "price_usd_change": round(change, 2),
-                    "marketcap_usd": project.get("marketcap_usd"),
-                })
-
-    # Filter out extreme outliers (>500% change usually bad data)
-    tokens = [t for t in tokens if abs(t["price_usd_change"]) < 500]
-    tokens.sort(key=lambda x: x["price_usd_change"], reverse=True)
-    gainers = tokens[:count]
-    losers = list(reversed(tokens[-count:]))
+    """Get top gainers and losers by 24h price change (uses cached data)."""
+    tokens = _get_summary_tokens()
+    valid = [
+        t for t in tokens
+        if t.get("price_usd") is not None
+        and t.get("price_usd_change") is not None
+        and abs(t.get("price_usd_change", 0)) < 500
+    ]
+    valid.sort(key=lambda x: x.get("price_usd_change", 0), reverse=True)
+    gainers = valid[:count]
+    losers = list(reversed(valid[-count:]))
     return gainers, losers
 
 
@@ -449,62 +393,21 @@ def _build_screener_tokens(
     sort_by: str = "marketcap_usd",
     order: str = "desc",
 ):
-    """Build token list with filters for the screener."""
-    if not _san_cache:
-        return []
-
-    all_projects = _san_cache.get_all_projects()
-    tokens = []
-    for project in all_projects:
-        slug = project.get("slug")
-        if not slug:
-            continue
-
-        mcap = project.get("marketcap_usd") or 0
+    """Build token list with filters for the screener (uses cached data)."""
+    tokens = _get_all_tokens()
+    filtered = []
+    for t in tokens:
+        mcap = t.get("marketcap_usd") or 0
         if mcap < min_mcap or mcap > max_mcap:
             continue
-
-        token_data = {
-            "slug": slug,
-            "name": project.get("name", slug),
-            "ticker": project.get("ticker", ""),
-            "marketcap_usd": mcap,
-        }
-
-        price_data = _san_cache.get_timeseries("price_usd", slug)
-        if price_data and len(price_data) >= 2:
-            latest = price_data[-1]["value"]
-            prev = price_data[-2]["value"]
-            change = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
-            token_data["price_usd"] = latest
-            token_data["price_usd_change"] = round(change, 2)
-        elif price_data and len(price_data) == 1:
-            token_data["price_usd"] = price_data[-1]["value"]
-            token_data["price_usd_change"] = 0
-        else:
+        pct = t.get("price_usd_change", 0) or 0
+        if pct < min_change or pct > max_change:
             continue
-
-        if token_data["price_usd_change"] < min_change or token_data["price_usd_change"] > max_change:
-            continue
-
-        # Get MVRV if available
-        mvrv_data = _san_cache.get_timeseries("mvrv_usd", slug)
-        if mvrv_data:
-            token_data["mvrv_usd"] = mvrv_data[-1]["value"]
-
-        vol_data = _san_cache.get_timeseries("volume_usd", slug)
-        if vol_data:
-            token_data["volume_usd"] = vol_data[-1]["value"]
-
-        # 7-day sparkline
-        if price_data and len(price_data) >= 7:
-            token_data["sparkline_7d"] = price_data[-7:]
-
-        tokens.append(token_data)
+        filtered.append(t)
 
     reverse = order == "desc"
-    tokens.sort(key=lambda x: x.get(sort_by) or 0, reverse=reverse)
-    return tokens
+    filtered.sort(key=lambda x: x.get(sort_by) or 0, reverse=reverse)
+    return filtered
 
 
 def _build_comparison_data(slugs: list[str]):
