@@ -263,8 +263,10 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
                 <a href="/api">API</a>
             </div>
             <div class="footer-meta">
-                On-chain data via <strong>Santiment</strong>. Refreshed daily. Not financial advice.
-                <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC</span>
+                On-chain data via <a href="https://santiment.net" class="footer-data-link" target="_blank" rel="noopener"><strong>Santiment API</strong></a>.
+                100% server-rendered &middot; zero JavaScript &middot; refreshed daily.
+                <br>Charts are inline SVG with Bezier interpolation. Not financial advice.
+                <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC &middot; Pure HTML &amp; CSS</span>
             </div>
             <a href="#top" class="scroll-top" aria-label="Back to top">&uarr; Top</a>
         </div>
