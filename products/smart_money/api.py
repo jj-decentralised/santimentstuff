@@ -1250,12 +1250,16 @@ def create_app() -> FastAPI:
                                     sector=sector, sectors=SECTORS)
 
     @app.get("/valuation", response_class=HTMLResponse)
-    async def get_valuation_page():
+    async def get_valuation_page(
+        sector: str = Query(default="all"),
+    ):
         """Valuation scanner — fully server-rendered."""
         if not _san_cache:
             return render_valuation_page([])
         enriched = _build_all_tokens_for_valuation()
-        return render_valuation_page(enriched)
+        if sector != "all":
+            enriched = [t for t in enriched if t.get("sector") == sector]
+        return render_valuation_page(enriched, sector=sector, sectors=SECTORS)
 
     @app.get("/sync", response_class=HTMLResponse)
     async def get_sync_page():

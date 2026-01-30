@@ -1332,7 +1332,7 @@ def render_screener_page(
 # VALUATION PAGE
 # ================================================================
 
-def render_valuation_page(tokens: list) -> str:
+def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = None) -> str:
     zone_counts = {}
     for t in tokens:
         mvrv = t.get("mvrv_usd")
@@ -1349,6 +1349,14 @@ def render_valuation_page(tokens: list) -> str:
         ]
     )
 
+    # Sector filter
+    sector_filter = ""
+    if sectors:
+        sector_btns = f'<a href="/valuation" class="filter-btn{" active" if sector == "all" else ""}">All</a>'
+        for key, label in sorted(sectors.items(), key=lambda x: x[1]):
+            sector_btns += f'<a href="/valuation?sector={key}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
+        sector_filter = f'<div class="filter-bar"><div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div></div>'
+
     rows = []
     for i, t in enumerate(tokens):
         mvrv = t.get("mvrv_usd")
@@ -1357,27 +1365,33 @@ def render_valuation_page(tokens: list) -> str:
         slug = t.get("slug", "")
         zone_label, zone_css, _ = mvrv_zone(mvrv)
         bar_pct = min(100, max(0, mvrv / 4 * 100))
+        sec = t.get("sector", "other")
+        sec_label = (sectors or {}).get(sec, sec.replace("_", " ").title()) if sectors else sec.replace("_", " ").title()
         rows.append(f"""<tr>
             <td class="col-rank">{i+1}</td>
             <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+            <td class="col-tag hide-mobile"><a href="/valuation?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
             <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
             <td class="col-num bold">{mvrv:.2f}</td>
             <td class="col-tag"><span class="zone {zone_css}">{zone_label}</span></td>
             <td class="hide-mobile" style="min-width:120px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:{bar_pct:.0f}%"></div></div></td>
         </tr>""")
 
+    sector_note = f' in {(sectors or {}).get(sector, sector)}' if sector != "all" else ""
     body = f"""
     <h1 class="page-title">Valuation Scanner</h1>
-    <p class="page-subtitle">MVRV zones across {len(tokens)} tokens</p>
+    <p class="page-subtitle">MVRV zones across {len(tokens)} tokens{sector_note}</p>
+    {sector_filter}
     <div class="val-legend">{legend}</div>
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
                 <th class="col-rank">#</th><th>Name</th>
+                <th class="col-tag hide-mobile">Sector</th>
                 <th class="col-num">Price</th><th class="col-num">MVRV</th>
                 <th class="col-tag">Zone</th><th class="hide-mobile">Bar</th>
             </tr></thead>
-            <tbody>{"".join(rows) if rows else '<tr><td colspan="6" class="empty-cell">MVRV data not yet available.</td></tr>'}</tbody>
+            <tbody>{"".join(rows) if rows else '<tr><td colspan="7" class="empty-cell">MVRV data not yet available.</td></tr>'}</tbody>
         </table>
     </div>
     """
