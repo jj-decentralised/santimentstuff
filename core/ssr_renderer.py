@@ -2263,23 +2263,71 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
     cl = client_stats or {}
 
     phases = [
-        ("Discovery", "phase1_discovery"),
-        ("Quick Load", "phase1_pulling"),
-        ("Universe Pull", "phase2_universe"),
-        ("Deep Pull", "phase3_deep"),
-        ("Ready", "ready"),
+        ("Discovery", "phase1_discovery", "Discovering token universe from Santiment API"),
+        ("Quick Load", "phase1_pulling", "Loading top 10 tokens with Tier 1 metrics (1 year)"),
+        ("Universe Pull", "phase2_universe", "Pulling core metrics for all tokens (7 years)"),
+        ("Deep Pull", "phase3_deep", "Deep metrics for top 200 tokens (Tier 1+2, 7 years)"),
+        ("Ready", "ready", "All data synced and ready to serve"),
     ]
     current_idx = -1
-    for i, (_, key) in enumerate(phases):
+    for i, (_, key, _desc) in enumerate(phases):
         if key in status:
             current_idx = i
     if status == "ready":
         current_idx = len(phases) - 1
 
+    # Progress percentage
+    progress_pct = 0
+    if current_idx >= 0:
+        if status == "ready":
+            progress_pct = 100
+        else:
+            progress_pct = int((current_idx / (len(phases) - 1)) * 100)
+
     pipeline_html = ""
-    for i, (label, _) in enumerate(phases):
+    for i, (label, _key, _desc) in enumerate(phases):
         cls = "done" if (status == "ready" or i < current_idx) else ("active" if i == current_idx else "")
         pipeline_html += f'<span class="sync-step {cls}"><span class="sync-step-dot"></span>{label}</span>'
+
+    # Phase description
+    phase_desc = ""
+    if 0 <= current_idx < len(phases):
+        phase_desc = phases[current_idx][2]
+
+    # Progress bar
+    bar_cls = "sync-bar-complete" if progress_pct == 100 else "sync-bar-active"
+    progress_bar = f"""
+    <div class="sync-progress-wrap">
+        <div class="sync-progress-bar"><div class="sync-progress-fill {bar_cls}" style="width:{progress_pct}%"></div></div>
+        <span class="sync-progress-pct">{progress_pct}%</span>
+    </div>"""
+
+    # Elapsed time
+    elapsed_html = ""
+    started_at = pull_status.get("started_at")
+    last_pull = pull_status.get("last_pull")
+    if started_at:
+        try:
+            from datetime import datetime as _dt, timezone as _tz
+            start = _dt.fromisoformat(started_at.replace("Z", "+00:00"))
+            now = _dt.now(_tz.utc)
+            delta = now - start
+            mins = int(delta.total_seconds() // 60)
+            secs = int(delta.total_seconds() % 60)
+            elapsed_html = f'<div class="sync-elapsed">Elapsed: {mins}m {secs}s</div>'
+        except Exception:
+            pass
+    if last_pull:
+        try:
+            from datetime import datetime as _dt2, timezone as _tz2
+            lp = _dt2.fromisoformat(last_pull.replace("Z", "+00:00"))
+            elapsed_html += f'<div class="sync-last-pull">Last completed: {lp.strftime("%Y-%m-%d %H:%M UTC")}</div>'
+        except Exception:
+            pass
+
+    # Universe size
+    universe = pull_status.get("universe_size", 0)
+    universe_html = f'<div class="sync-universe">Universe: {universe} tokens</div>' if universe else ""
 
     stats_grid = f"""
     <div class="sync-stats-grid">
@@ -2293,18 +2341,37 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
         <div class="sync-stat"><div class="sync-stat-label">Cache Hits</div><div class="sync-stat-value">{fmt_num(cl.get("cache_hits", 0))}</div></div>
     </div>"""
 
+    # Error section
     error_html = ""
     last_err = cl.get("last_error")
+    phase_errs = []
+    for k in ("error", "phase1_error", "phase2_error", "phase3_error"):
+        v = pull_status.get(k)
+        if v:
+            phase_errs.append(str(v)[:200])
     if last_err:
-        error_html = f'<div class="sync-error"><strong>Last Error:</strong> {_esc(str(last_err)[:300])}</div>'
+        error_html += f'<div class="sync-error"><strong>Last API Error:</strong> {_esc(str(last_err)[:300])}</div>'
+    for pe in phase_errs:
+        error_html += f'<div class="sync-error"><strong>Pipeline Error:</strong> {_esc(pe)}</div>'
+
+    # Retry button (only if not currently pulling)
+    retry_html = ""
+    if status not in ("phase1_discovery", "phase1_pulling", "phase2_universe", "phase3_deep"):
+        retry_html = '<div class="sync-retry"><a href="/api/retry-pull" class="export-btn">Retry Pull</a></div>'
 
     body = f"""
+    {_breadcrumbs(("Sync",))}
     <h1 class="page-title">Data Sync</h1>
     <p class="page-subtitle">Pipeline status and statistics</p>
     <div class="sync-pipeline">{pipeline_html}</div>
+    {progress_bar}
+    {f'<p class="sync-phase-desc">{phase_desc}</p>' if phase_desc else ''}
+    {elapsed_html}
+    {universe_html}
     {stats_grid}
     {error_html}
-    <p class="sync-hint">Snapshot — refresh for latest.</p>
+    {retry_html}
+    <p class="sync-hint">Auto-refreshes every 30s &middot; Snapshot at page load</p>
     """
     return page_shell("Sync", body, active_nav="sync", auto_refresh=30)
 
