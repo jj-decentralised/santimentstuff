@@ -1134,6 +1134,36 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
                     cls = "up" if v > 0 else "down" if v < 0 else "flat"
                     changes.append(f'<span class="change-pill {cls}">{label} {fmt_pct(v)}</span>')
 
+    # Alert badges — highlight notable metric thresholds
+    alerts = []
+    if mvrv is not None:
+        if mvrv < 0.7:
+            alerts.append(("Deep Value Zone", "alert-bullish", "MVRV well below realized value"))
+        elif mvrv > 3.5:
+            alerts.append(("Euphoria Zone", "alert-bearish", "MVRV far above realized value — extreme caution"))
+        elif mvrv > 2.5:
+            alerts.append(("Overvalued", "alert-warn", "MVRV elevated — distribution risk"))
+    nvt = _latest("nvt")
+    if nvt is not None:
+        if nvt > 150:
+            alerts.append(("High NVT", "alert-warn", "Network value exceeds transaction throughput"))
+        elif nvt < 20:
+            alerts.append(("Low NVT", "alert-bullish", "Strong network utilization relative to value"))
+    exch = _latest("exchange_balance")
+    exch_ts = _data("exchange_balance")
+    if exch is not None and exch_ts and len(exch_ts) >= 7:
+        exch_7d = exch_ts[-7].get("value")
+        if exch_7d and exch_7d > 0:
+            exch_chg = (exch - exch_7d) / exch_7d * 100
+            if exch_chg < -5:
+                alerts.append(("Exchange Outflow", "alert-bullish", f"{exch_chg:.1f}% in 7d — accumulation signal"))
+            elif exch_chg > 5:
+                alerts.append(("Exchange Inflow", "alert-bearish", f"+{exch_chg:.1f}% in 7d — distribution signal"))
+    alerts_html = ""
+    if alerts:
+        badges = "".join(f'<span class="alert-badge {cls}" title="{_esc(desc)}">{_esc(label)}</span>' for label, cls, desc in alerts)
+        alerts_html = f'<div class="alert-badges">{badges}</div>'
+
     # Metric cards
     metric_cards = []
     metric_defs = [
@@ -1245,6 +1275,8 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             {mvrv_html}
         </div>
     </div>
+
+    {alerts_html}
 
     {_render_token_description(token)}
 

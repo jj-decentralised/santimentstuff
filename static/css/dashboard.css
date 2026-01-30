@@ -866,6 +866,24 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-secondary);
   font-family: var(--mono);
 }
+/* Alert badges */
+.alert-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.alert-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: default;
+}
+.alert-bullish { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+.alert-bearish { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+.alert-warn { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+
 .profile-section { margin-bottom: 24px; }
 .profile-section-header {
   display: flex;
