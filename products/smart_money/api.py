@@ -1757,6 +1757,13 @@ def create_app() -> FastAPI:
         if token_info:
             sec = token_info.get("sector", "other")
             related_tokens = [t for t in all_tokens if t.get("sector") == sec and t.get("slug") != slug][:8]
+            # Fetch sparklines for related tokens
+            if related_tokens and _san_cache:
+                rel_slugs = [rt["slug"] for rt in related_tokens if rt.get("slug")]
+                if rel_slugs:
+                    spark_data = _san_cache.get_timeseries_multi_slugs("price_usd", rel_slugs, limit_per_slug=7)
+                    for rt in related_tokens:
+                        rt["sparkline_7d"] = spark_data.get(rt["slug"], [])
 
         # Prev/next token navigation (by market cap rank)
         prev_token = None

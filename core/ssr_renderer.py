@@ -2252,12 +2252,18 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         for rt in related_tokens:
             rt_pct = rt.get("price_usd_change")
             rt_cls = css_class(rt_pct)
+            rt_mvrv = rt.get("mvrv_usd")
+            rt_zone = f'<span class="zone {mvrv_zone(rt_mvrv)[1]}" style="font-size:0.55rem">{mvrv_zone(rt_mvrv)[0]}</span>' if rt_mvrv is not None else ""
+            rt_spark = rt.get("sparkline_7d", [])
+            rt_spark_html = mini_trend_svg(rt_spark, width=60, height=16, color="#9CA3AF") if len(rt_spark) >= 3 else ""
             rel_cards += (
                 f'<a href="/token/{rt["slug"]}" class="related-token-card">'
                 f'<strong>{_esc(rt.get("ticker", ""))}</strong>'
                 f'<span class="related-token-name">{_esc(rt.get("name", ""))}</span>'
                 f'<span class="related-token-price">{fmt_usd(rt.get("price_usd"))}</span>'
                 f'<span class="related-token-pct {rt_cls}">{fmt_pct(rt_pct)}</span>'
+                f'{rt_zone}'
+                f'{f"<span class=related-token-spark>{rt_spark_html}</span>" if rt_spark_html else ""}'
                 f'</a>'
             )
         body += f"""
