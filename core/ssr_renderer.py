@@ -892,6 +892,31 @@ def render_insights_page(
     if filter_rows:
         parts.append(f'<div class="filter-bar filter-bar-stacked">{filter_rows}</div>')
 
+    # Insights narrative summary
+    thesis_counts = insights.get("thesis_counts", {})
+    if thesis_counts:
+        insight_parts = []
+        sm = thesis_counts.get("smart_money", 0)
+        bm = thesis_counts.get("builder_momentum", 0)
+        dv = thesis_counts.get("deep_value", 0)
+        dw = thesis_counts.get("distribution_warning", 0)
+        total_c = sum(thesis_counts.values())
+        if sm > 5:
+            insight_parts.append(f"{sm} tokens showing smart money accumulation patterns")
+        if bm > 5:
+            insight_parts.append(f"{bm} projects with strong builder momentum")
+        if dv > 5:
+            insight_parts.append(f"{dv} tokens in deep value territory")
+        if dw > 5:
+            insight_parts.append(f"{dw} tokens flagged for distribution warning")
+        if sm + bm > dw * 2:
+            insight_parts.append("Overall: constructive market posture")
+        elif dw > sm + bm:
+            insight_parts.append("Overall: cautious signals dominate")
+        if insight_parts:
+            narrative = ". ".join(insight_parts) + "."
+            parts.append(f'<div class="onchain-narrative"><p>{narrative}</p></div>')
+
     # ── Scatter plot ──
     current_view = None
     if scatter_views:
