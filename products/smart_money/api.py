@@ -1534,6 +1534,27 @@ def create_app() -> FastAPI:
         dev_tokens.sort(key=lambda t: t.get("dev_activity") or 0, reverse=True)
         return render_developers_page(dev_tokens[:100], sector=sector, sectors=SECTORS)
 
+    @app.get("/developers/export.csv")
+    async def get_developers_csv(
+        sector: str = Query(default="all"),
+    ):
+        """Export developer leaderboard as CSV."""
+        tokens = _get_all_tokens()
+        dev_tokens = [t for t in tokens if t.get("dev_activity") is not None and (t.get("dev_activity") or 0) > 0]
+        if sector != "all":
+            dev_tokens = [t for t in dev_tokens if t.get("sector") == sector]
+        dev_tokens.sort(key=lambda t: t.get("dev_activity") or 0, reverse=True)
+        lines = ["Rank,Name,Ticker,Slug,Sector,Dev Activity,Dev Change 30d %,Price USD,Market Cap"]
+        for i, t in enumerate(dev_tokens[:200], 1):
+            name = t.get("name", "").replace(",", "")
+            lines.append(f"{i},{name},{t.get('ticker','')},{t.get('slug','')},{t.get('sector','')},{t.get('dev_activity',0):.1f},{t.get('dev_activity_change',0) or 0:.1f},{t.get('price_usd',0) or 0:.4f},{t.get('marketcap_usd',0) or 0:.0f}")
+        csv_data = "\n".join(lines)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=developers_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"},
+        )
+
     @app.get("/sectors", response_class=HTMLResponse)
     async def get_sectors_page():
         """Sector overview — performance by sector."""

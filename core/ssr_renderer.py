@@ -1497,6 +1497,30 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
                 alerts.append(("Exchange Outflow", "alert-bullish", f"{exch_chg:.1f}% in 7d — accumulation signal"))
             elif exch_chg > 5:
                 alerts.append(("Exchange Inflow", "alert-bearish", f"+{exch_chg:.1f}% in 7d — distribution signal"))
+    # Whale transaction surge
+    whale = _latest("whale_transaction_count_100k_usd_to_inf")
+    whale_ts = _data("whale_transaction_count_100k_usd_to_inf")
+    if whale is not None and whale_ts and len(whale_ts) >= 7:
+        whale_avg = sum(d.get("value", 0) for d in whale_ts[-7:]) / 7
+        if whale_avg > 0 and whale > whale_avg * 2:
+            alerts.append(("Whale Surge", "alert-warn", f"Whale txs at {whale:.0f} vs 7d avg {whale_avg:.0f} — elevated large-tx activity"))
+    # Social sentiment extreme
+    sentiment = _latest("sentiment_balance_total")
+    if sentiment is not None:
+        if sentiment > 5:
+            alerts.append(("High Sentiment", "alert-warn", f"Sentiment balance {sentiment:.1f} — crowd euphoria, contrarian caution"))
+        elif sentiment < -5:
+            alerts.append(("Negative Sentiment", "alert-bullish", f"Sentiment balance {sentiment:.1f} — crowd fear, contrarian opportunity"))
+    # Dev activity surge/drop
+    dev_act = _latest("dev_activity")
+    dev_ts = _data("dev_activity")
+    if dev_act is not None and dev_ts and len(dev_ts) >= 30:
+        dev_avg30 = sum(d.get("value", 0) for d in dev_ts[-30:]) / 30
+        if dev_avg30 > 0:
+            if dev_act > dev_avg30 * 2:
+                alerts.append(("Dev Surge", "alert-bullish", f"Dev activity {dev_act:.0f} vs 30d avg {dev_avg30:.0f}"))
+            elif dev_act < dev_avg30 * 0.3 and dev_avg30 > 5:
+                alerts.append(("Dev Decline", "alert-warn", f"Dev activity {dev_act:.0f} vs 30d avg {dev_avg30:.0f}"))
     alerts_html = ""
     if alerts:
         badges = "".join(f'<span class="alert-badge {cls}" title="{_esc(desc)}">{_esc(label)}</span>' for label, cls, desc in alerts)
@@ -2461,7 +2485,8 @@ def render_developers_page(tokens: list, sector: str = "all", sectors: dict = No
         <div class="stat-card"><div class="stat-label">Growing (&gt;5%)</div><div class="stat-value up">{growing}</div></div>
         <div class="stat-card"><div class="stat-label">Declining (&lt;-5%)</div><div class="stat-value down">{declining}</div></div>
     </div>
-    {f'<p class="regime-narrative">{dev_narrative}</p>' if dev_narrative else ''}""")
+    {f'<p class="regime-narrative">{dev_narrative}</p>' if dev_narrative else ''}
+    <div class="export-bar"><a href="/developers/export.csv?sector={sector}" class="export-btn">&#8681; Export CSV</a></div>""")
 
     # Leaderboard table
     rows = ""
