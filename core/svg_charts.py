@@ -634,16 +634,31 @@ def comparison_table(
             f'<strong>{name}</strong> <span class="ticker">{ticker}</span></a></th>'
         )
 
+    # Metrics where lower = better (inverted ranking)
+    lower_is_better = {"nvt"}
+
     rows = []
     for key, label in metric_keys:
-        cells = f'<td class="col-name">{html_mod.escape(label)}</td>'
+        # Find the best value for highlighting
+        vals = []
         for t in tokens:
             m = t.get("metrics", {}).get(key, {})
-            val = m.get("latest")
-            if val is None:
+            v = m.get("latest")
+            vals.append(v)
+        numeric_vals = [v for v in vals if v is not None]
+        if numeric_vals:
+            best = min(numeric_vals) if key in lower_is_better else max(numeric_vals)
+        else:
+            best = None
+
+        cells = f'<td class="col-name">{html_mod.escape(label)}</td>'
+        for v in vals:
+            if v is None:
                 cells += '<td class="col-num">&mdash;</td>'
             else:
-                cells += f'<td class="col-num num-bold">{_fmt_val(val, key)}</td>'
+                is_best = (best is not None and v == best and len(numeric_vals) > 1)
+                cls = "col-num num-bold compare-best" if is_best else "col-num num-bold"
+                cells += f'<td class="{cls}">{_fmt_val(v, key)}</td>'
         rows.append(f'<tr>{cells}</tr>')
 
     return f"""
