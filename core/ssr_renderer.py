@@ -2506,6 +2506,28 @@ def render_screener_page(
 # VALUATION PAGE
 # ================================================================
 
+def _valuation_heatmap(tokens: list) -> str:
+    """Compact MVRV heatmap — each token is a small colored tile."""
+    tiles = []
+    for t in tokens:
+        mvrv = t.get("mvrv_usd")
+        if mvrv is None:
+            continue
+        slug = t.get("slug", "")
+        ticker = t.get("ticker", "")
+        _, zone_css, _ = mvrv_zone(mvrv)
+        tiles.append(
+            f'<a href="/token/{slug}" class="heatmap-tile {zone_css}" title="{_esc(ticker)} MVRV: {mvrv:.2f}">'
+            f'{_esc(ticker)}</a>'
+        )
+    if len(tiles) < 5:
+        return ""
+    return f"""<details class="val-heatmap-wrap" open>
+        <summary class="val-heatmap-title">MVRV Heatmap</summary>
+        <div class="val-heatmap">{"".join(tiles)}</div>
+    </details>"""
+
+
 def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = None, zone_filter: str = "all") -> str:
     zone_counts = {}
     for t in tokens:
@@ -2591,6 +2613,7 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
     <div class="val-legend">{legend}</div>
     {f'<div class="onchain-narrative"><p>{val_narrative}</p></div>' if val_narrative else ''}
     <div class="export-bar"><a href="/valuation/export.csv?sector={sector}&zone={zone_filter}" class="export-btn">&#8681; Export CSV</a></div>
+    {_valuation_heatmap(tokens)}
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>

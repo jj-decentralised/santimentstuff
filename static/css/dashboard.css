@@ -1756,6 +1756,33 @@ html.dark .spark-grid-cell { background: #161B22; border-color: #30363D; }
 /* ================================================================
    VALUATION PAGE
    ================================================================ */
+/* Valuation heatmap */
+.val-heatmap-wrap {
+  margin-bottom: 14px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.val-heatmap-title {
+  font-size: 0.78rem; font-weight: 700; padding: 8px 14px;
+  cursor: pointer; color: var(--text-secondary);
+}
+.val-heatmap {
+  display: flex; flex-wrap: wrap; gap: 3px; padding: 4px 14px 10px;
+}
+.heatmap-tile {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 6px; font-size: 0.58rem; font-weight: 700;
+  border-radius: 3px; text-decoration: none; color: #fff;
+  line-height: 1; transition: transform 0.1s, box-shadow 0.1s;
+}
+.heatmap-tile:hover { transform: scale(1.15); box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 1; }
+.heatmap-tile.zone-deep-value { background: #059669; }
+.heatmap-tile.zone-undervalued { background: #10B981; }
+.heatmap-tile.zone-fair { background: #6B7280; }
+.heatmap-tile.zone-fair-high { background: #F59E0B; color: #1a1a1a; }
+.heatmap-tile.zone-overvalued { background: #EF4444; }
+.heatmap-tile.zone-extreme-high { background: #DC2626; }
+html.dark .val-heatmap-wrap { border-color: #30363D; }
+
 .val-legend {
   display: flex;
   flex-wrap: wrap;
