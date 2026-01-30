@@ -245,6 +245,9 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             <label for="nav-toggle" class="nav-toggle-label"><span></span></label>
             <nav class="header-nav" aria-label="Main navigation">{nav_html}</nav>
             <div class="header-right">
+                <form action="/explore" method="get" class="header-search" role="search">
+                    <input type="text" name="q" placeholder="Search..." class="header-search-input" accesskey="s" autocomplete="off">
+                </form>
                 {_freshness_badge()}
                 <a href="?theme=dark" class="theme-toggle" title="Dark mode">&#9790;</a>
                 <a href="?theme=light" class="theme-toggle" title="Light mode">&#9788;</a>
@@ -271,7 +274,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
                 On-chain data via <a href="https://santiment.net" class="footer-data-link" target="_blank" rel="noopener"><strong>Santiment API</strong></a>.
                 100% server-rendered &middot; zero JavaScript &middot; refreshed daily.
                 <br>Charts are inline SVG with Bezier interpolation. Not financial advice.
-                <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC &middot; Pure HTML &amp; CSS</span>
+                <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC &middot; Pure HTML &amp; CSS &middot; <a href="/sync">Sync status</a></span>
             </div>
             <a href="#top" class="scroll-top" aria-label="Back to top">&uarr; Top</a>
         </div>
