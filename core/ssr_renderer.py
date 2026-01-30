@@ -654,6 +654,47 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             <div class="health-card-trend">{trend_chart}</div>
         </div>"""
 
+    # Network Health Pulse — aggregate score
+    pulse_signals = []
+    if daa_ch is not None:
+        pulse_signals.append(max(0, min(100, 50 + daa_ch * 2)))
+    if dev_ch is not None:
+        pulse_signals.append(max(0, min(100, 50 + dev_ch * 2)))
+    accum_raw = b.get("accumulating", 0)
+    distrib_raw = b.get("distributing", 0)
+    if accum_raw + distrib_raw > 0:
+        pulse_signals.append(accum_raw / (accum_raw + distrib_raw) * 100)
+    if avg_mvrv is not None:
+        pulse_signals.append(max(0, min(100, 100 - abs(avg_mvrv - 1.2) * 30)))
+    pulse_html = ""
+    if pulse_signals:
+        pulse_score = int(sum(pulse_signals) / len(pulse_signals))
+        if pulse_score >= 70:
+            p_label, p_cls = "Strong", "pulse-strong"
+        elif pulse_score >= 45:
+            p_label, p_cls = "Moderate", "pulse-moderate"
+        else:
+            p_label, p_cls = "Weak", "pulse-weak"
+        # SVG ring gauge
+        ring_r = 36
+        ring_circ = 2 * 3.14159 * ring_r
+        ring_dash = pulse_score / 100 * ring_circ
+        ring_color = "#10B981" if pulse_score >= 70 else "#F59E0B" if pulse_score >= 45 else "#EF4444"
+        pulse_html = f"""<div class="health-pulse">
+            <svg width="90" height="90" viewBox="0 0 90 90">
+                <circle cx="45" cy="45" r="{ring_r}" fill="none" stroke="#E5E7EB" stroke-width="6" opacity="0.3"/>
+                <circle cx="45" cy="45" r="{ring_r}" fill="none" stroke="{ring_color}" stroke-width="6"
+                    stroke-dasharray="{ring_dash:.1f} {ring_circ:.1f}" stroke-linecap="round"
+                    transform="rotate(-90 45 45)"/>
+                <text x="45" y="42" text-anchor="middle" font-size="18" font-weight="700" fill="{ring_color}">{pulse_score}</text>
+                <text x="45" y="57" text-anchor="middle" font-size="8" fill="#6B7280">{p_label}</text>
+            </svg>
+            <div class="pulse-detail">
+                <div class="pulse-title">Network Health Pulse</div>
+                <div class="pulse-desc">Composite score from DAA growth, dev activity, capital flows, and MVRV valuation</div>
+            </div>
+        </div>"""
+
     if health_cards:
         # Capital flow signals
         accum = b.get("accumulating", 0)
@@ -691,6 +732,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             <h2 class="card-title" id="health">Network Health</h2>
             <span class="card-badge">Top 20 bellwether tokens · 90 day trends</span>
         </div>
+        {pulse_html}
         <div class="health-grid">{health_cards}</div>
         {flow_html}
         {f'<p class="health-narrative">{health_narrative}</p>' if health_narrative else ''}
