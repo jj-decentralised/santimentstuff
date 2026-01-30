@@ -169,7 +169,7 @@ def _freshness_badge() -> str:
         return ""
 
 
-def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0, theme: str = "auto") -> str:
+def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0, theme: str = "auto", og_description: str = "") -> str:
     nav_items = [
         ("briefing", "/", "Briefing"),
         ("explore", "/explore", "Explore"),
@@ -218,9 +218,9 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{_esc(title)} — Onchain Pulse</title>
     {f'<meta http-equiv="refresh" content="{auto_refresh}">' if auto_refresh > 0 else ''}
-    <meta name="description" content="Real-time on-chain crypto analytics powered by Santiment. MVRV, active addresses, exchange flows, dev activity across 3500+ tokens.">
+    <meta name="description" content="{_esc(og_description) if og_description else 'Real-time on-chain crypto analytics powered by Santiment. MVRV, active addresses, exchange flows, dev activity across 3500+ tokens.'}">
     <meta property="og:title" content="{_esc(title)} — Onchain Pulse">
-    <meta property="og:description" content="On-chain crypto analytics dashboard. MVRV zones, network health, smart money signals.">
+    <meta property="og:description" content="{_esc(og_description) if og_description else 'On-chain crypto analytics dashboard. MVRV zones, network health, smart money signals.'}">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230F1419'/><text x='16' y='22' text-anchor='middle' fill='%2310B981' font-family='sans-serif' font-weight='900' font-size='18'>P</text></svg>">
@@ -1455,7 +1455,14 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         <a href="https://coinmarketcap.com/currencies/{slug}/" class="profile-ext-link" target="_blank" rel="noopener">CoinMarketCap</a>
     </div>"""
 
-    return page_shell(f"{name} ({ticker})", body)
+    og_parts = [f"{name} ({ticker})"]
+    if price:
+        og_parts.append(f"Price: {fmt_usd(price)}")
+    if mvrv is not None:
+        zl, _, _ = mvrv_zone(mvrv)
+        og_parts.append(f"MVRV: {mvrv:.2f} ({zl})")
+    og_desc = " | ".join(og_parts) + " — Onchain Pulse analytics"
+    return page_shell(f"{name} ({ticker})", body, og_description=og_desc)
 
 
 # ================================================================
