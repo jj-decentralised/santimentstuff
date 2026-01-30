@@ -2010,6 +2010,10 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
                 <div class="sector-overview-bar-fill" style="width:{min(pct_of_total, 100):.1f}%"></div>
             </div>
             <div class="sector-top-tokens">{top_list}</div>
+            <div class="sector-tag-cloud">{"".join(
+                f'<a href="/token/{t["slug"]}" class="tag-cloud-item" style="font-size:{max(0.55, min(0.85, 0.55 + 0.3 * ((t.get("marketcap_usd") or 0) / max(data["mcap"], 1)) * data["count"])):.2f}rem">{_esc(t.get("ticker", ""))}</a>'
+                for t in data.get("all_tokens", data["top_tokens"])[:20]
+            )}</div>
             <div class="sector-overview-actions">
                 <a href="/explore?sector={sec_key}" class="sector-overview-link">View all {data["count"]} &rarr;</a>
                 <a href="/compare?tokens={','.join(t['slug'] for t in data['top_tokens'][:5])}" class="sector-overview-link">Compare top 5</a>

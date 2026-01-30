@@ -2183,6 +2183,28 @@ a { color: inherit; text-decoration: none; }
   min-width: 48px;
   text-align: right;
 }
+.sector-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 6px 0;
+  border-top: 1px solid var(--border-light);
+}
+.tag-cloud-item {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-family: var(--mono);
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: all 0.1s;
+  line-height: 1.3;
+}
+.tag-cloud-item:hover {
+  color: var(--text-primary);
+  background: var(--border-light);
+}
 .sector-overview-actions {
   display: flex;
   gap: 12px;

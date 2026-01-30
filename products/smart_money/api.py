@@ -1414,7 +1414,9 @@ def create_app() -> FastAPI:
         for sec, data in sector_details.items():
             data["avg_change"] = data["pct_sum"] / data["pct_count"] if data["pct_count"] > 0 else 0
             data["count"] = len(data["tokens"])
-            data["top_tokens"] = sorted(data["tokens"], key=lambda x: x.get("marketcap_usd") or 0, reverse=True)[:5]
+            sorted_tokens = sorted(data["tokens"], key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
+            data["top_tokens"] = sorted_tokens[:5]
+            data["all_tokens"] = sorted_tokens[:20]
         return render_sectors_page(sector_details, SECTORS)
 
     @app.get("/watchlist", response_class=HTMLResponse)
