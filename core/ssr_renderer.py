@@ -169,7 +169,7 @@ def _freshness_badge() -> str:
         return ""
 
 
-def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0, theme: str = "auto", og_description: str = "") -> str:
+def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0, theme: str = "auto", og_description: str = "", canonical: str = "") -> str:
     nav_items = [
         ("briefing", "/", "Briefing"),
         ("explore", "/explore", "Explore"),
@@ -227,6 +227,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/dashboard.css">
+    {f'<link rel="canonical" href="{_esc(canonical)}">' if canonical else ''}
 </head>
 <body id="top">
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -1515,7 +1516,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         zl, _, _ = mvrv_zone(mvrv)
         og_parts.append(f"MVRV: {mvrv:.2f} ({zl})")
     og_desc = " | ".join(og_parts) + " — Onchain Pulse analytics"
-    return page_shell(f"{name} ({ticker})", body, og_description=og_desc)
+    return page_shell(f"{name} ({ticker})", body, og_description=og_desc, canonical=f"/token/{slug}")
 
 
 # ================================================================
