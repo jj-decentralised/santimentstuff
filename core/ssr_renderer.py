@@ -2527,6 +2527,7 @@ def render_screener_page(
             <tbody>{"".join(rows) if rows else '<tr><td colspan="10" class="empty-cell">No tokens match.</td></tr>'}</tbody>
         </table>
     </div>
+    <div class="scroll-hint">Scroll right for more columns &rarr;</div>
     """
     return page_shell("Screener", body, active_nav="screener")
 
@@ -2654,6 +2655,7 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
             <tbody>{"".join(rows) if rows else '<tr><td colspan="7" class="empty-cell">MVRV data not yet available.</td></tr>'}</tbody>
         </table>
     </div>
+    <div class="scroll-hint">Scroll right for more columns &rarr;</div>
     """
     return page_shell("Valuation", body, active_nav="valuation")
 
