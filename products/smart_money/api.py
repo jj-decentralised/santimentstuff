@@ -38,6 +38,7 @@ from core.ssr_renderer import (
     render_sync_page,
     render_compare_page,
     render_screener_page,
+    render_watchlist_page,
     set_ticker_data_fn,
     fmt_usd,
     fmt_pct,
@@ -1293,6 +1294,25 @@ def create_app() -> FastAPI:
             sort_by=sort, order=order, sector=sector, category=category,
             sectors=SECTORS, categories=CATEGORIES, search=q,
         )
+
+    @app.get("/watchlist", response_class=HTMLResponse)
+    async def get_watchlist_page(
+        tokens: str = Query(default="", description="Comma-separated slugs"),
+    ):
+        """Personal watchlist — bookmark to save."""
+        slug_list = [s.strip() for s in tokens.split(",") if s.strip()][:50]
+        if not slug_list:
+            return render_watchlist_page([], [])
+        all_tokens = _get_all_tokens()
+        slug_map = {t["slug"]: t for t in all_tokens}
+        matched = [slug_map[s] for s in slug_list if s in slug_map]
+        # Add sparklines
+        if matched and _san_cache:
+            visible_slugs = [t["slug"] for t in matched]
+            sparkline_data = _san_cache.get_timeseries_multi_slugs("price_usd", visible_slugs, limit_per_slug=7)
+            for t in matched:
+                t["sparkline_7d"] = sparkline_data.get(t["slug"], [])
+        return render_watchlist_page(matched, slug_list)
 
     @app.get("/token/{slug}", response_class=HTMLResponse)
     async def get_token_page(

@@ -113,6 +113,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
         ("screener", "/screener", "Screener"),
         ("valuation", "/valuation", "Valuation"),
         ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
+        ("watchlist", "/watchlist?tokens=bitcoin,ethereum,solana,cardano,avalanche", "Watchlist"),
         ("sync", "/sync", "Sync"),
     ]
     nav_html = "".join(
@@ -1329,3 +1330,114 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
     <p class="sync-hint">Snapshot — refresh for latest.</p>
     """
     return page_shell("Sync", body, active_nav="sync")
+
+
+# ================================================================
+# WATCHLIST PAGE
+# ================================================================
+
+def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
+    slug_list = slug_list or []
+    slugs_str = ",".join(slug_list)
+
+    parts = []
+    parts.append(f"""
+    <h1 class="page-title">Watchlist</h1>
+    <p class="page-subtitle">Track your favorite tokens &middot; Bookmark this URL to save your list</p>""")
+
+    # Add token form
+    parts.append(f"""
+    <form class="search-bar watchlist-form" action="/watchlist" method="get">
+        <input type="text" name="tokens" value="{_esc(slugs_str)}" placeholder="Enter slugs: bitcoin,ethereum,solana..." class="search-input" autocomplete="off">
+        <button type="submit" class="search-btn">Update</button>
+    </form>""")
+
+    # Preset watchlists
+    presets = [
+        ("Top 10", "bitcoin,ethereum,tether,xrp,binance-coin,solana,cardano,dogecoin,tron,avalanche"),
+        ("DeFi Blue Chips", "aave,uniswap,maker,compound,curve-dao-token,lido-dao"),
+        ("L1 Chains", "bitcoin,ethereum,solana,cardano,avalanche,near-protocol,sui,aptos"),
+        ("L2s", "polygon,arbitrum,optimism,starknet,immutable-x,mantle"),
+        ("Memes", "dogecoin,shiba-inu,pepe,bonk,floki,dogwifhat"),
+        ("AI Tokens", "fetch,singularitynet,render-token,bittensor,akash-network"),
+    ]
+    chips = "".join(f'<a href="/watchlist?tokens={slugs}" class="compare-chip">{label}</a>' for label, slugs in presets)
+    parts.append(f'<div class="compare-bar"><span class="compare-bar-label">Presets:</span>{chips}</div>')
+
+    if not tokens:
+        parts.append('<div class="empty-state"><h2>No tokens selected</h2><p>Add token slugs above or pick a preset watchlist.</p></div>')
+        return page_shell("Watchlist", "\n".join(parts), active_nav="watchlist")
+
+    # Summary stats
+    total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
+    avg_change = sum(t.get("price_usd_change") or 0 for t in tokens) / len(tokens) if tokens else 0
+    mvrv_vals = [t.get("mvrv_usd") for t in tokens if t.get("mvrv_usd") is not None]
+    avg_mvrv = sum(mvrv_vals) / len(mvrv_vals) if mvrv_vals else None
+
+    parts.append(f"""
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">Combined MCap</div>
+            <div class="stat-value">{fmt_usd(total_mcap)}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg 24h Change</div>
+            <div class="stat-value {css_class(avg_change)}">{fmt_pct(avg_change)}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg MVRV</div>
+            <div class="stat-value">{f"{avg_mvrv:.2f}" if avg_mvrv else "&mdash;"}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Tokens</div>
+            <div class="stat-value">{len(tokens)}</div>
+        </div>
+    </div>""")
+
+    # Token table
+    rows = ""
+    for i, t in enumerate(tokens):
+        slug_t = t.get("slug", "")
+        pct = t.get("price_usd_change")
+        mvrv_t = t.get("mvrv_usd")
+        zone_html = f'<span class="zone {mvrv_zone(mvrv_t)[1]}">{mvrv_zone(mvrv_t)[0]}</span>' if mvrv_t else "&mdash;"
+        spark = t.get("sparkline_7d", [])
+        spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
+        sec = t.get("sector", "other")
+        sec_label = sec.replace("_", " ").title()
+        rows += f"""<tr>
+            <td class="col-rank">{i+1}</td>
+            <td class="col-name"><a href="/token/{slug_t}" class="token-link"><strong>{_esc(t.get("name", slug_t))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+            <td class="col-tag hide-mobile"><a href="/explore?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
+            <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
+            <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
+            <td class="col-spark hide-mobile">{spark_html}</td>
+            <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
+            <td class="col-num hide-mobile">{fmt_usd(t.get("volume_usd"))}</td>
+            <td class="col-num hide-mobile">{f"{mvrv_t:.2f}" if mvrv_t else "&mdash;"}</td>
+            <td class="col-tag hide-mobile">{zone_html}</td>
+        </tr>"""
+
+    parts.append(f"""
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr>
+                <th class="col-rank">#</th><th>Name</th>
+                <th class="col-tag hide-mobile">Sector</th>
+                <th class="col-num">Price</th>
+                <th class="col-num">24h</th>
+                <th class="col-spark hide-mobile">7d</th>
+                <th class="col-num">Mkt Cap</th>
+                <th class="col-num hide-mobile">Volume</th>
+                <th class="col-num hide-mobile">MVRV</th>
+                <th class="col-tag hide-mobile">Zone</th>
+            </tr></thead>
+            <tbody>{rows}</tbody>
+        </table>
+    </div>""")
+
+    # Compare link
+    if len(slug_list) >= 2:
+        parts.append(f'<div class="card-footer" style="margin-top:12px"><a href="/compare?tokens={_esc(slugs_str)}">Compare these tokens side-by-side &rarr;</a></div>')
+
+    return page_shell("Watchlist", "\n".join(parts), active_nav="watchlist")
