@@ -2096,6 +2096,18 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         ld["offers"] = {"@type": "Offer", "price": f"{price:.6f}", "priceCurrency": "USD"}
     body += f'\n<script type="application/ld+json">{_json.dumps(ld)}</script>'
 
+    # BreadcrumbList structured data
+    breadcrumb_ld = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": "/"},
+            {"@type": "ListItem", "position": 2, "name": "Screener", "item": "/screener"},
+            {"@type": "ListItem", "position": 3, "name": f"{token.get('name', slug)}", "item": f"/token/{slug}"},
+        ],
+    }
+    body += f'\n<script type="application/ld+json">{_json.dumps(breadcrumb_ld)}</script>'
+
     return page_shell(f"{name} ({ticker})", body, og_description=og_desc, canonical=f"/token/{slug}")
 
 
