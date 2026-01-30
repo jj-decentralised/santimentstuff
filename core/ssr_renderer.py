@@ -1076,14 +1076,19 @@ def render_explore_page(
         </div>
     </div>""")
 
-    # Search bar
+    # Search bar with popular suggestions
+    popular = [("BTC", "bitcoin"), ("ETH", "ethereum"), ("SOL", "solana"),
+               ("ADA", "cardano"), ("DOT", "polkadot"), ("AVAX", "avalanche"),
+               ("LINK", "chainlink"), ("UNI", "uniswap"), ("AAVE", "aave")]
+    suggestions = "".join(f'<a href="/token/{slug}" class="search-suggestion">{ticker}</a>' for ticker, slug in popular)
     parts.append(f"""
     <form class="search-bar" action="/explore" method="get" role="search" aria-label="Search tokens">
         <input type="text" name="q" value="{_esc(search)}" placeholder="Search by name, ticker, or slug..." class="search-input" autocomplete="off">
         <button type="submit" class="search-btn">Search</button>
         {f'<input type="hidden" name="sector" value="{_esc(sector)}">' if sector != "all" else ""}
         <input type="hidden" name="per_page" value="{per_page}">
-    </form>""")
+    </form>
+    <div class="search-suggestions"><span class="search-suggestions-label">Popular:</span>{suggestions}</div>""")
 
     # Sector filter bar
     if sectors:
