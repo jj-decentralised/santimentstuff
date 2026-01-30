@@ -2329,6 +2329,38 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
             </div>
         </div>"""
 
+    # Leaderboard summary table
+    lb_rows = ""
+    for rank, (sec_key, data) in enumerate(sorted_sectors, 1):
+        sec_label = sector_labels.get(sec_key, sec_key.replace("_", " ").title())
+        avg_ch = data.get("avg_change", 0)
+        ch_cls = css_class(avg_ch)
+        pct = (data["mcap"] / total_mcap * 100) if total_mcap > 0 else 0
+        best = data["top_tokens"][0] if data["top_tokens"] else None
+        best_html = f'<a href="/token/{best["slug"]}">{_esc(best.get("ticker",""))}</a>' if best else "&mdash;"
+        lb_rows += f"""<tr>
+            <td class="col-rank">{rank}</td>
+            <td class="col-name"><a href="/explore?sector={sec_key}" class="sector-tag sector-{sec_key}">{_esc(sec_label)}</a></td>
+            <td class="col-num">{data["count"]}</td>
+            <td class="col-num bold">{fmt_usd(data["mcap"])}</td>
+            <td class="col-num">{pct:.1f}%</td>
+            <td class="col-num {ch_cls}">{fmt_pct(avg_ch)}</td>
+            <td class="col-num">{best_html}</td>
+        </tr>"""
+
+    parts.append(f"""
+    <div class="table-wrap" style="margin-bottom:20px">
+        <table class="data-table">
+            <thead><tr>
+                <th class="col-rank">#</th><th>Sector</th>
+                <th class="col-num">Tokens</th><th class="col-num">Market Cap</th>
+                <th class="col-num">% Total</th><th class="col-num">Avg 24h</th>
+                <th class="col-num">Top Token</th>
+            </tr></thead>
+            <tbody>{lb_rows}</tbody>
+        </table>
+    </div>""")
+
     parts.append(f'<div class="sector-overview-grid">{cards}</div>')
 
     return page_shell("Sectors", "\n".join(parts), active_nav="sectors")
