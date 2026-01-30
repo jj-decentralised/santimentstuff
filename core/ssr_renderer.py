@@ -289,6 +289,20 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         </div>
     </div>""")
 
+    # ── Table of Contents ──
+    toc_items = [
+        ("regime", "Market Regime"),
+        ("valuation", "Valuation"),
+        ("sectors", "Sectors"),
+        ("health", "Network Health"),
+        ("signals", "Signals"),
+        ("dominance", "Dominance"),
+        ("movers", "Movers"),
+        ("top-metrics", "Top by Metric"),
+    ]
+    toc_links = "".join(f'<a href="#{tid}" class="toc-link">{tlabel}</a>' for tid, tlabel in toc_items)
+    parts.append(f'<nav class="briefing-toc">{toc_links}</nav>')
+
     # ── Section 1: Market Regime ──
     avg_mvrv = b.get("avg_mvrv")
     breadth = b.get("breadth", {})
@@ -341,7 +355,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     regime_narrative = ". ".join(narrative_parts) + "." if narrative_parts else ""
 
     parts.append(f"""
-    <section class="card regime-card">
+    <section class="card regime-card" id="regime">
         <div class="card-header">
             <h2 class="card-title">Market Regime</h2>
             <span class="regime-badge {regime[1]}">{regime[0]}</span>
@@ -410,7 +424,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     parts.append(f"""
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">Valuation Landscape</h2>
+            <h2 class="card-title" id="valuation">Valuation Landscape</h2>
             <span class="card-badge">{zone_total} tokens with MVRV data</span>
         </div>
         <div class="zone-distribution">{zone_bars}</div>
@@ -444,7 +458,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         parts.append(f"""
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">Sector Breakdown</h2>
+            <h2 class="card-title" id="sectors">Sector Breakdown</h2>
             <span class="card-badge">{len(sorted_sectors)} sectors</span>
         </div>
         <div class="sector-grid">{sector_items}</div>
@@ -526,7 +540,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         parts.append(f"""
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">Network Health</h2>
+            <h2 class="card-title" id="health">Network Health</h2>
             <span class="card-badge">Top 20 bellwether tokens · 90 day trends</span>
         </div>
         <div class="health-grid">{health_cards}</div>
@@ -553,7 +567,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         parts.append(f"""
     <section class="card">
         <div class="card-header">
-            <h2 class="card-title">On-Chain Signals</h2>
+            <h2 class="card-title" id="signals">On-Chain Signals</h2>
             <span class="card-badge">Meaningful moves beyond price</span>
         </div>
         <div class="signal-list">{signal_rows}</div>
@@ -566,7 +580,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         parts.append(f"""
     <div class="two-col">
         <section class="card">
-            <div class="card-header"><h2 class="card-title">Market Dominance</h2></div>
+            <div class="card-header"><h2 class="card-title" id="dominance">Market Dominance</h2></div>
             <div class="dominance-wrap">{dominance_bar_svg(dom)}</div>
         </section>
         <section class="card">
@@ -598,7 +612,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             return rows
 
         parts.append(f"""
-    <div class="two-col">
+    <div class="two-col" id="movers">
         <section class="card">
             <div class="card-header"><h2 class="card-title up-header">Top Gainers</h2></div>
             {_mover_rows(gainers)}
@@ -636,7 +650,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             cols.append(f'<section class="card"><div class="card-header"><h2 class="card-title">By Active Addresses</h2></div>{_top_list(top_daa, "daily_active_addresses", fmt_num)}</section>')
         if top_dev:
             cols.append(f'<section class="card"><div class="card-header"><h2 class="card-title">By Dev Activity</h2></div>{_top_list(top_dev, "dev_activity", fmt_num)}</section>')
-        parts.append(f'<div class="three-col">{"".join(cols)}</div>')
+        parts.append(f'<div class="three-col" id="top-metrics">{"".join(cols)}</div>')
 
     # ── Footer nav ──
     parts.append("""
