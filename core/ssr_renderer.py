@@ -215,7 +215,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             <a href="/" class="logo">Onchain<span>Pulse</span></a>
             <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
             <label for="nav-toggle" class="nav-toggle-label"><span></span></label>
-            <nav class="header-nav">{nav_html}</nav>
+            <nav class="header-nav" aria-label="Main navigation">{nav_html}</nav>
             <div class="header-right">
                 {_freshness_badge()}
                 <a href="?theme=dark" class="theme-toggle" title="Dark mode">&#9790;</a>
@@ -223,8 +223,8 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             </div>
         </div>
     </header>
-    <main class="main" id="main-content">{body}</main>
-    <footer class="footer">
+    <main class="main" id="main-content" role="main">{body}</main>
+    <footer class="footer" role="contentinfo">
         <div class="footer-inner">
             <div class="footer-links">
                 <a href="/">Briefing</a>
@@ -994,7 +994,7 @@ def render_explore_page(
 
     # Search bar
     parts.append(f"""
-    <form class="search-bar" action="/explore" method="get">
+    <form class="search-bar" action="/explore" method="get" role="search" aria-label="Search tokens">
         <input type="text" name="q" value="{_esc(search)}" placeholder="Search by name, ticker, or slug..." class="search-input" autocomplete="off">
         <button type="submit" class="search-btn">Search</button>
         {f'<input type="hidden" name="sector" value="{_esc(sector)}">' if sector != "all" else ""}
@@ -1601,7 +1601,7 @@ def render_screener_page(
     {_breadcrumbs(("Screener",))}
     <h1 class="page-title">Screener</h1>
     <p class="page-subtitle">Filter and sort {len(tokens)} tokens{search_note}</p>
-    <form class="search-bar" action="/screener" method="get">
+    <form class="search-bar" action="/screener" method="get" role="search" aria-label="Search screener">
         <input type="text" name="q" value="{_esc(search)}" placeholder="Search tokens..." class="search-input" autocomplete="off">
         <button type="submit" class="search-btn">Search</button>
         <input type="hidden" name="tier" value="{_esc(tier)}">
