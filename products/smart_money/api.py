@@ -39,6 +39,7 @@ from core.ssr_renderer import (
     render_compare_page,
     render_screener_page,
     render_watchlist_page,
+    render_sectors_page,
     set_ticker_data_fn,
     fmt_usd,
     fmt_pct,
@@ -1296,6 +1297,29 @@ def create_app() -> FastAPI:
             sort_by=sort, order=order, sector=sector, category=category,
             sectors=SECTORS, categories=CATEGORIES, search=q,
         )
+
+    @app.get("/sectors", response_class=HTMLResponse)
+    async def get_sectors_page():
+        """Sector overview — performance by sector."""
+        tokens = _get_all_tokens()
+        sector_details = {}
+        for t in tokens:
+            sec = t.get("sector", "other")
+            if sec not in sector_details:
+                sector_details[sec] = {"tokens": [], "mcap": 0, "vol": 0, "pct_sum": 0, "pct_count": 0}
+            sector_details[sec]["tokens"].append(t)
+            sector_details[sec]["mcap"] += t.get("marketcap_usd") or 0
+            sector_details[sec]["vol"] += t.get("volume_usd") or 0
+            pct = t.get("price_usd_change")
+            if pct is not None:
+                sector_details[sec]["pct_sum"] += pct
+                sector_details[sec]["pct_count"] += 1
+        # Calculate averages and sort by mcap
+        for sec, data in sector_details.items():
+            data["avg_change"] = data["pct_sum"] / data["pct_count"] if data["pct_count"] > 0 else 0
+            data["count"] = len(data["tokens"])
+            data["top_tokens"] = sorted(data["tokens"], key=lambda x: x.get("marketcap_usd") or 0, reverse=True)[:5]
+        return render_sectors_page(sector_details, SECTORS)
 
     @app.get("/watchlist", response_class=HTMLResponse)
     async def get_watchlist_page(

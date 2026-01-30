@@ -1605,6 +1605,119 @@ a { color: inherit; text-decoration: none; }
 .sector-gaming .sector-card-fill { background: #DB2777; }
 .sector-oracle .sector-card-fill { background: #1D4ED8; }
 
+/* Sector overview page */
+.sector-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+.sector-overview-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+.sector-overview-card:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--border);
+}
+.sector-overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.sector-overview-change {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+.sector-overview-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.sector-overview-stat {
+  display: flex;
+  flex-direction: column;
+}
+.sector-overview-stat-val {
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-family: var(--mono);
+}
+.sector-overview-stat-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.sector-overview-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--border-light);
+  border-radius: 2px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.sector-overview-bar-fill {
+  height: 100%;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+.sector-top-tokens {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.sector-top-token {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.78rem;
+  border-bottom: 1px solid var(--border-light);
+  transition: background 0.1s;
+}
+.sector-top-token:last-child { border-bottom: none; }
+.sector-top-token:hover { background: var(--bg-alt); }
+.sector-top-name {
+  font-weight: 700;
+  font-family: var(--mono);
+  min-width: 50px;
+}
+.sector-top-price {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+.sector-top-pct {
+  font-weight: 700;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  min-width: 48px;
+  text-align: right;
+}
+.sector-overview-link {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-top: 6px;
+  border-top: 1px solid var(--border-light);
+  transition: color 0.1s;
+}
+.sector-overview-link:hover { color: var(--text); }
+
+@media (max-width: 640px) {
+  .sector-overview-grid { grid-template-columns: 1fr; }
+  .sector-overview-stats { gap: 10px; }
+}
+
 /* Filter bar stacked variant */
 .filter-bar-stacked {
   flex-direction: column;

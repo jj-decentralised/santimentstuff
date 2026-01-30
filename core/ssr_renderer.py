@@ -108,9 +108,10 @@ def set_ticker_data_fn(fn):
 def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None) -> str:
     nav_items = [
         ("briefing", "/", "Briefing"),
-        ("insights", "/insights", "Insights"),
         ("explore", "/explore", "Explore"),
+        ("sectors", "/sectors", "Sectors"),
         ("screener", "/screener", "Screener"),
+        ("insights", "/insights", "Insights"),
         ("valuation", "/valuation", "Valuation"),
         ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
         ("watchlist", "/watchlist?tokens=bitcoin,ethereum,solana,cardano,avalanche", "Watchlist"),
@@ -1379,6 +1380,73 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
     <p class="sync-hint">Snapshot — refresh for latest.</p>
     """
     return page_shell("Sync", body, active_nav="sync")
+
+
+# ================================================================
+# SECTORS OVERVIEW PAGE
+# ================================================================
+
+def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
+    total_mcap = sum(d["mcap"] for d in sector_details.values())
+    # Sort sectors by market cap
+    sorted_sectors = sorted(sector_details.items(), key=lambda x: x[1]["mcap"], reverse=True)
+
+    parts = []
+    parts.append("""
+    <h1 class="page-title">Sector Overview</h1>
+    <p class="page-subtitle">Performance breakdown by sector</p>""")
+
+    # Sector cards grid
+    cards = ""
+    for sec_key, data in sorted_sectors:
+        sec_label = sector_labels.get(sec_key, sec_key.replace("_", " ").title())
+        avg_ch = data.get("avg_change", 0)
+        ch_cls = "up" if avg_ch > 0 else "down" if avg_ch < 0 else "muted"
+        pct_of_total = (data["mcap"] / total_mcap * 100) if total_mcap > 0 else 0
+
+        # Top tokens list
+        top_list = ""
+        for t in data["top_tokens"]:
+            t_pct = t.get("price_usd_change")
+            t_cls = css_class(t_pct)
+            top_list += (
+                f'<a href="/token/{t["slug"]}" class="sector-top-token">'
+                f'<span class="sector-top-name">{_esc(t.get("ticker", ""))}</span>'
+                f'<span class="sector-top-price">{fmt_usd(t.get("price_usd"))}</span>'
+                f'<span class="sector-top-pct {t_cls}">{fmt_pct(t_pct)}</span>'
+                f'</a>'
+            )
+
+        cards += f"""
+        <div class="sector-overview-card">
+            <div class="sector-overview-header">
+                <a href="/explore?sector={sec_key}" class="sector-tag sector-{sec_key}" style="font-size:0.72rem">{_esc(sec_label)}</a>
+                <span class="sector-overview-change {ch_cls}">{fmt_pct(avg_ch)} avg</span>
+            </div>
+            <div class="sector-overview-stats">
+                <div class="sector-overview-stat">
+                    <span class="sector-overview-stat-val">{fmt_usd(data["mcap"])}</span>
+                    <span class="sector-overview-stat-label">Market Cap</span>
+                </div>
+                <div class="sector-overview-stat">
+                    <span class="sector-overview-stat-val">{data["count"]}</span>
+                    <span class="sector-overview-stat-label">Tokens</span>
+                </div>
+                <div class="sector-overview-stat">
+                    <span class="sector-overview-stat-val">{pct_of_total:.1f}%</span>
+                    <span class="sector-overview-stat-label">of Total</span>
+                </div>
+            </div>
+            <div class="sector-overview-bar">
+                <div class="sector-overview-bar-fill" style="width:{min(pct_of_total, 100):.1f}%"></div>
+            </div>
+            <div class="sector-top-tokens">{top_list}</div>
+            <a href="/explore?sector={sec_key}" class="sector-overview-link">View all {data["count"]} tokens &rarr;</a>
+        </div>"""
+
+    parts.append(f'<div class="sector-overview-grid">{cards}</div>')
+
+    return page_shell("Sectors", "\n".join(parts), active_nav="sectors")
 
 
 # ================================================================
