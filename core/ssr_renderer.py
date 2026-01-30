@@ -440,6 +440,22 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     else:
         score_label, score_cls = "Extreme Fear", "score-fear"
 
+    # Factor breakdown for the composite score
+    factor_items = []
+    if avg_mvrv is not None:
+        factor_items.append(("Valuation (MVRV)", mvrv_score))
+    if total_bd > 0:
+        factor_items.append(("Market Breadth", breadth_pct))
+    if vol_conc > 0:
+        factor_items.append(("Volume Spread", max(0, 100 - vol_conc)))
+    factor_html = ""
+    if factor_items:
+        rows_html = ""
+        for f_name, f_val in factor_items:
+            f_cls = "up" if f_val >= 55 else "down" if f_val <= 45 else "muted"
+            rows_html += f'<div class="fg-factor"><span class="fg-factor-name">{f_name}</span><span class="fg-factor-bar"><span class="fg-factor-fill" style="width:{f_val:.0f}%"></span></span><span class="fg-factor-val {f_cls}">{f_val:.0f}</span></div>'
+        factor_html = f'<div class="fg-factors">{rows_html}</div>'
+
     score_html = f"""
         <div class="composite-score">
             <div class="composite-score-num {score_cls}">{composite_score}</div>
@@ -447,6 +463,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             <div class="composite-score-bar">
                 <div class="composite-score-fill" style="left:{composite_score}%"></div>
             </div>
+            {factor_html}
         </div>"""
 
     parts.append(f"""

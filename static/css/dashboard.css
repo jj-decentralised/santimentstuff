@@ -2295,6 +2295,18 @@ html.dark .val-heatmap-wrap { border-color: #30363D; }
   border-radius: 2px;
   box-shadow: 0 0 4px rgba(0,0,0,0.3);
 }
+/* Fear & Greed factor breakdown */
+.fg-factors { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.fg-factor {
+  display: flex; align-items: center; gap: 8px; font-size: 0.68rem;
+}
+.fg-factor-name { width: 120px; color: var(--text-muted); font-weight: 600; flex-shrink: 0; }
+.fg-factor-bar {
+  flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+}
+.fg-factor-fill { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.fg-factor-val { width: 28px; text-align: right; font-family: var(--mono); font-weight: 700; font-size: 0.66rem; }
+
 .regime-badge {
   font-size: 0.68rem;
   font-weight: 800;
