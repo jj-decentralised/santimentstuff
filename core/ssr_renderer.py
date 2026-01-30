@@ -452,6 +452,20 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             <span class="zone-row-count">{cnt}</span>
         </div>"""
 
+    # MVRV heatmap tiles (top 30 tokens)
+    all_tokens = b.get("all_tokens", [])
+    mvrv_tiles = ""
+    mvrv_tokens = [t for t in all_tokens if t.get("mvrv_usd") is not None][:30]
+    for t in mvrv_tokens:
+        mv = t.get("mvrv_usd", 0)
+        zl, zc, _ = mvrv_zone(mv)
+        mvrv_tiles += (
+            f'<a href="/token/{t.get("slug","")}" class="mvrv-tile {zc}" title="{_esc(t.get("name",""))}: MVRV {mv:.2f} ({zl})">'
+            f'{_esc(t.get("ticker","")[:5])}'
+            f'</a>'
+        )
+    mvrv_heatmap = f'<div class="mvrv-heatmap">{mvrv_tiles}</div>' if mvrv_tiles else ""
+
     parts.append(f"""
     <section class="card">
         <div class="card-header">
@@ -459,6 +473,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             <span class="card-badge">{zone_total} tokens with MVRV data</span>
         </div>
         <div class="zone-distribution">{zone_bars}</div>
+        {mvrv_heatmap}
         <div class="card-footer">
             <a href="/valuation">View full valuation scanner &rarr;</a>
         </div>

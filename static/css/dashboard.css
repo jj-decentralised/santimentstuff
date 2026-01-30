@@ -1693,6 +1693,25 @@ a { color: inherit; text-decoration: none; }
 
 /* Valuation zone distribution */
 .zone-distribution { display: flex; flex-direction: column; gap: 6px; }
+.mvrv-heatmap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
+.mvrv-tile {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 3px;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.15s;
+  font-family: var(--mono);
+}
+.mvrv-tile:hover { opacity: 0.8; }
 .zone-row {
   display: flex;
   align-items: center;
