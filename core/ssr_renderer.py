@@ -2170,6 +2170,25 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
             <td class="hide-mobile" style="min-width:120px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:{bar_pct:.0f}%"></div></div></td>
         </tr>""")
 
+    # Valuation narrative
+    val_narrative_parts = []
+    total_with_mvrv = sum(zone_counts.values())
+    if total_with_mvrv > 0:
+        undervalued = zone_counts.get("Deep Value", 0) + zone_counts.get("Undervalued", 0)
+        overvalued = zone_counts.get("Overvalued", 0) + zone_counts.get("Euphoria", 0)
+        fair = zone_counts.get("Fair Value", 0) + zone_counts.get("Elevated", 0)
+        if undervalued > overvalued * 2:
+            val_narrative_parts.append(f"Market leans undervalued — {undervalued} of {total_with_mvrv} tokens below fair MVRV")
+        elif overvalued > undervalued * 2:
+            val_narrative_parts.append(f"Market leans overvalued — {overvalued} of {total_with_mvrv} tokens above fair MVRV")
+        else:
+            val_narrative_parts.append(f"Mixed valuation landscape — {undervalued} undervalued, {fair} fair, {overvalued} overvalued")
+        if zone_counts.get("Deep Value", 0) > 3:
+            val_narrative_parts.append(f"{zone_counts['Deep Value']} tokens in deep value zone — historically strong buying opportunities")
+        if zone_counts.get("Euphoria", 0) > 3:
+            val_narrative_parts.append(f"{zone_counts['Euphoria']} tokens in euphoria — historically a distribution signal")
+    val_narrative = ". ".join(val_narrative_parts) + "." if val_narrative_parts else ""
+
     sector_note = f' in {(sectors or {}).get(sector, sector)}' if sector != "all" else ""
     body = f"""
     {_breadcrumbs(("Valuation",))}
@@ -2178,6 +2197,7 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
     {sector_filter}
     {zone_filter_html}
     <div class="val-legend">{legend}</div>
+    {f'<div class="onchain-narrative"><p>{val_narrative}</p></div>' if val_narrative else ''}
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
