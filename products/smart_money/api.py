@@ -358,6 +358,55 @@ def _build_profile_metrics(slug: str):
     return metrics_data
 
 
+def _build_all_tokens_summary():
+    """Build a lightweight summary of ALL tokens for dashboard charts (heatmap, dominance, etc.)."""
+    if not _san_cache:
+        return []
+
+    all_projects = _san_cache.get_all_projects()
+    tokens = []
+    for project in all_projects:
+        slug = project.get("slug")
+        if not slug:
+            continue
+        token_data = {
+            "slug": slug,
+            "name": project.get("name", slug),
+            "ticker": project.get("ticker", ""),
+        }
+        # Only pull price and market cap for efficiency
+        for metric in ["price_usd", "marketcap_usd", "volume_usd", "daily_active_addresses", "mvrv_usd", "nvt"]:
+            data = _san_cache.get_timeseries(metric, slug)
+            if data and len(data) >= 2:
+                latest = data[-1]["value"]
+                prev = data[-2]["value"]
+                change = ((latest - prev) / prev * 100) if prev and prev != 0 else 0
+                token_data[metric] = latest
+                token_data[f"{metric}_change"] = round(change, 2)
+            elif data and len(data) == 1:
+                token_data[metric] = data[-1]["value"]
+                token_data[f"{metric}_change"] = 0
+            else:
+                token_data[metric] = None
+                token_data[f"{metric}_change"] = None
+
+        if token_data.get("price_usd") is not None:
+            tokens.append(token_data)
+
+    tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
+    return tokens
+
+
+def _build_mcap_trend():
+    """Build total market cap trend data from BTC market cap (proxy for market trend)."""
+    if not _san_cache:
+        return []
+    data = _san_cache.get_timeseries("marketcap_usd", "bitcoin")
+    if data and len(data) > 30:
+        return data[-30:]
+    return data or []
+
+
 def _build_gainers_losers(count: int = 10):
     """Get top gainers and losers by 24h price change."""
     if not _san_cache:
@@ -515,9 +564,11 @@ def create_app() -> FastAPI:
         page: int = Query(default=1, ge=1),
         per_page: int = Query(default=DEFAULT_PAGE_SIZE, ge=10, le=MAX_PAGE_SIZE),
     ):
-        """Market overview — fully server-rendered with pagination."""
+        """Market overview — fully server-rendered with pagination and rich dashboard."""
         tokens, total = _build_token_list(page, per_page)
         gainers, losers = _build_gainers_losers(10)
+        all_tokens_summary = _build_all_tokens_summary()
+        mcap_trend = _build_mcap_trend()
         status = _san_pull_status.get("status", "unknown")
         last_pull = _san_pull_status.get("last_pull")
         universe_size = _san_pull_status.get("universe_size", 0)
@@ -527,6 +578,8 @@ def create_app() -> FastAPI:
             page=page, per_page=per_page, total=total,
             universe_size=universe_size, cache_stats=cache_stats,
             gainers=gainers, losers=losers,
+            all_tokens_for_charts=all_tokens_summary,
+            mcap_trend_data=mcap_trend,
         )
 
     @app.get("/valuation", response_class=HTMLResponse)

@@ -937,6 +937,162 @@ a { color: inherit; }
   color: var(--black);
 }
 
+/* ============================================================
+   DASHBOARD SECTIONS — Rich landing page
+   ============================================================ */
+.dashboard-section {
+  margin-bottom: 28px;
+}
+.dash-section-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-900);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.dash-section-sub {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gray-400);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.chart-container.compact {
+  padding: 12px;
+}
+
+/* Stat card with mini trend */
+.stat-card-hero {
+  position: relative;
+}
+.stat-trend {
+  margin-top: 6px;
+}
+.breadth-value {
+  font-size: 1.3rem;
+}
+
+/* ============================================================
+   SENTIMENT GAUGE
+   ============================================================ */
+.dashboard-sentiment {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  align-items: center;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 28px;
+}
+@media (max-width: 768px) {
+  .dashboard-sentiment { grid-template-columns: 1fr; }
+}
+.sentiment-gauge-wrap {
+  width: 240px;
+  flex-shrink: 0;
+}
+.sentiment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sentiment-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sentiment-desc {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  line-height: 1.5;
+}
+.sentiment-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+.sentiment-stat strong {
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+/* ============================================================
+   TOP LISTS (Volume, Active Addresses)
+   ============================================================ */
+.top-lists-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+@media (max-width: 768px) {
+  .top-lists-row { grid-template-columns: 1fr; }
+}
+.top-list-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-600);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--gray-200);
+}
+.top-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.top-item {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 6px;
+  transition: background 0.15s;
+  font-size: 0.85rem;
+}
+.top-item:hover { background: var(--gray-50); }
+.top-rank {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--gray-400);
+  text-align: center;
+}
+.top-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.top-metric {
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--gray-700);
+}
+.top-change {
+  font-weight: 700;
+  white-space: nowrap;
+  min-width: 56px;
+  text-align: right;
+}
+
+/* ============================================================
+   HEATMAP LINK HOVER
+   ============================================================ */
+.chart-svg a { cursor: pointer; }
+.chart-svg a:hover rect { opacity: 0.85; }
+.chart-svg a text { pointer-events: none; }
+
 /* ========== FOOTER ========== */
 .footer {
   max-width: 1440px;

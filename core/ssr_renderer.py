@@ -9,7 +9,10 @@ import html as html_mod
 from datetime import datetime, timezone
 from typing import Optional
 
-from .svg_charts import sparkline_svg, line_chart_svg, chart_panel, comparison_table
+from .svg_charts import (
+    sparkline_svg, line_chart_svg, chart_panel, comparison_table,
+    market_heatmap_svg, dominance_bar_svg, sentiment_gauge_svg, mini_trend_svg,
+)
 
 
 # ============================================================
@@ -240,19 +243,29 @@ def render_market_page(
     page: int = 1, per_page: int = 100, total: int = 0,
     universe_size: int = 0, cache_stats: dict = None,
     gainers: list = None, losers: list = None,
+    all_tokens_for_charts: list = None,
+    mcap_trend_data: list = None,
+    top_by_volume: list = None,
+    top_by_daa: list = None,
 ) -> str:
-    """Render the full market overview page with pagination."""
+    """Render the full market overview page with pagination and rich dashboard sections."""
+    all_chart_tokens = all_tokens_for_charts or tokens
+
     # Summary stats
-    total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
-    total_vol = sum(t.get("volume_usd") or 0 for t in tokens)
-    mvrv_vals = [t["mvrv_usd"] for t in tokens if t.get("mvrv_usd") is not None]
-    nvt_vals = [t["nvt"] for t in tokens if t.get("nvt") is not None]
+    total_mcap = sum(t.get("marketcap_usd") or 0 for t in all_chart_tokens)
+    total_vol = sum(t.get("volume_usd") or 0 for t in all_chart_tokens)
+    mvrv_vals = [t["mvrv_usd"] for t in all_chart_tokens if t.get("mvrv_usd") is not None]
+    nvt_vals = [t["nvt"] for t in all_chart_tokens if t.get("nvt") is not None]
     avg_mvrv = sum(mvrv_vals) / len(mvrv_vals) if mvrv_vals else None
     avg_nvt = sum(nvt_vals) / len(nvt_vals) if nvt_vals else None
 
-    # Compute some extra aggregate metrics
-    daa_vals = [t["daily_active_addresses"] for t in tokens if t.get("daily_active_addresses")]
+    daa_vals = [t["daily_active_addresses"] for t in all_chart_tokens if t.get("daily_active_addresses")]
     total_daa = sum(daa_vals) if daa_vals else None
+
+    # Count positive / negative tokens
+    pos_count = sum(1 for t in all_chart_tokens if (t.get("price_usd_change") or 0) > 0)
+    neg_count = sum(1 for t in all_chart_tokens if (t.get("price_usd_change") or 0) < 0)
+    unchanged_count = len(all_chart_tokens) - pos_count - neg_count
 
     update_str = ""
     if last_pull:
@@ -266,17 +279,164 @@ def render_market_page(
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
     start_rank = (page - 1) * per_page
 
+    # ============================================================
+    # SYNC BANNER (shown when still pulling)
+    # ============================================================
+    sync_banner = ""
+    is_syncing = pull_status not in ("ready", "idle", "skipped")
+    if is_syncing:
+        cs = cache_stats or {}
+        ts_rows = cs.get("timeseries_rows", 0)
+        db_mb = cs.get("db_size_mb", 0)
+        pct_done = 0
+        if universe_size and total:
+            pct_done = min(99, int(total / universe_size * 100))
+        phase_labels = {
+            "phase1_discovery": "Phase 1: Discovering projects...",
+            "phase1_pulling": "Phase 1: Loading top 10 tokens...",
+            "phase1_complete": "Phase 1 complete. Starting universe pull...",
+            "phase2_universe": f"Phase 2: Pulling core data for all {universe_size} tokens (7yr history)",
+            "phase2_complete": "Phase 2 complete. Starting deep pull...",
+            "phase3_deep": "Phase 3: Pulling deep metrics for top 200 tokens...",
+            "refreshing": "Refreshing latest data...",
+        }
+        phase_label = phase_labels.get(pull_status, pull_status)
+
+        sync_banner = f"""
+    <div class="sync-banner">
+        <div class="sync-banner-inner">
+            <div class="sync-status-row">
+                <span class="sync-dot"></span>
+                <strong>Data Sync In Progress</strong>
+                <span class="sync-phase">{html_mod.escape(phase_label)}</span>
+            </div>
+            <div class="sync-progress-bar">
+                <div class="sync-progress-fill" style="width:{pct_done}%"></div>
+            </div>
+            <div class="sync-stats-row">
+                <span>{total} / {universe_size} tokens loaded ({pct_done}%)</span>
+                <span>{fmt_num(ts_rows)} data points</span>
+                <span>{db_mb:.1f} MB cached</span>
+                <a href="/sync" class="sync-detail-link">Full details &rarr;</a>
+            </div>
+        </div>
+    </div>"""
+
+    # ============================================================
+    # HERO STATS ROW — with mini trend chart
+    # ============================================================
+    mcap_trend_html = ""
+    if mcap_trend_data and len(mcap_trend_data) > 3:
+        mcap_trend_html = f'<div class="stat-trend">{mini_trend_svg(mcap_trend_data, width=120, height=32, color="#111111")}</div>'
+
+    # ============================================================
+    # MARKET SENTIMENT GAUGE
+    # ============================================================
+    sentiment_html = ""
+    if avg_mvrv is not None:
+        sentiment_html = f"""
+    <div class="dashboard-sentiment">
+        <div class="sentiment-gauge-wrap">
+            {sentiment_gauge_svg(avg_mvrv, min_val=0, max_val=4, label="Avg MVRV (Market Sentiment)")}
+        </div>
+        <div class="sentiment-details">
+            <div class="sentiment-zone">
+                <span class="zone-tag {mvrv_zone(avg_mvrv)[1]}">{mvrv_zone(avg_mvrv)[0]}</span>
+            </div>
+            <p class="sentiment-desc">{mvrv_zone(avg_mvrv)[2]}</p>
+            <div class="sentiment-stats">
+                <span class="sentiment-stat"><strong>{pos_count}</strong> tokens up</span>
+                <span class="sentiment-stat"><strong>{neg_count}</strong> tokens down</span>
+                <span class="sentiment-stat"><strong>{unchanged_count}</strong> flat</span>
+            </div>
+        </div>
+    </div>"""
+
+    # ============================================================
+    # DOMINANCE BAR
+    # ============================================================
+    dominance_html = ""
+    if all_chart_tokens and len(all_chart_tokens) > 3:
+        dom_sorted = sorted(all_chart_tokens, key=lambda t: t.get("marketcap_usd") or 0, reverse=True)
+        dominance_html = f"""
+    <div class="dashboard-section">
+        <h3 class="dash-section-title">Market Dominance</h3>
+        <div class="chart-container compact">
+            {dominance_bar_svg(dom_sorted)}
+        </div>
+    </div>"""
+
+    # ============================================================
+    # MARKET HEATMAP
+    # ============================================================
+    heatmap_html = ""
+    if all_chart_tokens and len(all_chart_tokens) > 5:
+        heatmap_html = f"""
+    <div class="dashboard-section">
+        <h3 class="dash-section-title">Market Heatmap <span class="dash-section-sub">24h Performance</span></h3>
+        <div class="chart-container">
+            {market_heatmap_svg(all_chart_tokens, max_tokens=50)}
+        </div>
+    </div>"""
+
+    # ============================================================
+    # TOP BY VOLUME / TOP BY ACTIVE ADDRESSES
+    # ============================================================
+    top_sections_html = ""
+    vol_list = top_by_volume or sorted(all_chart_tokens, key=lambda t: t.get("volume_usd") or 0, reverse=True)[:8]
+    daa_list = top_by_daa or sorted([t for t in all_chart_tokens if t.get("daily_active_addresses")], key=lambda t: t.get("daily_active_addresses") or 0, reverse=True)[:8]
+
+    if vol_list or daa_list:
+        vol_items = ""
+        for i, t in enumerate(vol_list[:8]):
+            slug = t.get("slug", "")
+            pct = t.get("price_usd_change")
+            vol_items += (
+                f'<a href="/token/{slug}" class="top-item">'
+                f'<span class="top-rank">{i+1}</span>'
+                f'<span class="top-name"><strong>{html_mod.escape(t.get("name", slug)[:18])}</strong>'
+                f' <span class="ticker">{html_mod.escape(t.get("ticker", ""))}</span></span>'
+                f'<span class="top-metric">{fmt_usd(t.get("volume_usd"))}</span>'
+                f'<span class="top-change {pct_class(pct)}">{fmt_pct(pct)}</span>'
+                f'</a>'
+            )
+
+        daa_items = ""
+        for i, t in enumerate(daa_list[:8]):
+            slug = t.get("slug", "")
+            pct = t.get("price_usd_change")
+            daa_items += (
+                f'<a href="/token/{slug}" class="top-item">'
+                f'<span class="top-rank">{i+1}</span>'
+                f'<span class="top-name"><strong>{html_mod.escape(t.get("name", slug)[:18])}</strong>'
+                f' <span class="ticker">{html_mod.escape(t.get("ticker", ""))}</span></span>'
+                f'<span class="top-metric">{fmt_num(t.get("daily_active_addresses"))}</span>'
+                f'<span class="top-change {pct_class(pct)}">{fmt_pct(pct)}</span>'
+                f'</a>'
+            )
+
+        top_sections_html = f"""
+    <div class="top-lists-row">
+        <div class="top-list-col">
+            <h4 class="top-list-title">Top by Volume</h4>
+            <div class="top-list">{vol_items}</div>
+        </div>
+        <div class="top-list-col">
+            <h4 class="top-list-title">Top by Active Addresses</h4>
+            <div class="top-list">{daa_items}</div>
+        </div>
+    </div>"""
+
+    # ============================================================
+    # MAIN TABLE
+    # ============================================================
     rows = []
     for i, t in enumerate(tokens):
         rank = start_rank + i + 1
         slug = t.get("slug", "")
         pct = t.get("price_usd_change")
         mvrv = t.get("mvrv_usd")
-        nvt_v = t.get("nvt")
         daa = t.get("daily_active_addresses")
-        dev = t.get("dev_activity")
-        exch = t.get("exchange_balance")
-        nw_growth = t.get("network_growth")
 
         # MVRV zone tag
         if mvrv is not None:
@@ -313,7 +473,6 @@ def render_market_page(
         else:
             pages.append('<span class="page-link disabled">&laquo; Prev</span>')
 
-        # Show page numbers with ellipsis
         for p in range(1, total_pages + 1):
             if p == page:
                 pages.append(f'<span class="page-link active">{p}</span>')
@@ -335,47 +494,6 @@ def render_market_page(
         data_info += f" (of {universe_size} discovered)"
     showing_info = f"Showing {start_rank+1}&ndash;{min(start_rank + per_page, total)}" if total > 0 else "No data yet"
 
-    # Sync banner (shown when still pulling)
-    sync_banner = ""
-    is_syncing = pull_status not in ("ready", "idle", "skipped")
-    if is_syncing:
-        cs = cache_stats or {}
-        ts_rows = cs.get("timeseries_rows", 0)
-        db_mb = cs.get("db_size_mb", 0)
-        pct_done = 0
-        if universe_size and total:
-            pct_done = min(99, int(total / universe_size * 100))
-        phase_labels = {
-            "phase1_discovery": "Phase 1: Discovering projects...",
-            "phase1_pulling": "Phase 1: Loading top 10 tokens...",
-            "phase1_complete": "Phase 1 complete. Starting universe pull...",
-            "phase2_universe": f"Phase 2: Pulling core data for all {universe_size} tokens (7yr history)...",
-            "phase2_complete": "Phase 2 complete. Starting deep pull...",
-            "phase3_deep": "Phase 3: Pulling deep metrics for top 200 tokens...",
-            "refreshing": "Refreshing latest data...",
-        }
-        phase_label = phase_labels.get(pull_status, pull_status)
-
-        sync_banner = f"""
-    <div class="sync-banner">
-        <div class="sync-banner-inner">
-            <div class="sync-status-row">
-                <span class="sync-dot"></span>
-                <strong>Data Sync In Progress</strong>
-                <span class="sync-phase">{html_mod.escape(phase_label)}</span>
-            </div>
-            <div class="sync-progress-bar">
-                <div class="sync-progress-fill" style="width:{pct_done}%"></div>
-            </div>
-            <div class="sync-stats-row">
-                <span>{total} / {universe_size} tokens loaded ({pct_done}%)</span>
-                <span>{fmt_num(ts_rows)} data points</span>
-                <span>{db_mb:.1f} MB cached</span>
-                <a href="/sync" class="sync-detail-link">Full details &rarr;</a>
-            </div>
-        </div>
-    </div>"""
-
     content = f"""
     <div class="view-header">
         <div>
@@ -387,10 +505,10 @@ def render_market_page(
     {sync_banner}
 
     <div class="stats-row">
-        <div class="stat-card">
+        <div class="stat-card stat-card-hero">
             <div class="stat-label">Total Market Cap</div>
             <div class="stat-value">{fmt_usd(total_mcap)}</div>
-            <div class="stat-sub">(this page)</div>
+            {mcap_trend_html}
         </div>
         <div class="stat-card">
             <div class="stat-label">24h Volume</div>
@@ -406,38 +524,53 @@ def render_market_page(
             <div class="stat-value">{f'{avg_nvt:.1f}' if avg_nvt is not None else '&mdash;'}</div>
         </div>
         <div class="stat-card hide-mobile">
-            <div class="stat-label">Total Active Addresses</div>
+            <div class="stat-label">Active Addresses</div>
             <div class="stat-value">{fmt_num(total_daa)}</div>
+        </div>
+        <div class="stat-card hide-mobile">
+            <div class="stat-label">Market Breadth</div>
+            <div class="stat-value breadth-value"><span class="num-positive">{pos_count}</span> / <span class="num-negative">{neg_count}</span></div>
+            <div class="stat-sub">up / down</div>
         </div>
     </div>
 
+    {sentiment_html}
+
+    {dominance_html}
+
+    {heatmap_html}
+
     {_render_gainers_losers(gainers or [], losers or [])}
 
-    <div class="page-info">{showing_info} of {total}</div>
+    {top_sections_html}
 
-    <div class="table-wrap">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th class="col-rank">#</th>
-                    <th class="col-name">Name</th>
-                    <th class="col-num">Price</th>
-                    <th class="col-num">24h</th>
-                    <th class="col-spark hide-mobile">7d</th>
-                    <th class="col-num">Market Cap</th>
-                    <th class="col-num">Volume</th>
-                    <th class="col-num hide-mobile">MVRV</th>
-                    <th class="col-tag hide-mobile">Zone</th>
-                    <th class="col-num hide-mobile">Active Addr</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_body}
-            </tbody>
-        </table>
+    <div class="dashboard-section">
+        <h3 class="dash-section-title">All Tokens <span class="dash-section-sub">{showing_info} of {total}</span></h3>
+
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="col-rank">#</th>
+                        <th class="col-name">Name</th>
+                        <th class="col-num">Price</th>
+                        <th class="col-num">24h</th>
+                        <th class="col-spark hide-mobile">7d</th>
+                        <th class="col-num">Market Cap</th>
+                        <th class="col-num">Volume</th>
+                        <th class="col-num hide-mobile">MVRV</th>
+                        <th class="col-tag hide-mobile">Zone</th>
+                        <th class="col-num hide-mobile">Active Addr</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {table_body}
+                </tbody>
+            </table>
+        </div>
+
+        {pagination_html}
     </div>
-
-    {pagination_html}
     """
     return page_shell("Market", content, active_nav="market")
 
