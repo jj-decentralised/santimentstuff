@@ -1358,8 +1358,17 @@ def render_compare_page(tokens: list) -> str:
         body = """
         <h1 class="page-title">Compare Tokens</h1>
         <p class="page-subtitle">Side-by-side on-chain comparison</p>
-        <p class="chart-empty">Usage: /compare?tokens=bitcoin,ethereum,solana</p>
-        """
+        <div class="empty-state">
+            <div class="empty-state-icon">&#8644;</div>
+            <h2>Select tokens to compare</h2>
+            <p>Add token slugs to the URL or pick a preset:</p>
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+                <a href="/compare?tokens=bitcoin,ethereum" class="filter-btn">BTC vs ETH</a>
+                <a href="/compare?tokens=bitcoin,ethereum,solana,cardano" class="filter-btn">L1 Chains</a>
+                <a href="/compare?tokens=aave,uniswap,maker" class="filter-btn">DeFi</a>
+                <a href="/compare?tokens=dogecoin,shiba-inu,pepe" class="filter-btn">Memes</a>
+            </div>
+        </div>"""
         return page_shell("Compare", body, active_nav="compare")
 
     presets = [
@@ -1929,7 +1938,7 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
     parts.append(f'<div class="compare-bar"><span class="compare-bar-label">Presets:</span>{chips}</div>')
 
     if not tokens:
-        parts.append('<div class="empty-state"><h2>No tokens selected</h2><p>Add token slugs above or pick a preset watchlist.</p></div>')
+        parts.append('<div class="empty-state"><div class="empty-state-icon">&#9734;</div><h2>No tokens selected</h2><p>Enter token slugs in the box above or pick a preset watchlist to get started.</p></div>')
         return page_shell("Watchlist", "\n".join(parts), active_nav="watchlist")
 
     # Summary stats
