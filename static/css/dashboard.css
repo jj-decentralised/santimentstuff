@@ -621,6 +621,7 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius);
   overflow-x: auto;
   background: var(--bg-card);
+  -webkit-overflow-scrolling: touch;
 }
 .data-table {
   width: 100%;

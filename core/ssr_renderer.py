@@ -1757,6 +1757,20 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         zl, _, _ = mvrv_zone(mvrv)
         og_parts.append(f"MVRV: {mvrv:.2f} ({zl})")
     og_desc = " | ".join(og_parts) + " — Onchain Pulse analytics"
+
+    # JSON-LD structured data
+    import json as _json
+    ld = {
+        "@context": "https://schema.org",
+        "@type": "FinancialProduct",
+        "name": f"{token.get('name', slug)} ({token.get('ticker', '')})",
+        "description": og_desc,
+        "url": f"/token/{slug}",
+    }
+    if price is not None:
+        ld["offers"] = {"@type": "Offer", "price": f"{price:.6f}", "priceCurrency": "USD"}
+    body += f'\n<script type="application/ld+json">{_json.dumps(ld)}</script>'
+
     return page_shell(f"{name} ({ticker})", body, og_description=og_desc, canonical=f"/token/{slug}")
 
 
