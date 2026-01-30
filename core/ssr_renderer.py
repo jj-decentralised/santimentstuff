@@ -172,21 +172,23 @@ def _freshness_badge() -> str:
 
 def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0, theme: str = "auto", og_description: str = "", canonical: str = "") -> str:
     nav_items = [
-        ("briefing", "/", "Briefing"),
-        ("explore", "/explore", "Explore"),
-        ("sectors", "/sectors", "Sectors"),
-        ("screener", "/screener", "Screener"),
-        ("insights", "/insights", "Insights"),
-        ("valuation", "/valuation", "Valuation"),
-        ("developers", "/developers", "Developers"),
-        ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
-        ("watchlist", "/watchlist?tokens=bitcoin,ethereum,solana,cardano,avalanche", "Watchlist"),
-        ("sync", "/sync", "Sync"),
+        ("briefing", "/", "Briefing", "b"),
+        ("explore", "/explore", "Explore", "e"),
+        ("sectors", "/sectors", "Sectors", ""),
+        ("screener", "/screener", "Screener", "r"),
+        ("insights", "/insights", "Insights", "i"),
+        ("valuation", "/valuation", "Valuation", "v"),
+        ("developers", "/developers", "Developers", "d"),
+        ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare", ""),
+        ("watchlist", "/watchlist?tokens=bitcoin,ethereum,solana,cardano,avalanche", "Watchlist", "w"),
+        ("sync", "/sync", "Sync", ""),
     ]
-    nav_html = "".join(
-        f'<a href="{href}" class="nav-link{" active" if key == active_nav else ""}">{label}</a>'
-        for key, href, label in nav_items
-    )
+    nav_links = []
+    for key, href, label, ak in nav_items:
+        active = " active" if key == active_nav else ""
+        ak_attr = f' accesskey="{ak}"' if ak else ""
+        nav_links.append(f'<a href="{href}" class="nav-link{active}"{ak_attr}>{label}</a>')
+    nav_html = "".join(nav_links)
 
     # Market ticker strip — use passed data or fetch from global getter
     if ticker_data is None and _ticker_data_fn:
@@ -223,7 +225,10 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <meta property="og:title" content="{_esc(title)} — Onchain Pulse">
     <meta property="og:description" content="{_esc(og_description) if og_description else 'On-chain crypto analytics dashboard. MVRV zones, network health, smart money signals.'}">
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Onchain Pulse">
+    {f'<meta property="og:url" content="{_esc(canonical)}">' if canonical else ''}
     <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{_esc(title)} — Onchain Pulse">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230F1419'/><text x='16' y='22' text-anchor='middle' fill='%2310B981' font-family='sans-serif' font-weight='900' font-size='18'>P</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -830,7 +835,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         </a>
     </div>""")
 
-    return page_shell("Daily Briefing", "\n".join(parts), active_nav="briefing", auto_refresh=300)
+    return page_shell("Daily Briefing", "\n".join(parts), active_nav="briefing", auto_refresh=300, canonical="/")
 
 
 # ================================================================
