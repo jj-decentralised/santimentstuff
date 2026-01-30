@@ -2323,6 +2323,18 @@ html.dark .sector-exchange { background: #78350F; color: #FCD34D; border-color: 
   font-family: var(--mono);
   font-size: 0.64rem;
 }
+.scroll-top {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.scroll-top:hover { color: var(--text-primary); border-color: var(--text-muted); }
 
 /* ================================================================
    MOBILE NAV — CSS-only hamburger

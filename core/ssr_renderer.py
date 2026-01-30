@@ -207,7 +207,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
-<body>
+<body id="top">
     <a href="#main-content" class="skip-link">Skip to main content</a>
     {ticker_html}
     <header class="header">
@@ -243,6 +243,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
                 On-chain data via <strong>Santiment</strong>. Refreshed daily. Not financial advice.
                 <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC</span>
             </div>
+            <a href="#top" class="scroll-top" aria-label="Back to top">&uarr; Top</a>
         </div>
     </footer>
 </body>
