@@ -546,6 +546,40 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         {score_html}
     </section>""")
 
+    # ── Breadth distribution histogram ──
+    all_tokens_bd = b.get("all_tokens", [])
+    if all_tokens_bd:
+        change_buckets = [
+            ("<-10%", -999, -10, "#991b1b"),
+            ("-10 to -5%", -10, -5, "#ef4444"),
+            ("-5 to -2%", -5, -2, "#f97316"),
+            ("-2 to 0%", -2, 0, "#eab308"),
+            ("0 to 2%", 0, 2, "#84cc16"),
+            ("2 to 5%", 2, 5, "#22c55e"),
+            ("5 to 10%", 5, 10, "#10b981"),
+            (">10%", 10, 999, "#059669"),
+        ]
+        bucket_counts = [0] * len(change_buckets)
+        for t in all_tokens_bd:
+            chg = t.get("price_usd_change")
+            if chg is None:
+                continue
+            for idx, (_, lo, hi, _) in enumerate(change_buckets):
+                if lo <= chg < hi:
+                    bucket_counts[idx] += 1
+                    break
+        max_count = max(bucket_counts) or 1
+        hist_bars = ""
+        for idx, (label, _, _, color) in enumerate(change_buckets):
+            cnt = bucket_counts[idx]
+            bar_h = max(2, cnt / max_count * 60)
+            hist_bars += f'<div class="breadth-hist-col"><div class="breadth-hist-bar" style="height:{bar_h:.0f}px;background:{color}"></div><div class="breadth-hist-count">{cnt}</div><div class="breadth-hist-label">{label}</div></div>'
+        parts.append(f"""
+    <div class="breadth-histogram">
+        <div class="section-label">24h Change Distribution</div>
+        <div class="breadth-hist-row">{hist_bars}</div>
+    </div>""")
+
     # ── Section 2: Valuation Landscape ──
     zones = b.get("mvrv_zones", {})
     zone_total = b.get("mvrv_total", 0) or 1
