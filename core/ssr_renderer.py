@@ -2467,6 +2467,46 @@ def render_compare_page(tokens: list) -> str:
         </table></div>
     </div>"""
 
+    # Multi-period performance table
+    perf_html = ""
+    if len(tokens) >= 2:
+        periods = [("24h", 1), ("7d", 7), ("30d", 30)]
+        perf_header = "<th>Token</th>" + "".join(f"<th class='col-num'>{p}</th>" for p, _ in periods) + "<th class='col-num'>Best Period</th>"
+        perf_rows = ""
+        for t in tokens:
+            price_data = t.get("metrics", {}).get("price_usd", {}).get("data", [])
+            vals = [d.get("value") for d in price_data if d.get("value") is not None]
+            curr = vals[-1] if vals else None
+            cells = f"<td class='col-name'><a href='/token/{t.get('slug','')}'><strong>{_esc(t.get('name',''))}</strong></a></td>"
+            best_ret = None
+            best_label = ""
+            for label, days in periods:
+                if curr and len(vals) > days:
+                    prev = vals[-1 - days]
+                    if prev and prev > 0:
+                        ret = (curr - prev) / prev * 100
+                        cls = css_class(ret)
+                        cells += f"<td class='col-num {cls}'>{ret:+.1f}%</td>"
+                        if best_ret is None or ret > best_ret:
+                            best_ret = ret
+                            best_label = label
+                    else:
+                        cells += "<td class='col-num'>&mdash;</td>"
+                else:
+                    cells += "<td class='col-num'>&mdash;</td>"
+            best_cls = css_class(best_ret) if best_ret is not None else ""
+            best_text = f"{best_label}: {best_ret:+.1f}%" if best_ret is not None else "&mdash;"
+            cells += f"<td class='col-num {best_cls}'>{best_text}</td>"
+            perf_rows += f"<tr>{cells}</tr>"
+        perf_html = f"""
+    <div class="section">
+        <div class="section-title">Performance Comparison</div>
+        <div class="table-wrap"><table class="data-table">
+            <thead><tr>{perf_header}</tr></thead>
+            <tbody>{perf_rows}</tbody>
+        </table></div>
+    </div>"""
+
     body = f"""
     {_breadcrumbs(("Compare",))}
     <h1 class="page-title">Compare Tokens</h1>
@@ -2488,6 +2528,7 @@ def render_compare_page(tokens: list) -> str:
         <div class="section-title">Metrics</div>
         {comp_table}
     </div>
+    {perf_html}
     {corr_html}
     {_compare_radar(tokens)}
     <div class="section">
