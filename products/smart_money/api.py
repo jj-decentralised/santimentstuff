@@ -1390,6 +1390,47 @@ def create_app() -> FastAPI:
             sectors=SECTORS, categories=CATEGORIES, search=q,
         )
 
+    @app.get("/screener/export.csv")
+    async def get_screener_csv(
+        tier: str = Query(default="all"),
+        min_change: float = Query(default=-999),
+        max_change: float = Query(default=999),
+        sort: str = Query(default="marketcap_usd"),
+        order: str = Query(default="desc"),
+        sector: str = Query(default="all"),
+        category: str = Query(default="all"),
+        q: str = Query(default=""),
+    ):
+        """Export screener data as CSV."""
+        tier_ranges = {
+            "mega": (100e9, float("inf")),
+            "large": (10e9, 100e9),
+            "mid": (1e9, 10e9),
+            "small": (100e6, 1e9),
+            "micro": (0, 100e6),
+            "all": (0, float("inf")),
+        }
+        min_mcap, max_mcap = tier_ranges.get(tier, (0, float("inf")))
+        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order, sector, category, search=q)
+        lines = ["Name,Ticker,Slug,Sector,Price USD,24h Change %,Market Cap,Volume 24h,MVRV"]
+        for t in tokens[:500]:
+            name = t.get("name", "").replace(",", "")
+            ticker = t.get("ticker", "")
+            slug = t.get("slug", "")
+            sec = t.get("sector", "")
+            price = t.get("price_usd") or 0
+            pct = t.get("price_usd_change") or 0
+            mcap = t.get("marketcap_usd") or 0
+            vol = t.get("volume_usd") or 0
+            mvrv = t.get("mvrv_usd") or 0
+            lines.append(f"{name},{ticker},{slug},{sec},{price:.4f},{pct:.2f},{mcap:.0f},{vol:.0f},{mvrv:.4f}")
+        csv_data = "\n".join(lines)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=screener_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"},
+        )
+
     @app.get("/developers", response_class=HTMLResponse)
     async def get_developers_page(
         sector: str = Query(default="all"),

@@ -1985,8 +1985,13 @@ def render_screener_page(
     search_note = f' matching "{_esc(search)}"' if search else ""
     body = f"""
     {_breadcrumbs(("Screener",))}
-    <h1 class="page-title">Screener</h1>
-    <p class="page-subtitle">Filter and sort {len(tokens)} tokens{search_note}</p>
+    <div class="page-title-row">
+        <div>
+            <h1 class="page-title">Screener</h1>
+            <p class="page-subtitle">Filter and sort {len(tokens)} tokens{search_note}</p>
+        </div>
+        <a href="/screener/export.csv?tier={_esc(tier)}&sort={_esc(sort_by)}&order={_esc(order)}&sector={_esc(sector)}&category={_esc(category)}{f'&q={_esc(search)}' if search else ''}" class="export-btn" title="Download CSV">&#8681; Export CSV</a>
+    </div>
     {zone_summary_html}
     <form class="search-bar" action="/screener" method="get" role="search" aria-label="Search screener">
         <input type="text" name="q" value="{_esc(search)}" placeholder="Search tokens..." class="search-input" autocomplete="off">
