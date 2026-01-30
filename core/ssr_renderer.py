@@ -2848,9 +2848,11 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
         spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
         sec = t.get("sector", "other")
         sec_label = sec.replace("_", " ").title()
+        alloc_pct = ((t.get("marketcap_usd") or 0) / total_mcap * 100) if total_mcap > 0 else 0
         rows += f"""<tr>
             <td class="col-rank">{i+1}</td>
             <td class="col-name"><a href="/token/{slug_t}" class="token-link"><strong>{_esc(t.get("name", slug_t))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+            <td class="col-num hide-mobile"><div class="alloc-cell"><span>{alloc_pct:.1f}%</span><div class="alloc-bar"><div class="alloc-fill" style="width:{min(alloc_pct, 100):.0f}%"></div></div></div></td>
             <td class="col-tag hide-mobile"><a href="/explore?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
             <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
             <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
@@ -2866,6 +2868,7 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
         <table class="data-table">
             <thead><tr>
                 <th class="col-rank">#</th><th>Name</th>
+                <th class="col-num hide-mobile">Alloc%</th>
                 <th class="col-tag hide-mobile">Sector</th>
                 <th class="col-num">Price</th>
                 <th class="col-num">24h</th>
