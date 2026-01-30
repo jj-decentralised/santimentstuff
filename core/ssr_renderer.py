@@ -1768,6 +1768,16 @@ def render_screener_page(
     <div class="filter-bar">
         <div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>
     </div>
+    <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">Quick:</span>
+            <a href="/screener?sort=mvrv_usd&order=asc" class="filter-btn preset-btn">Undervalued</a>
+            <a href="/screener?sort=price_usd_change&order=desc" class="filter-btn preset-btn">Top Gainers</a>
+            <a href="/screener?sort=price_usd_change&order=asc" class="filter-btn preset-btn">Top Losers</a>
+            <a href="/screener?sort=volume_usd&order=desc" class="filter-btn preset-btn">High Volume</a>
+            <a href="/screener?sort=dev_activity&order=desc" class="filter-btn preset-btn">Active Dev</a>
+        </div>
+    </div>
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>

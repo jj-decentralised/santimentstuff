@@ -1239,6 +1239,7 @@ a { color: inherit; text-decoration: none; }
 }
 .filter-btn:hover { background: var(--bg-card); border-color: var(--text-muted); }
 .filter-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+.preset-btn { border-style: dashed; }
 .sort-link { font-weight: 700; }
 .sort-link:hover { text-decoration: underline; }
 
