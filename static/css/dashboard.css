@@ -1183,6 +1183,47 @@ a { color: inherit; text-decoration: none; }
 .vm-bar-fill.vm-vlow { background: #D1D5DB; }
 .vm-hint { font-size: 0.62rem; color: var(--text-muted); }
 
+/* Volatility indicator */
+.volatility-indicator {
+  padding: 10px 14px; margin-bottom: 14px;
+  background: var(--bg-alt); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+.vol-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px; font-size: 0.72rem; font-weight: 600;
+}
+.vol-title { color: var(--text-muted); }
+.vol-ann { font-family: var(--mono); font-size: 0.78rem; font-weight: 700; }
+.vol-tag {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 3px; letter-spacing: 0.04em;
+}
+.vol-tag.vol-low { background: rgba(16,185,129,0.15); color: #059669; }
+.vol-tag.vol-moderate { background: rgba(59,130,246,0.15); color: #3B82F6; }
+.vol-tag.vol-high { background: rgba(245,158,11,0.15); color: #F59E0B; }
+.vol-tag.vol-vhigh { background: rgba(239,68,68,0.15); color: #EF4444; }
+.vol-tag.vol-extreme { background: rgba(220,38,38,0.2); color: #DC2626; }
+.vol-bar-track {
+  height: 5px; background: var(--border); border-radius: 3px;
+  overflow: hidden; margin-bottom: 6px;
+}
+.vol-bar-fill {
+  height: 100%; border-radius: 3px; transition: width 0.3s;
+}
+.vol-bar-fill.vol-low { background: #10B981; }
+.vol-bar-fill.vol-moderate { background: #3B82F6; }
+.vol-bar-fill.vol-high { background: #F59E0B; }
+.vol-bar-fill.vol-vhigh { background: #EF4444; }
+.vol-bar-fill.vol-extreme { background: #DC2626; }
+.vol-periods {
+  display: flex; gap: 12px; margin-bottom: 3px;
+}
+.vol-period {
+  font-size: 0.64rem; font-family: var(--mono); color: var(--text-muted);
+}
+.vol-hint { font-size: 0.62rem; color: var(--text-muted); }
+
 .signal-summary {
   padding: 10px 14px; margin-bottom: 14px;
   background: var(--bg-alt); border-radius: var(--radius-sm);
@@ -2956,6 +2997,11 @@ html.dark .signal-row { color: #8B949E; }
 html.dark .vol-mcap-indicator { background: #161B22; border-color: #30363D; }
 html.dark .vm-header { color: #C9D1D9; }
 html.dark .vm-bar-track { background: #21262D; }
+
+/* Dark mode — volatility indicator */
+html.dark .volatility-indicator { background: #161B22; border-color: #30363D; }
+html.dark .vol-header { color: #C9D1D9; }
+html.dark .vol-bar-track { background: #21262D; }
 
 /* Dark mode — tooltip hover cards */
 html.dark .metric-tip-card {

@@ -1689,6 +1689,50 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             <div class="vm-hint">Higher ratio = more liquid relative to size</div>
         </div>"""
 
+    # Volatility indicator — annualized from daily returns std dev
+    volatility_html = ""
+    if price_ts and len(price_ts) >= 7:
+        import math as _math2
+        returns = []
+        for i in range(1, len(price_ts)):
+            p0 = price_ts[i - 1].get("value")
+            p1 = price_ts[i].get("value")
+            if p0 and p1 and p0 > 0:
+                returns.append((p1 - p0) / p0)
+        if len(returns) >= 5:
+            mean_r = sum(returns) / len(returns)
+            var_r = sum((r - mean_r) ** 2 for r in returns) / len(returns)
+            daily_vol = _math2.sqrt(var_r)
+            ann_vol = daily_vol * _math2.sqrt(365) * 100
+            if ann_vol > 150:
+                v_label, v_cls = "Extreme", "vol-extreme"
+            elif ann_vol > 100:
+                v_label, v_cls = "Very High", "vol-vhigh"
+            elif ann_vol > 60:
+                v_label, v_cls = "High", "vol-high"
+            elif ann_vol > 30:
+                v_label, v_cls = "Moderate", "vol-moderate"
+            else:
+                v_label, v_cls = "Low", "vol-low"
+            bar_w = min(100, ann_vol / 2)  # 200% ann vol = 100% bar
+            # 7-day and 30-day rolling
+            r7 = returns[-7:] if len(returns) >= 7 else returns
+            mean7 = sum(r7) / len(r7)
+            vol7 = _math2.sqrt(sum((r - mean7) ** 2 for r in r7) / len(r7)) * _math2.sqrt(365) * 100
+            r30 = returns[-30:] if len(returns) >= 30 else returns
+            mean30 = sum(r30) / len(r30)
+            vol30 = _math2.sqrt(sum((r - mean30) ** 2 for r in r30) / len(r30)) * _math2.sqrt(365) * 100
+            volatility_html = f"""<div class="volatility-indicator">
+            <div class="vol-header"><span class="vol-title">Volatility</span><span class="vol-ann">{ann_vol:.0f}%</span><span class="vol-tag {v_cls}">{v_label}</span></div>
+            <div class="vol-bar-track"><div class="vol-bar-fill {v_cls}" style="width:{bar_w:.1f}%"></div></div>
+            <div class="vol-periods">
+                <span class="vol-period">7d: {vol7:.0f}%</span>
+                <span class="vol-period">30d: {vol30:.0f}%</span>
+                <span class="vol-period">All: {ann_vol:.0f}%</span>
+            </div>
+            <div class="vol-hint">Annualized from daily return standard deviation</div>
+        </div>"""
+
     # Metric cards with tooltip explanations
     _metric_tips = {
         "marketcap_usd": "Total supply × current price",
@@ -1875,6 +1919,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {alerts_html}
     {health_score_html}
     {vol_mcap_html}
+    {volatility_html}
     {signal_html}
 
     {_render_token_description(token)}
