@@ -1758,7 +1758,13 @@ def create_app() -> FastAPI:
 
 curl https://santimentstuff-production-2305.up.railway.app/api/v1/profile/bitcoin
 
-curl https://santimentstuff-production-2305.up.railway.app/api/v1/metric/mvrv_usd?slug=ethereum</code></pre>
+curl https://santimentstuff-production-2305.up.railway.app/api/v1/metric/mvrv_usd?slug=ethereum
+
+curl https://santimentstuff-production-2305.up.railway.app/api/v1/briefing
+
+curl https://santimentstuff-production-2305.up.railway.app/api/v1/sectors
+
+curl https://santimentstuff-production-2305.up.railway.app/api/v1/valuation/bitcoin</code></pre>
         </div>"""
         return page_shell("API Documentation", body)
 
@@ -1827,6 +1833,50 @@ curl https://santimentstuff-production-2305.up.railway.app/api/v1/metric/mvrv_us
                     "max_365d": max(values[-365:]) if len(values) >= 365 else None,
                 }
         return {"slug": slug, "valuation": result}
+
+    @app.get("/api/v1/briefing")
+    async def get_briefing_api():
+        """JSON: economy briefing summary."""
+        b = _build_economy_briefing()
+        if not b:
+            raise HTTPException(503, "Briefing data not available")
+        breadth = b.get("breadth", {})
+        return {
+            "total_tokens": b.get("total_tokens", 0),
+            "total_mcap": b.get("total_mcap"),
+            "total_volume": b.get("total_vol"),
+            "avg_mvrv": b.get("avg_mvrv"),
+            "breadth": breadth,
+            "breadth_pct": (breadth.get("up", 0) / (breadth.get("up", 0) + breadth.get("down", 1)) * 100) if breadth else None,
+            "mvrv_zones": b.get("mvrv_zones", {}),
+            "vol_concentration_top10": b.get("vol_concentration_top10"),
+            "accumulating": b.get("accumulating"),
+            "distributing": b.get("distributing"),
+            "total_daa": b.get("total_daa"),
+            "total_dev": b.get("total_dev"),
+            "signals_count": len(b.get("signals", [])),
+            "gainers_count": len(b.get("gainers", [])),
+            "losers_count": len(b.get("losers", [])),
+        }
+
+    @app.get("/api/v1/sectors")
+    async def get_sectors_api():
+        """JSON: sector breakdown."""
+        tokens = _get_all_tokens()
+        sector_agg = {}
+        for t in tokens:
+            sec = t.get("sector", "other")
+            if sec not in sector_agg:
+                sector_agg[sec] = {"label": SECTORS.get(sec, sec), "count": 0, "mcap": 0, "vol": 0, "up": 0, "down": 0}
+            sector_agg[sec]["count"] += 1
+            sector_agg[sec]["mcap"] += t.get("marketcap_usd") or 0
+            sector_agg[sec]["vol"] += t.get("volume_usd") or 0
+            chg = t.get("price_usd_change") or 0
+            if chg > 0:
+                sector_agg[sec]["up"] += 1
+            elif chg < 0:
+                sector_agg[sec]["down"] += 1
+        return {"sectors": sector_agg, "total_tokens": len(tokens)}
 
     # ============================================================
     # SEO — SITEMAP + ROBOTS
