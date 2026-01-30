@@ -343,13 +343,33 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             <a href="/sync">Details &rarr;</a>
         </div>""")
 
+    # ── Pre-compute regime for header ──
+    avg_mvrv = b.get("avg_mvrv")
+    breadth = b.get("breadth", {})
+    zone_label, zone_css, zone_desc = mvrv_zone(avg_mvrv)
+    up = breadth.get("up", 0)
+    down = breadth.get("down", 0)
+    total_bd = up + down
+    breadth_pct = (up / total_bd * 100) if total_bd else 50
+
+    if avg_mvrv is not None and avg_mvrv < 1.0 and breadth_pct < 40:
+        regime = ("Bearish", "regime-bear")
+    elif avg_mvrv is not None and avg_mvrv > 2.0 and breadth_pct > 65:
+        regime = ("Bullish", "regime-bull")
+    elif breadth_pct > 55:
+        regime = ("Cautiously Bullish", "regime-neutral-bull")
+    elif breadth_pct < 45:
+        regime = ("Cautiously Bearish", "regime-neutral-bear")
+    else:
+        regime = ("Neutral", "regime-neutral")
+
     # ── Header ──
     now_str = datetime.utcnow().strftime("%B %d, %Y")
     parts.append(f"""
     <div class="briefing-header">
         <div>
             <h1 class="briefing-title">Daily Economy Briefing</h1>
-            <p class="briefing-date">{now_str} &middot; {b.get("total_tokens", 0)} tokens tracked</p>
+            <p class="briefing-date">{now_str} &middot; {b.get("total_tokens", 0)} tokens tracked &middot; <span class="regime-badge {regime[1]}">{regime[0]}</span></p>
         </div>
     </div>""")
 
@@ -368,27 +388,6 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     parts.append(f'<nav class="briefing-toc">{toc_links}</nav>')
 
     # ── Section 1: Market Regime ──
-    avg_mvrv = b.get("avg_mvrv")
-    breadth = b.get("breadth", {})
-    zone_label, zone_css, zone_desc = mvrv_zone(avg_mvrv)
-
-    # Regime verdict
-    up = breadth.get("up", 0)
-    down = breadth.get("down", 0)
-    total_bd = up + down
-    breadth_pct = (up / total_bd * 100) if total_bd else 50
-
-    if avg_mvrv is not None and avg_mvrv < 1.0 and breadth_pct < 40:
-        regime = ("Bearish", "regime-bear")
-    elif avg_mvrv is not None and avg_mvrv > 2.0 and breadth_pct > 65:
-        regime = ("Bullish", "regime-bull")
-    elif breadth_pct > 55:
-        regime = ("Cautiously Bullish", "regime-neutral-bull")
-    elif breadth_pct < 45:
-        regime = ("Cautiously Bearish", "regime-neutral-bear")
-    else:
-        regime = ("Neutral", "regime-neutral")
-
     gauge_svg = sentiment_gauge_svg(avg_mvrv, min_val=0, max_val=4, label="MVRV") if avg_mvrv is not None else ""
 
     # BTC price trend
