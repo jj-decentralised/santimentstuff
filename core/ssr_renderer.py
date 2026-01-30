@@ -2955,75 +2955,144 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
 # ================================================================
 
 def render_glossary_page() -> str:
-    metrics = [
-        ("MVRV (Market Value to Realized Value)", "mvrv_usd",
-         "Compares current market cap to realized cap (the value when each coin last moved on-chain). "
-         "Below 1.0 historically signals undervaluation; above 3.0 often precedes corrections.",
-         [("< 0.7", "Deep Value — strong buying zone historically"),
-          ("0.7 – 1.0", "Undervalued — accumulation territory"),
-          ("1.0 – 1.5", "Fair Value — balanced market"),
-          ("1.5 – 2.5", "Elevated — caution warranted"),
-          ("2.5 – 3.5", "Overvalued — distribution risk"),
-          ("> 3.5", "Euphoria — extreme caution")]),
-        ("NVT Ratio (Network Value to Transactions)", "nvt",
-         "Crypto equivalent of P/E ratio. Divides market cap by on-chain transaction volume. "
-         "High NVT means the network is overvalued relative to its usage; low NVT suggests undervaluation.",
-         [("< 20", "Strong utilization — potentially undervalued"),
-          ("20 – 80", "Normal range"),
-          ("> 150", "Overvalued relative to network throughput")]),
-        ("Daily Active Addresses (DAA)", "daily_active_addresses",
-         "Count of unique addresses that transacted on-chain in the past 24 hours. "
-         "Rising DAA indicates growing network adoption and user engagement.", []),
-        ("Exchange Balance", "exchange_balance",
-         "Total token supply held on known exchange wallets. "
-         "Decreasing balance suggests accumulation; increasing suggests distribution.",
-         [("Decreasing", "Accumulation — coins moving to cold storage"),
-          ("Increasing", "Distribution — coins moving to exchanges for potential sale")]),
-        ("Dev Activity", "dev_activity",
-         "Measures GitHub events (commits, PRs, issues) in the project's repositories. "
-         "Consistent dev activity signals an actively maintained project.", []),
-        ("Network Growth", "network_growth",
-         "Number of new addresses created on the network per day. "
-         "Higher growth indicates expanding network adoption.", []),
-        ("Transaction Volume", "transaction_volume",
-         "Total value of on-chain transactions per day. "
-         "Captures actual on-chain economic activity, distinct from exchange volume.", []),
-        ("Circulation", "circulation",
-         "Number of unique tokens transacted on-chain during the period. "
-         "High circulation suggests active usage rather than dormant holding.", []),
-        ("Velocity", "velocity",
-         "Transaction volume divided by circulating supply — how frequently tokens change hands.", []),
-        ("Mean Dollar Age", "mean_age",
-         "Average age of all tokens weighted by USD value. "
-         "Drops indicate older coins moving — often a distribution signal.", []),
-        ("Whale Transactions (>$100K)", "whale_transaction_count_100k_usd_to_inf",
-         "Count of transactions exceeding $100,000. "
-         "Spikes often precede significant price movements.", []),
-        ("Social Volume", "social_volume_total",
-         "Number of mentions across social platforms. "
-         "Spikes indicate growing interest or fear.", []),
-        ("Sentiment Balance", "sentiment_balance_total",
-         "Ratio of positive to negative social mentions. "
-         "Extreme positive can be contrarian bearish; extreme negative can be contrarian bullish.", []),
+    # Categorized metrics with use-case guidance and page links
+    categories = [
+        ("Valuation", "valuation", [
+            ("MVRV (Market Value to Realized Value)", "mvrv_usd",
+             "Compares current market cap to realized cap (the value when each coin last moved on-chain). "
+             "Below 1.0 historically signals undervaluation; above 3.0 often precedes corrections.",
+             "Use when assessing whether a token is over- or under-valued relative to its cost basis.",
+             [("< 0.7", "Deep Value — strong buying zone historically"),
+              ("0.7 – 1.0", "Undervalued — accumulation territory"),
+              ("1.0 – 1.5", "Fair Value — balanced market"),
+              ("1.5 – 2.5", "Elevated — caution warranted"),
+              ("2.5 – 3.5", "Overvalued — distribution risk"),
+              ("> 3.5", "Euphoria — extreme caution")],
+             [("/valuation", "Valuation"), ("/screener", "Screener")]),
+            ("NVT Ratio (Network Value to Transactions)", "nvt",
+             "Crypto equivalent of P/E ratio. Divides market cap by on-chain transaction volume. "
+             "High NVT means the network is overvalued relative to its usage; low NVT suggests undervaluation.",
+             "Use when evaluating network usage efficiency relative to market valuation.",
+             [("< 20", "Strong utilization — potentially undervalued"),
+              ("20 – 80", "Normal range"),
+              ("> 150", "Overvalued relative to network throughput")],
+             [("/valuation", "Valuation")]),
+        ]),
+        ("Network Activity", "activity", [
+            ("Daily Active Addresses (DAA)", "daily_active_addresses",
+             "Count of unique addresses that transacted on-chain in the past 24 hours. "
+             "Rising DAA indicates growing network adoption and user engagement.",
+             "Use when gauging real-world adoption and user base growth.",
+             [], [("/", "Briefing")]),
+            ("Network Growth", "network_growth",
+             "Number of new addresses created on the network per day. "
+             "Higher growth indicates expanding network adoption.",
+             "Use when tracking new user onboarding momentum.",
+             [], []),
+            ("Transaction Volume", "transaction_volume",
+             "Total value of on-chain transactions per day. "
+             "Captures actual on-chain economic activity, distinct from exchange volume.",
+             "Use when measuring genuine on-chain economic throughput.",
+             [], []),
+            ("Circulation", "circulation",
+             "Number of unique tokens transacted on-chain during the period. "
+             "High circulation suggests active usage rather than dormant holding.",
+             "Use when distinguishing active usage from speculative holding.",
+             [], []),
+            ("Velocity", "velocity",
+             "Transaction volume divided by circulating supply — how frequently tokens change hands.",
+             "Use when assessing speculative activity vs. holding behavior.",
+             [], []),
+        ]),
+        ("Supply Distribution", "supply", [
+            ("Exchange Balance", "exchange_balance",
+             "Total token supply held on known exchange wallets. "
+             "Decreasing balance suggests accumulation; increasing suggests distribution.",
+             "Use when identifying accumulation or distribution phases.",
+             [("Decreasing", "Accumulation — coins moving to cold storage"),
+              ("Increasing", "Distribution — coins moving to exchanges for potential sale")],
+             [("/", "Briefing")]),
+            ("Mean Dollar Age", "mean_age",
+             "Average age of all tokens weighted by USD value. "
+             "Drops indicate older coins moving — often a distribution signal.",
+             "Use when detecting whether long-term holders are selling.",
+             [], []),
+            ("Whale Transactions (>$100K)", "whale_transaction_count_100k_usd_to_inf",
+             "Count of transactions exceeding $100,000. "
+             "Spikes often precede significant price movements.",
+             "Use when tracking institutional or whale-level activity.",
+             [], []),
+        ]),
+        ("Social & Sentiment", "social", [
+            ("Social Volume", "social_volume_total",
+             "Number of mentions across social platforms. "
+             "Spikes indicate growing interest or fear.",
+             "Use when monitoring crowd attention and potential hype cycles.",
+             [], [("/insights", "Insights")]),
+            ("Sentiment Balance", "sentiment_balance_total",
+             "Ratio of positive to negative social mentions. "
+             "Extreme positive can be contrarian bearish; extreme negative can be contrarian bullish.",
+             "Use for contrarian signals — extreme sentiment often precedes reversals.",
+             [], [("/insights", "Insights")]),
+        ]),
+        ("Development", "dev", [
+            ("Dev Activity", "dev_activity",
+             "Measures GitHub events (commits, PRs, issues) in the project's repositories. "
+             "Consistent dev activity signals an actively maintained project.",
+             "Use when evaluating project fundamentals and long-term commitment.",
+             [], [("/developers", "Developers")]),
+        ]),
     ]
 
-    cards = ""
-    for title, key, desc, thresholds in metrics:
-        threshold_html = ""
-        if thresholds:
-            items = "".join(f"<li><strong>{_esc(k)}</strong>: {_esc(v)}</li>" for k, v in thresholds)
-            threshold_html = f'<ul class="glossary-thresholds">{items}</ul>'
-        cards += f"""
-        <div class="card glossary-card">
-            <h3 class="glossary-metric-name">{_esc(title)}</h3>
-            <code class="glossary-key">{_esc(key)}</code>
-            <p class="glossary-desc">{_esc(desc)}</p>
-            {threshold_html}
+    # Build category navigation and cards
+    cat_nav = ""
+    cat_sections = ""
+    for cat_name, cat_id, cat_metrics in categories:
+        cat_nav += f'<a href="#{cat_id}" class="glossary-cat-link">{_esc(cat_name)}</a>'
+        cards = ""
+        for title, key, desc, use_when, thresholds, pages in cat_metrics:
+            threshold_html = ""
+            if thresholds:
+                items = "".join(f"<li><strong>{_esc(k)}</strong>: {_esc(v)}</li>" for k, v in thresholds)
+                threshold_html = f'<ul class="glossary-thresholds">{items}</ul>'
+            pages_html = ""
+            if pages:
+                links = " ".join(f'<a href="{href}" class="glossary-page-link">{_esc(lbl)}</a>' for href, lbl in pages)
+                pages_html = f'<div class="glossary-pages"><span class="glossary-pages-label">See it on:</span> {links}</div>'
+            cards += f"""
+            <div class="card glossary-card" id="metric-{_esc(key)}">
+                <h3 class="glossary-metric-name">{_esc(title)}</h3>
+                <code class="glossary-key">{_esc(key)}</code>
+                <p class="glossary-desc">{_esc(desc)}</p>
+                <p class="glossary-use-when"><strong>When to use:</strong> {_esc(use_when)}</p>
+                {threshold_html}
+                {pages_html}
+            </div>"""
+        cat_sections += f"""
+        <div class="glossary-category" id="{cat_id}">
+            <h2 class="glossary-cat-title">{_esc(cat_name)}</h2>
+            <div class="glossary-grid">{cards}</div>
         </div>"""
+
+    # Quick reference table
+    quick_ref_rows = ""
+    for _, _, cat_metrics in categories:
+        for title, key, desc, use_when, thresholds, _ in cat_metrics:
+            short_desc = desc[:80] + "..." if len(desc) > 80 else desc
+            quick_ref_rows += f'<tr><td><a href="#metric-{_esc(key)}" class="glossary-qr-link">{_esc(title)}</a></td><td><code>{_esc(key)}</code></td><td>{_esc(short_desc)}</td></tr>'
+    quick_ref = f"""<details class="glossary-quickref">
+        <summary>Quick Reference Table</summary>
+        <table class="data-table glossary-qr-table">
+            <thead><tr><th>Metric</th><th>API Key</th><th>Description</th></tr></thead>
+            <tbody>{quick_ref_rows}</tbody>
+        </table>
+    </details>"""
 
     body = f"""
     {_breadcrumbs(("Glossary",))}
     <h1 class="page-title">Metric Glossary</h1>
     <p class="page-subtitle">Understanding the on-chain metrics used across the dashboard</p>
-    <div class="glossary-grid">{cards}</div>"""
+    <nav class="glossary-cat-nav">{cat_nav}</nav>
+    {quick_ref}
+    {cat_sections}"""
     return page_shell("Glossary", body)

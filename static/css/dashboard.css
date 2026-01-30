@@ -1662,6 +1662,45 @@ a { color: inherit; text-decoration: none; }
 }
 .glossary-thresholds li { padding: 2px 0; color: var(--text-secondary); }
 .glossary-thresholds strong { color: var(--text-primary); }
+.glossary-cat-nav {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;
+}
+.glossary-cat-link {
+  font-size: 0.72rem; font-weight: 600; padding: 4px 12px;
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  color: var(--text-muted); text-decoration: none; transition: all 0.12s;
+}
+.glossary-cat-link:hover { color: var(--accent); border-color: var(--accent); }
+.glossary-cat-title {
+  font-size: 1rem; font-weight: 700; margin: 20px 0 10px;
+  padding-bottom: 6px; border-bottom: 2px solid var(--accent);
+  color: var(--text-primary);
+}
+.glossary-use-when {
+  font-size: 0.72rem; color: var(--text-muted); line-height: 1.4;
+  margin-bottom: 6px; font-style: italic;
+}
+.glossary-pages {
+  margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-light);
+  font-size: 0.68rem;
+}
+.glossary-pages-label { color: var(--text-faint); margin-right: 4px; }
+.glossary-page-link {
+  display: inline-block; padding: 2px 8px; font-weight: 600;
+  background: rgba(59,130,246,0.1); color: #3B82F6; border-radius: 3px;
+  text-decoration: none; margin-right: 4px; transition: background 0.1s;
+}
+.glossary-page-link:hover { background: rgba(59,130,246,0.2); }
+.glossary-quickref {
+  margin-bottom: 18px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.glossary-quickref summary {
+  font-size: 0.78rem; font-weight: 600; padding: 10px 14px; cursor: pointer;
+  color: var(--text-secondary);
+}
+.glossary-qr-table { font-size: 0.72rem; }
+.glossary-qr-link { color: var(--accent); text-decoration: none; }
+.glossary-qr-link:hover { text-decoration: underline; }
 
 .api-method {
   display: inline-block;
