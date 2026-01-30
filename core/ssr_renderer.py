@@ -1447,6 +1447,12 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         <a href="/compare?tokens=ethereum,{slug}" class="profile-action-btn">Compare with ETH</a>
         <a href="/watchlist?tokens={slug}" class="profile-action-btn">Add to Watchlist</a>
         <a href="/api/v1/profile/{slug}" class="profile-action-btn">API (JSON)</a>
+    </div>
+    <div class="profile-external-links">
+        <span class="profile-external-label">External:</span>
+        <a href="https://app.santiment.net/charts?slug={slug}" class="profile-ext-link" target="_blank" rel="noopener">Santiment</a>
+        <a href="https://www.coingecko.com/en/coins/{slug}" class="profile-ext-link" target="_blank" rel="noopener">CoinGecko</a>
+        <a href="https://coinmarketcap.com/currencies/{slug}/" class="profile-ext-link" target="_blank" rel="noopener">CoinMarketCap</a>
     </div>"""
 
     return page_shell(f"{name} ({ticker})", body)
