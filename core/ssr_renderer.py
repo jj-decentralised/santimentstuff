@@ -3233,7 +3233,30 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
     parts.append(f'<div class="compare-bar"><span class="compare-bar-label">Presets:</span>{chips}</div>')
 
     if not tokens:
-        parts.append('<div class="empty-state"><div class="empty-state-icon">&#9734;</div><h2>No tokens selected</h2><p>Enter token slugs in the box above or pick a preset watchlist to get started.</p></div>')
+        quick_adds = [
+            ("Bitcoin", "bitcoin"), ("Ethereum", "ethereum"), ("Solana", "solana"),
+            ("Cardano", "cardano"), ("Avalanche", "avalanche"), ("Polkadot", "polkadot"),
+            ("Chainlink", "chainlink"), ("Uniswap", "uniswap"), ("Aave", "aave"),
+            ("Render", "render-token"), ("Arbitrum", "arbitrum"), ("Sui", "sui"),
+        ]
+        quick_chips = "".join(
+            f'<a href="/watchlist?tokens={slug}" class="watchlist-quick-add">+ {name}</a>'
+            for name, slug in quick_adds
+        )
+        parts.append(f"""<div class="empty-state">
+            <div class="empty-state-icon">&#9734;</div>
+            <h2>No tokens selected</h2>
+            <p>Build a watchlist to track prices, MVRV, and on-chain metrics for your favorite tokens.</p>
+            <div class="empty-state-steps">
+                <div class="empty-step"><span class="empty-step-num">1</span> Type slugs (e.g. <code>bitcoin,ethereum</code>) in the box above</div>
+                <div class="empty-step"><span class="empty-step-num">2</span> Or pick a preset watchlist above</div>
+                <div class="empty-step"><span class="empty-step-num">3</span> Bookmark the URL to save your list</div>
+            </div>
+            <div class="empty-state-quick">
+                <span class="empty-quick-label">Quick add:</span>
+                {quick_chips}
+            </div>
+        </div>""")
         return page_shell("Watchlist", "\n".join(parts), active_nav="watchlist")
 
     # Summary stats

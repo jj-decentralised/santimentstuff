@@ -2648,6 +2648,69 @@ html.dark .health-pulse circle[stroke="#E5E7EB"] { stroke: #30363D; }
   margin-bottom: 12px;
   opacity: 0.4;
 }
+.empty-state-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px auto 20px;
+  max-width: 340px;
+  text-align: left;
+}
+.empty-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.empty-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.empty-step code {
+  background: var(--bg-secondary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+.empty-state-quick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.empty-quick-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  width: 100%;
+  margin-bottom: 2px;
+}
+.watchlist-quick-add {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.watchlist-quick-add:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
 /* Loading shimmer animation */
 .loading-bar {
   height: 14px;
