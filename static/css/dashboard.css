@@ -2313,3 +2313,25 @@ html.dark .sector-exchange { background: #78350F; color: #FCD34D; border-color: 
   .briefing-title { font-size: 1.2rem; }
   .health-grid { grid-template-columns: 1fr; }
 }
+
+/* ================================================================
+   PRINT STYLES
+   ================================================================ */
+@media print {
+  body { background: white; color: black; font-size: 10pt; }
+  .header, .footer, .ticker-strip, .skip-link, .nav-toggle-label,
+  .theme-toggle, .search-bar, .filter-bar, .pagination, .page-controls,
+  .export-btn, .token-quick-nav, .breadcrumbs, .compare-bar,
+  .briefing-footer-nav, .sync-banner { display: none !important; }
+  .main { max-width: 100%; padding: 0; margin: 0; }
+  .card { border: 1px solid #ccc; break-inside: avoid; box-shadow: none; margin-bottom: 12pt; }
+  .stats-row, .health-grid { grid-template-columns: repeat(auto-fit, minmax(120pt, 1fr)); }
+  a { color: black; text-decoration: none; }
+  .zone { border: 1px solid #999; }
+  .up { color: #059669 !important; }
+  .down { color: #dc2626 !important; }
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  th, td { border-bottom: 0.5pt solid #ccc; padding: 3pt 6pt; }
+  .hide-mobile { display: table-cell !important; }
+  svg { max-width: 100%; }
+}
