@@ -2640,6 +2640,10 @@ def render_screener_page(
             <a href="/screener?sort=price_usd_change&order=asc" class="filter-btn preset-btn">Top Losers</a>
             <a href="/screener?sort=volume_usd&order=desc" class="filter-btn preset-btn">High Volume</a>
             <a href="/screener?sort=dev_activity&order=desc" class="filter-btn preset-btn">Active Dev</a>
+            <a href="/screener?tier=large&min_mvrv=-999&max_mvrv=1.0" class="filter-btn preset-btn">Large &amp; Cheap</a>
+            <a href="/screener?sector=defi&sort=mvrv_usd&order=asc" class="filter-btn preset-btn">DeFi Value</a>
+            <a href="/screener?sector=l1&sort=dev_activity&order=desc" class="filter-btn preset-btn">L1 Dev Leaders</a>
+            <a href="/screener?tier=mid&sort=price_usd_change&order=desc" class="filter-btn preset-btn">Mid-cap Momentum</a>
         </div>
     </div>
     <div class="filter-bar">
