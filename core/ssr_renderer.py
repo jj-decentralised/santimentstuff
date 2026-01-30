@@ -257,24 +257,35 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <main class="main" id="main-content" role="main">{body}</main>
     <footer class="footer" role="contentinfo">
         <div class="footer-inner">
-            <div class="footer-links">
-                <a href="/">Briefing</a>
-                <a href="/explore">Explore</a>
-                <a href="/sectors">Sectors</a>
-                <a href="/screener">Screener</a>
-                <a href="/insights">Insights</a>
-                <a href="/valuation">Valuation</a>
-                <a href="/compare?tokens=bitcoin,ethereum,solana">Compare</a>
-                <a href="/watchlist?tokens=bitcoin,ethereum,solana">Watchlist</a>
-                <a href="/sync">Sync Status</a>
-                <a href="/glossary">Glossary</a>
-                <a href="/api">API</a>
+            <div class="footer-columns">
+                <div class="footer-col">
+                    <div class="footer-col-title">Navigate</div>
+                    <a href="/">Briefing</a>
+                    <a href="/explore">Explore</a>
+                    <a href="/sectors">Sectors</a>
+                    <a href="/screener">Screener</a>
+                    <a href="/developers">Developers</a>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-col-title">Analyze</div>
+                    <a href="/insights">Insights</a>
+                    <a href="/valuation">Valuation</a>
+                    <a href="/compare?tokens=bitcoin,ethereum,solana">Compare</a>
+                    <a href="/watchlist?tokens=bitcoin,ethereum,solana">Watchlist</a>
+                </div>
+                <div class="footer-col">
+                    <div class="footer-col-title">Resources</div>
+                    <a href="/glossary">Glossary</a>
+                    <a href="/api">API Docs</a>
+                    <a href="/sync">Sync Status</a>
+                    <a href="/sitemap.xml">Sitemap</a>
+                </div>
             </div>
             <div class="footer-meta">
                 On-chain data via <a href="https://santiment.net" class="footer-data-link" target="_blank" rel="noopener"><strong>Santiment API</strong></a>.
                 100% server-rendered &middot; zero JavaScript &middot; refreshed daily.
                 <br>Charts are inline SVG with Bezier interpolation. Not financial advice.
-                <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC &middot; Pure HTML &amp; CSS &middot; <a href="/sync">Sync status</a></span>
+                <br><span class="footer-timestamp">Rendered {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC &middot; Pure HTML &amp; CSS &middot; FastAPI + SQLite WAL</span>
             </div>
             <a href="#top" class="scroll-top" aria-label="Back to top">&uarr; Top</a>
         </div>

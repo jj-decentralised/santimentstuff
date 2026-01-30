@@ -3448,6 +3448,33 @@ html.dark .screener-table tbody tr:hover { background: #161B22; }
   flex-direction: column;
   gap: 10px;
 }
+.footer-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.footer-col-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.footer-col a {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 0.1s;
+  text-decoration: none;
+}
+.footer-col a:hover { color: var(--text); }
 .footer-links {
   display: flex;
   flex-wrap: wrap;
