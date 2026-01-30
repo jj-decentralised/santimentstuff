@@ -2126,6 +2126,8 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         <a href="https://app.santiment.net/charts?slug={slug}" class="profile-ext-link" target="_blank" rel="noopener">Santiment</a>
         <a href="https://www.coingecko.com/en/coins/{slug}" class="profile-ext-link" target="_blank" rel="noopener">CoinGecko</a>
         <a href="https://coinmarketcap.com/currencies/{slug}/" class="profile-ext-link" target="_blank" rel="noopener">CoinMarketCap</a>
+        <a href="https://messari.io/asset/{slug}" class="profile-ext-link" target="_blank" rel="noopener">Messari</a>
+        <a href="https://dexscreener.com/search?q={_esc(ticker)}" class="profile-ext-link" target="_blank" rel="noopener">DexScreener</a>
     </div>"""
 
     og_parts = [f"{name} ({ticker})"]

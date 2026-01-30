@@ -3476,4 +3476,12 @@ html.dark .screener-table tbody tr:hover { background: #161B22; }
   svg { max-width: 100%; }
   .chart-wrap, .chart-cell { break-inside: avoid; page-break-inside: avoid; }
   .briefing-title::after { content: " — Printed Report"; font-weight: 400; font-size: 0.6em; color: #666; }
+  /* Token profile print enhancements */
+  .profile-hero { border: 1px solid #ddd; padding: 8pt; margin-bottom: 8pt; }
+  .signal-summary, .vol-mcap-indicator, .volatility-indicator, .supply-info,
+  .health-pulse { border: 1px solid #ddd; break-inside: avoid; }
+  .alert-badges, .scroll-hint, .sector-detail-actions, .movers-row,
+  .results-bar, .glossary-cat-nav, .val-heatmap-wrap { display: none !important; }
+  .spark-grid { grid-template-columns: repeat(3, 1fr); }
+  .profile-name { font-size: 14pt; }
 }
