@@ -1346,6 +1346,15 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         <div class="card-footer"><a href="/explore?sector={sec}">View all {_esc(sec_label)} tokens &rarr;</a></div>
     </div>"""
 
+    # Quick actions
+    body += f"""
+    <div class="profile-actions">
+        <a href="/compare?tokens=bitcoin,{slug}" class="profile-action-btn">Compare with BTC</a>
+        <a href="/compare?tokens=ethereum,{slug}" class="profile-action-btn">Compare with ETH</a>
+        <a href="/watchlist?tokens={slug}" class="profile-action-btn">Add to Watchlist</a>
+        <a href="/api/v1/profile/{slug}" class="profile-action-btn">API (JSON)</a>
+    </div>"""
+
     return page_shell(f"{name} ({ticker})", body)
 
 

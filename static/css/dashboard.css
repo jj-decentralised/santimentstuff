@@ -888,6 +888,31 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-secondary);
   font-family: var(--mono);
 }
+/* Profile quick actions */
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+.profile-action-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.profile-action-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: var(--bg-alt);
+}
+
 /* Alert badges */
 .alert-badges {
   display: flex;
