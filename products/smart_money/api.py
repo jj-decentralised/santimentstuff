@@ -1567,6 +1567,12 @@ def create_app() -> FastAPI:
         if sector != "all":
             dev_tokens = [t for t in dev_tokens if t.get("sector") == sector]
         dev_tokens.sort(key=lambda t: t.get("dev_activity") or 0, reverse=True)
+        # Add dev activity sparklines for top 100
+        top_slugs = [t["slug"] for t in dev_tokens[:100]]
+        if top_slugs and _san_cache:
+            dev_spark = _san_cache.get_timeseries_multi_slugs("dev_activity", top_slugs, limit_per_slug=30)
+            for t in dev_tokens[:100]:
+                t["dev_sparkline_30d"] = dev_spark.get(t["slug"], [])
         return render_developers_page(dev_tokens[:100], sector=sector, sectors=SECTORS)
 
     @app.get("/developers/export.csv")

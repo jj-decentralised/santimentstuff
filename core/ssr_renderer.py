@@ -2840,12 +2840,15 @@ def render_developers_page(tokens: list, sector: str = "all", sectors: dict = No
         slug = t.get("slug", "")
         sec = t.get("sector", "other")
         sec_label = (sectors or {}).get(sec, sec.replace("_", " ").title())
+        dev_spark = t.get("dev_sparkline_30d", [])
+        dev_spark_html = sparkline_svg(dev_spark, width=80, height=24) if dev_spark and len(dev_spark) >= 3 else "&mdash;"
         rows += f"""<tr>
             <td class="col-rank">{i+1}</td>
             <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
             <td class="col-tag hide-mobile"><a href="/developers?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
             <td class="col-num bold">{dev:,.0f}</td>
             <td class="col-num {css_class(dev_ch)} hide-mobile">{fmt_pct(dev_ch)}</td>
+            <td class="col-spark hide-mobile">{dev_spark_html}</td>
             <td class="hide-mobile" style="min-width:100px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:{bar_pct:.0f}%"></div></div></td>
             <td class="col-num hide-mobile">{fmt_usd(t.get("price_usd"))}</td>
             <td class="col-num hide-mobile">{fmt_usd(t.get("marketcap_usd"))}</td>
@@ -2859,11 +2862,12 @@ def render_developers_page(tokens: list, sector: str = "all", sectors: dict = No
                 <th class="col-tag hide-mobile">Sector</th>
                 <th class="col-num">Dev Activity</th>
                 <th class="col-num hide-mobile">Change</th>
+                <th class="col-spark hide-mobile">30d</th>
                 <th class="hide-mobile">Bar</th>
                 <th class="col-num hide-mobile">Price</th>
                 <th class="col-num hide-mobile">Mkt Cap</th>
             </tr></thead>
-            <tbody>{rows if rows else '<tr><td colspan="8" class="empty-cell">No dev activity data available.</td></tr>'}</tbody>
+            <tbody>{rows if rows else '<tr><td colspan="9" class="empty-cell">No dev activity data available.</td></tr>'}</tbody>
         </table>
     </div>""")
 
