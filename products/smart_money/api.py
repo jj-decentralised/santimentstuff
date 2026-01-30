@@ -1340,6 +1340,38 @@ def create_app() -> FastAPI:
                 enriched = [t for t in enriched if t.get("mvrv_usd") is not None and _mz(t["mvrv_usd"])[0] == target_label]
         return render_valuation_page(enriched, sector=sector, sectors=SECTORS, zone_filter=zone)
 
+    @app.get("/valuation/export.csv")
+    async def get_valuation_csv(
+        sector: str = Query(default="all"),
+        zone: str = Query(default="all"),
+    ):
+        """Export valuation data as CSV."""
+        if not _san_cache:
+            return Response(content="No data", media_type="text/plain")
+        enriched = _build_all_tokens_for_valuation()
+        if sector != "all":
+            enriched = [t for t in enriched if t.get("sector") == sector]
+        if zone != "all":
+            from core.ssr_renderer import mvrv_zone as _mz
+            zone_label_map = {"deep_value": "Deep Value", "undervalued": "Undervalued", "fair": "Fair Value",
+                             "elevated": "Elevated", "overvalued": "Overvalued", "euphoria": "Euphoria"}
+            target_label = zone_label_map.get(zone, "")
+            if target_label:
+                enriched = [t for t in enriched if t.get("mvrv_usd") is not None and _mz(t["mvrv_usd"])[0] == target_label]
+        lines = ["Name,Ticker,Slug,Sector,Price USD,MVRV,Zone,Market Cap"]
+        for t in enriched[:500]:
+            name = t.get("name", "").replace(",", "")
+            mvrv = t.get("mvrv_usd") or 0
+            from core.ssr_renderer import mvrv_zone as _mz2
+            z_label, _ = _mz2(mvrv) if mvrv else ("N/A", "#999")
+            lines.append(f"{name},{t.get('ticker','')},{t.get('slug','')},{t.get('sector','')},{t.get('price_usd',0):.4f},{mvrv:.4f},{z_label},{t.get('marketcap_usd',0) or 0:.0f}")
+        csv_data = "\n".join(lines)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=valuation_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"},
+        )
+
     @app.get("/sync", response_class=HTMLResponse)
     async def get_sync_page():
         """Sync status — fully server-rendered."""

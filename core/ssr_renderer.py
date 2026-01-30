@@ -2237,6 +2237,7 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
     {zone_filter_html}
     <div class="val-legend">{legend}</div>
     {f'<div class="onchain-narrative"><p>{val_narrative}</p></div>' if val_narrative else ''}
+    <div class="export-bar"><a href="/valuation/export.csv?sector={sector}&zone={zone_filter}" class="export-btn">&#8681; Export CSV</a></div>
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
