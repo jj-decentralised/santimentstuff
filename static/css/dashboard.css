@@ -1064,6 +1064,14 @@ html.dark .spark-grid-cell { background: #161B22; border-color: #30363D; }
   width: 100%;
   max-width: 80px;
 }
+.metric-pctile {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 2px;
+  font-family: var(--mono);
+  opacity: 0.7;
+}
 .metric-sub {
   font-size: 0.65rem;
   color: var(--text-muted);

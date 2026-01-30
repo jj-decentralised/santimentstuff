@@ -1677,7 +1677,7 @@ def _sparkline_grid(_data_fn, token_name: str) -> str:
     </div>"""
 
 
-def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None, mcap_rank: int = None) -> str:
+def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None, mcap_rank: int = None, all_tokens: list = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
     ticker = _esc(token.get("ticker", ""))
@@ -1981,6 +1981,16 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             {soc_vol_note}
         </div>"""
 
+    # Pre-compute percentile ranks from all_tokens
+    _percentiles = {}
+    if all_tokens and len(all_tokens) >= 10:
+        for pkey in ["marketcap_usd", "volume_usd", "mvrv_usd", "daily_active_addresses", "dev_activity"]:
+            vals = sorted([t.get(pkey) for t in all_tokens if t.get(pkey) is not None])
+            my_val = token_info.get(pkey) if token_info else _latest(pkey)
+            if vals and my_val is not None:
+                rank = sum(1 for v in vals if v <= my_val)
+                _percentiles[pkey] = int(rank / len(vals) * 100)
+
     # Metric cards with tooltip explanations
     _metric_tips = {
         "marketcap_usd": "Total supply × current price",
@@ -2037,11 +2047,14 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             tail = ts[-30:] if len(ts) >= 30 else ts
             spark_color = "#10B981" if delta_html and "up" in delta_html else "#EF4444" if delta_html and "down" in delta_html else "#9CA3AF"
             spark_html = f'<div class="metric-spark">{mini_trend_svg(tail, width=80, height=22, color=spark_color)}</div>'
+        pctile = _percentiles.get(key)
+        pctile_html = f'<div class="metric-pctile" title="Percentile rank vs universe">Top {100 - pctile}%</div>' if pctile is not None else ""
         metric_cards.append(f"""
         <div class="metric-card">
             <div class="metric-label">{label_html}</div>
             <div class="metric-value">{val_str}{delta_html}</div>
             {spark_html}
+            {pctile_html}
         </div>""")
 
     # Charts

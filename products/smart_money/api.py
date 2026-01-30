@@ -1771,7 +1771,7 @@ def create_app() -> FastAPI:
                     next_token = {"slug": all_tokens[i+1]["slug"], "name": all_tokens[i+1].get("name", "")}
                 break
 
-        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens, prev_token=prev_token, next_token=next_token, mcap_rank=mcap_rank)
+        return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens, prev_token=prev_token, next_token=next_token, mcap_rank=mcap_rank, all_tokens=all_tokens)
 
     @app.get("/glossary", response_class=HTMLResponse)
     async def get_glossary_page():
