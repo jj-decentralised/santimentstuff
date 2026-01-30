@@ -2227,6 +2227,33 @@ def _compare_radar(tokens: list) -> str:
     </div>"""
 
 
+def _screener_results_bar(tokens, displayed, tier, sector, category, search, min_mvrv, max_mvrv, sectors_map, categories_map):
+    """Render a results count bar with active filter chips."""
+    total = len(tokens)
+    shown = len(displayed)
+    chips = []
+    if tier != "all":
+        chips.append(f'<span class="result-chip">Tier: {_esc(tier.title())}</span>')
+    if sector != "all":
+        label = sectors_map.get(sector, sector.title())
+        chips.append(f'<span class="result-chip">Sector: {_esc(label)}</span>')
+    if category != "all":
+        label = categories_map.get(category, category.title())
+        chips.append(f'<span class="result-chip">Category: {_esc(label)}</span>')
+    if search:
+        chips.append(f'<span class="result-chip">Search: {_esc(search)}</span>')
+    if min_mvrv > -999:
+        chips.append(f'<span class="result-chip">MVRV &ge; {min_mvrv}</span>')
+    if max_mvrv < 999:
+        chips.append(f'<span class="result-chip">MVRV &le; {max_mvrv}</span>')
+    chips_html = " ".join(chips)
+    clear = ""
+    if chips:
+        clear = ' <a href="/screener" class="result-clear">Clear all</a>'
+    trunc_note = f' <span class="result-truncated">(showing first {shown})</span>' if shown < total else ""
+    return f'<div class="results-bar"><span class="results-count">{total} result{"s" if total != 1 else ""}{trunc_note}</span>{" " + chips_html if chips_html else ""}{clear}</div>'
+
+
 def render_screener_page(
     tokens: list, tier: str = "all",
     min_change: float = None, max_change: float = None,
@@ -2372,6 +2399,7 @@ def render_screener_page(
             <a href="/screener?{_qs(min_mvrv=3.5, max_mvrv=999)}" class="filter-btn{' active' if min_mvrv == 3.5 else ''}">Euphoria (&gt;3.5)</a>
         </div>
     </div>
+    {_screener_results_bar(tokens, displayed, tier, sector, category, search, min_mvrv, max_mvrv, _sectors, _categories)}
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
