@@ -2999,6 +2999,35 @@ html.dark .health-pulse circle[stroke="#E5E7EB"] { stroke: #30363D; }
 .sector-other { background: var(--bg-alt); color: var(--text-muted); }
 
 /* Sector grid — on briefing page */
+.sector-rotation {
+  margin: 12px 0 8px;
+}
+.rotation-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.rotation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 10px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.rotation-chip.up { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.rotation-chip.down { background: #fecaca; color: #991b1b; border-color: #fca5a5; }
+.rotation-chip.muted { background: var(--bg-alt); color: var(--text-muted); }
+.rotation-chip:hover { opacity: 0.8; }
+.rotation-name { font-weight: 600; }
+.rotation-pct { font-family: var(--mono); }
+html.dark .rotation-chip.up { background: #064e3b; color: #6ee7b7; border-color: #065f46; }
+html.dark .rotation-chip.down { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
+
 .sector-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

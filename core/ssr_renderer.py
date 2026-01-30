@@ -113,6 +113,30 @@ def _esc(s):
     return html_mod.escape(str(s)) if s else ""
 
 
+def _sector_rotation_bar(sorted_sectors: list, sector_labels: dict, total_mcap: float) -> str:
+    """Horizontal bar showing sector rotation — ranked by avg 24h performance."""
+    ranked = []
+    for sec_key, data in sorted_sectors:
+        cnt = data.get("count", 0)
+        if cnt == 0:
+            continue
+        avg = data.get("pct_sum", 0) / cnt
+        label = sector_labels.get(sec_key, sec_key.replace("_", " ").title())
+        ranked.append((label, sec_key, avg))
+    ranked.sort(key=lambda x: x[2], reverse=True)
+    if not ranked:
+        return ""
+    chips = ""
+    for label, key, avg in ranked:
+        cls = "up" if avg > 0 else "down" if avg < 0 else "muted"
+        chips += f'<a href="/sector/{key}" class="rotation-chip {cls}"><span class="rotation-name">{_esc(label)}</span><span class="rotation-pct">{avg:+.1f}%</span></a>'
+    return f"""
+        <div class="sector-rotation">
+            <div class="section-label">Sector Rotation (24h)</div>
+            <div class="rotation-chips">{chips}</div>
+        </div>"""
+
+
 def _breadcrumbs(*crumbs: tuple) -> str:
     """Generate a breadcrumb trail.  Each crumb is (label, url) or just (label,) for the current page."""
     items = ['<a href="/" class="bc-link">Home</a>']
@@ -693,8 +717,9 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             <h2 class="card-title" id="sectors">Sector Breakdown</h2>
             <span class="card-badge">{len(sorted_sectors)} sectors</span>
         </div>
-        <div class="sector-grid">{sector_items}</div>
-        <div class="card-footer">
+        <div class="sector-grid">{sector_items}</div>"""
+            + _sector_rotation_bar(sorted_sectors, _sectors, total_sec_mcap) +
+            f"""<div class="card-footer">
             <a href="/insights">View thesis analysis &rarr;</a>
         </div>
     </section>""")
