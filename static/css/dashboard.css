@@ -770,6 +770,10 @@ a { color: inherit; text-decoration: none; }
   flex-wrap: wrap;
   gap: 12px;
 }
+.page-showing {
+  font-size: 0.72rem; font-weight: 600; color: var(--text-muted);
+  font-family: var(--mono);
+}
 .explore-footer-stats {
   display: flex;
   flex-wrap: wrap;

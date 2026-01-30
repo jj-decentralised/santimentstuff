@@ -1397,7 +1397,10 @@ def render_explore_page(
         active = " active" if sz == per_page else ""
         sz_qs = f"per_page={sz}" + (f"&{base_qs}" if base_qs else "")
         size_options += f'<a href="/explore?{sz_qs}" class="page-size-btn{active}">{sz}</a>'
-    parts.append(f'<div class="page-controls"><div class="page-size-selector"><span class="page-size-label">Show:</span>{size_options}</div>')
+    range_start = start + 1
+    range_end = min(start + per_page, total)
+    showing_text = f'<span class="page-showing">Showing {range_start}-{range_end} of {total}</span>'
+    parts.append(f'<div class="page-controls">{showing_text}<div class="page-size-selector"><span class="page-size-label">Show:</span>{size_options}</div>')
 
     if total_pages > 1:
         qs = f"per_page={per_page}" + (f"&{base_qs}" if base_qs else "")
