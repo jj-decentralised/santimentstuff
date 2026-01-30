@@ -634,6 +634,15 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
                 <h2 class="card-title">24h Heatmap</h2>
             </div>
             <div class="heatmap-wrap">{market_heatmap_svg(all_tokens, max_tokens=40)}</div>
+            <div class="heatmap-legend">
+                <span class="heatmap-legend-item" style="background:#DC2626;color:#fff">&le;-10%</span>
+                <span class="heatmap-legend-item" style="background:#F87171;color:#fff">-5%</span>
+                <span class="heatmap-legend-item" style="background:#FCA5A5">-1%</span>
+                <span class="heatmap-legend-item" style="background:#E5E7EB">0%</span>
+                <span class="heatmap-legend-item" style="background:#86EFAC">+1%</span>
+                <span class="heatmap-legend-item" style="background:#34D399;color:#fff">+5%</span>
+                <span class="heatmap-legend-item" style="background:#059669;color:#fff">&ge;+10%</span>
+            </div>
         </section>
     </div>""")
 
