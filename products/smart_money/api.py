@@ -95,6 +95,16 @@ async def _santiment_background_pull():
         }
         logger.info(f"Santiment Phase 1 complete: {phase1_stats.get('total_points', 0)} data points cached")
 
+        # Pre-warm caches so first visitor gets instant response
+        try:
+            logger.info("Pre-warming in-memory caches...")
+            _get_all_tokens()
+            _get_summary_tokens()
+            _build_economy_briefing()
+            logger.info("Cache pre-warm complete")
+        except Exception as warm_err:
+            logger.warning(f"Cache pre-warm failed (non-fatal): {warm_err}")
+
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
@@ -127,6 +137,17 @@ async def _santiment_background_pull():
             },
         }
         logger.info(f"Santiment Phase 2 complete. {universe_stats.get('total_points', 0)} points. Cache: {_san_cache.get_pull_stats()}")
+
+        # Re-warm caches with full universe data
+        try:
+            logger.info("Re-warming caches after Phase 2...")
+            _result_cache.clear()
+            _get_all_tokens()
+            _get_summary_tokens()
+            _build_economy_briefing()
+            logger.info("Phase 2 cache re-warm complete")
+        except Exception as warm_err:
+            logger.warning(f"Phase 2 cache re-warm failed (non-fatal): {warm_err}")
 
     except Exception as e:
         import traceback
@@ -559,7 +580,7 @@ SCATTER_VIEWS = [
 
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 500
-_CACHE_TTL = 120  # seconds — recompute at most every 2 minutes
+_CACHE_TTL = 900  # seconds — recompute at most every 15 minutes
 
 # In-memory result cache: {key: (timestamp, value)}
 _result_cache: dict = {}
@@ -1040,15 +1061,11 @@ def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE, sector: 
     start = (page - 1) * per_page
     end = start + per_page
     page_tokens = tokens[start:end]
-    # Sparklines only for visible page
+    # Sparklines — single batch query instead of N serial queries
+    slugs = [t["slug"] for t in page_tokens]
+    sparkline_data = _san_cache.get_timeseries_multi_slugs("price_usd", slugs, limit_per_slug=7)
     for t in page_tokens:
-        price_data = _san_cache.get_timeseries("price_usd", t["slug"])
-        if price_data and len(price_data) >= 7:
-            t["sparkline_7d"] = price_data[-7:]
-        elif price_data and len(price_data) >= 2:
-            t["sparkline_7d"] = price_data[-len(price_data):]
-        else:
-            t["sparkline_7d"] = []
+        t["sparkline_7d"] = sparkline_data.get(t["slug"], [])
     return page_tokens, total
 
 
@@ -1058,9 +1075,10 @@ def _build_all_tokens_for_valuation():
 
 
 def _build_profile_metrics(slug: str):
+    # Single batch query for all metrics instead of 60+ serial queries
+    batch = _san_cache.get_timeseries_batch(ALL_PROFILE_METRICS, slug)
     metrics_data = {}
-    for metric in ALL_PROFILE_METRICS:
-        data = _san_cache.get_timeseries(metric, slug)
+    for metric, data in batch.items():
         if data:
             values = [d["value"] for d in data if d.get("value") is not None]
             metrics_data[metric] = {

@@ -242,6 +242,56 @@ class SantimentCache:
         ).fetchall()
         return [{"datetime": r["dt"], "value": r["total"]} for r in reversed(rows)]
 
+    def get_timeseries_batch(
+        self,
+        metrics: list[str],
+        slug: str,
+        interval: str = "1d",
+    ) -> dict[str, list[dict]]:
+        """Fetch timeseries for multiple metrics for one slug in a single query.
+        Returns {metric: [{"datetime": ..., "value": ...}, ...]}."""
+        if not metrics:
+            return {}
+        placeholders = ",".join("?" for _ in metrics)
+        rows = self._conn.execute(
+            f"""SELECT metric, dt, value FROM timeseries
+                WHERE slug = ? AND interval = ? AND metric IN ({placeholders})
+                ORDER BY metric, dt ASC""",
+            [slug, interval] + metrics,
+        ).fetchall()
+        result: dict[str, list[dict]] = {m: [] for m in metrics}
+        for row in rows:
+            result[row["metric"]].append({"datetime": row["dt"], "value": row["value"]})
+        return result
+
+    def get_timeseries_multi_slugs(
+        self,
+        metric: str,
+        slugs: list[str],
+        limit_per_slug: int = 7,
+        interval: str = "1d",
+    ) -> dict[str, list[dict]]:
+        """Fetch recent timeseries for one metric across multiple slugs in one query.
+        Returns {slug: [{"datetime": ..., "value": ...}, ...]}."""
+        if not slugs:
+            return {}
+        placeholders = ",".join("?" for _ in slugs)
+        # Use window function to get last N rows per slug
+        rows = self._conn.execute(
+            f"""SELECT slug, dt, value FROM (
+                SELECT slug, dt, value,
+                    ROW_NUMBER() OVER (PARTITION BY slug ORDER BY dt DESC) as rn
+                FROM timeseries
+                WHERE metric = ? AND interval = ? AND slug IN ({placeholders})
+            ) WHERE rn <= ?
+            ORDER BY slug, dt ASC""",
+            [metric, interval] + slugs + [limit_per_slug],
+        ).fetchall()
+        result: dict[str, list[dict]] = {s: [] for s in slugs}
+        for row in rows:
+            result[row["slug"]].append({"datetime": row["dt"], "value": row["value"]})
+        return result
+
     def get_timeseries_date_range(self, metric: str, slug: str, interval: str = "1d") -> Optional[dict]:
         """Get the earliest and latest date we have for a metric/slug."""
         row = self._conn.execute(
