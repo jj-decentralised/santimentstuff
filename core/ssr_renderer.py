@@ -16,7 +16,7 @@ from .svg_charts import (
     sparkline_svg, line_chart_svg, chart_panel, comparison_table,
     market_heatmap_svg, dominance_bar_svg, donut_chart_svg,
     sentiment_gauge_svg, mini_trend_svg,
-    scatter_plot_svg, THESIS_COLORS,
+    scatter_plot_svg, bar_chart_svg, THESIS_COLORS,
 )
 
 
@@ -1403,15 +1403,21 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         ("social_volume_total", "Social Volume", "#8B5CF6"),
         ("sentiment_balance_total", "Sentiment", "#3B82F6"),
     ]
+    bar_metrics = {"volume_usd", "social_volume_total", "whale_transaction_count_100k_usd_to_inf"}
     for key, title, color in chart_defs:
         data = _data(key)
         if not data or len(data) < 3:
             continue
-        secondary_charts.append(line_chart_svg(
-            [{"label": title, "data": data, "color": color}],
-            width=340, height=200, title=title, metric_key=key,
-            show_min_max=False, show_area=True,
-        ))
+        if key in bar_metrics:
+            secondary_charts.append(bar_chart_svg(
+                data, width=340, height=200, title=title, color=color, metric_key=key,
+            ))
+        else:
+            secondary_charts.append(line_chart_svg(
+                [{"label": title, "data": data, "color": color}],
+                width=340, height=200, title=title, metric_key=key,
+                show_min_max=False, show_area=True,
+            ))
 
     charts_html = ""
     if price_chart:

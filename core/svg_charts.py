@@ -1286,3 +1286,96 @@ def scatter_plot_svg(
 
     elements.append('</svg>')
     return "\n".join(elements)
+
+
+# ============================================================
+# BAR CHART — Vertical bars for volume / discrete data
+# ============================================================
+
+def bar_chart_svg(
+    data: list[dict],
+    width: int = 340,
+    height: int = 180,
+    title: str = "",
+    color: str = "#3B82F6",
+    metric_key: str = "",
+) -> str:
+    """Render a vertical bar chart SVG from time-series data."""
+    if not data or len(data) < 2:
+        return '<div class="chart-empty">No bar data</div>'
+
+    values = [d.get("value") for d in data if d.get("value") is not None]
+    if not values:
+        return '<div class="chart-empty">No bar data</div>'
+
+    pad_left = 60
+    pad_right = 16
+    pad_top = 30 if title else 12
+    pad_bottom = 30
+    chart_w = width - pad_left - pad_right
+    chart_h = height - pad_top - pad_bottom
+
+    max_val = max(values) if values else 1
+    if max_val == 0:
+        max_val = 1
+
+    n = len(data)
+    bar_w = max(1.5, chart_w / n - 1)
+    gap = max(0.5, (chart_w - bar_w * n) / max(1, n - 1))
+
+    elements = [
+        f'<svg width="100%" viewBox="0 0 {width} {height}" '
+        f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
+    ]
+
+    if title:
+        elements.append(
+            f'<text x="{pad_left}" y="18" font-size="12" font-weight="700" '
+            f'fill="#111" font-family="Inter,system-ui,sans-serif">{html_mod.escape(title)}</text>'
+        )
+
+    # Grid lines
+    for i in range(5):
+        gy = pad_top + (chart_h / 4) * i
+        gv = max_val * (1 - i / 4)
+        elements.append(f'<line x1="{pad_left}" y1="{gy:.1f}" x2="{pad_left + chart_w}" y2="{gy:.1f}" stroke="#E5E7EB" stroke-width="0.5"/>')
+        elements.append(
+            f'<text x="{pad_left - 6}" y="{gy + 3:.1f}" text-anchor="end" '
+            f'font-size="8" fill="#9CA3AF" font-family="Inter,system-ui,sans-serif">'
+            f'{_fmt_val(gv, metric_key)}</text>'
+        )
+
+    # Bars
+    for i, d in enumerate(data):
+        v = d.get("value")
+        if v is None:
+            continue
+        bx = pad_left + i * (bar_w + gap)
+        bh = max(1, (v / max_val) * chart_h)
+        by = pad_top + chart_h - bh
+        opacity = 0.4 + 0.6 * (i / max(1, n - 1))
+        elements.append(
+            f'<rect x="{bx:.1f}" y="{by:.1f}" width="{bar_w:.1f}" height="{bh:.1f}" '
+            f'rx="1" fill="{color}" opacity="{opacity:.2f}">'
+            f'<title>{_fmt_val(v, metric_key)}</title></rect>'
+        )
+
+    # X-axis date labels
+    for idx in [0, n // 2, n - 1]:
+        if idx < len(data):
+            dt = data[idx].get("datetime") or data[idx].get("date", "")
+            label = dt[5:10] if len(dt) >= 10 else dt[:10]
+            lx = pad_left + idx * (bar_w + gap) + bar_w / 2
+            elements.append(
+                f'<text x="{lx:.1f}" y="{pad_top + chart_h + 16}" text-anchor="middle" '
+                f'font-size="8" fill="#9CA3AF" font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
+            )
+
+    # Watermark
+    elements.append(
+        f'<text x="{width - 6}" y="{height - 4}" text-anchor="end" font-size="7" '
+        f'fill="#D1D5DB" font-family="Inter,system-ui,sans-serif" opacity="0.5">santiment</text>'
+    )
+
+    elements.append('</svg>')
+    return "\n".join(elements)
