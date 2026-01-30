@@ -1359,8 +1359,9 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         val_str = fmt_usd(latest) if is_usd else f"{latest:,.2f}" if latest < 1000 else fmt_num(latest)
         tip = _metric_tips.get(key, "")
         label_html = f'<abbr title="{_esc(tip)}" class="metric-abbr">{_esc(label)}</abbr>' if tip else _esc(label)
-        # 24h delta
+        # 24h delta + sparkline
         delta_html = ""
+        spark_html = ""
         ts = _data(key)
         if ts and len(ts) >= 2:
             prev_val = ts[-2].get("value")
@@ -1368,10 +1369,15 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
                 delta_pct = (latest - prev_val) / abs(prev_val) * 100
                 d_cls = "up" if delta_pct > 0 else "down" if delta_pct < 0 else "muted"
                 delta_html = f'<span class="metric-delta {d_cls}">{delta_pct:+.1f}%</span>'
+        if ts and len(ts) >= 5:
+            tail = ts[-30:] if len(ts) >= 30 else ts
+            spark_color = "#10B981" if delta_html and "up" in delta_html else "#EF4444" if delta_html and "down" in delta_html else "#9CA3AF"
+            spark_html = f'<div class="metric-spark">{mini_trend_svg(tail, width=80, height=22, color=spark_color)}</div>'
         metric_cards.append(f"""
         <div class="metric-card">
             <div class="metric-label">{label_html}</div>
             <div class="metric-value">{val_str}{delta_html}</div>
+            {spark_html}
         </div>""")
 
     # Charts

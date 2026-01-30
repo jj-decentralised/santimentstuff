@@ -925,6 +925,16 @@ a { color: inherit; text-decoration: none; }
   font-weight: 700;
   font-family: var(--mono);
 }
+.metric-spark {
+  margin-top: 4px;
+  line-height: 0;
+  opacity: 0.8;
+}
+.metric-spark svg {
+  display: block;
+  width: 100%;
+  max-width: 80px;
+}
 .metric-sub {
   font-size: 0.65rem;
   color: var(--text-muted);
