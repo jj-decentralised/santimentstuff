@@ -1441,6 +1441,37 @@ a { color: inherit; text-decoration: none; }
   flex-shrink: 0;
 }
 /* Volume bar in screener */
+/* Zone distribution bar (screener) */
+.zone-distribution { margin-bottom: 14px; }
+.zone-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.zone-bar-seg { min-width: 3px; }
+.zone-deep-value { background: #059669; }
+.zone-undervalued { background: #34D399; }
+.zone-fair { background: #E5E7EB; }
+.zone-overvalued { background: #F59E0B; }
+.zone-euphoria { background: #EF4444; }
+.zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.zone-legend-item { display: flex; align-items: center; gap: 4px; }
+.zone-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
 .vol-bar-wrap {
   position: relative;
   width: 100%;

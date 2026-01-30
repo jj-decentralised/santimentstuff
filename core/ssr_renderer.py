@@ -1710,11 +1710,37 @@ def render_screener_page(
             <td class="col-tag hide-mobile">{zone_html}</td>
         </tr>""")
 
+    # MVRV zone distribution
+    zone_dist = {}
+    for t in tokens:
+        mv = t.get("mvrv_usd")
+        if mv is not None:
+            zl, zc, _ = mvrv_zone(mv)
+            zone_dist[zl] = zone_dist.get(zl, 0) + 1
+    zone_total = sum(zone_dist.values()) or 1
+    zone_order = [("Deep Value", "zone-deep-value"), ("Undervalued", "zone-undervalued"),
+                  ("Fair Value", "zone-fair"), ("Overvalued", "zone-overvalued"), ("Euphoria", "zone-euphoria")]
+    zone_bar_segs = ""
+    zone_legend = ""
+    for zl, zcls in zone_order:
+        cnt = zone_dist.get(zl, 0)
+        if cnt == 0:
+            continue
+        pct = cnt / zone_total * 100
+        zone_bar_segs += f'<div class="zone-bar-seg {zcls}" style="width:{pct:.1f}%" title="{zl}: {cnt} ({pct:.0f}%)"></div>'
+        zone_legend += f'<span class="zone-legend-item"><span class="zone-legend-dot {zcls}"></span>{zl} {cnt}</span>'
+    zone_summary_html = f"""
+    <div class="zone-distribution">
+        <div class="zone-bar">{zone_bar_segs}</div>
+        <div class="zone-legend">{zone_legend}</div>
+    </div>""" if zone_bar_segs else ""
+
     search_note = f' matching "{_esc(search)}"' if search else ""
     body = f"""
     {_breadcrumbs(("Screener",))}
     <h1 class="page-title">Screener</h1>
     <p class="page-subtitle">Filter and sort {len(tokens)} tokens{search_note}</p>
+    {zone_summary_html}
     <form class="search-bar" action="/screener" method="get" role="search" aria-label="Search screener">
         <input type="text" name="q" value="{_esc(search)}" placeholder="Search tokens..." class="search-input" autocomplete="off">
         <button type="submit" class="search-btn">Search</button>
