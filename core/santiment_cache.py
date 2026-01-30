@@ -22,7 +22,9 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.environ.get("SANTIMENT_DB_PATH", "data/santiment_cache.db")
+# Prefer /data/ (Railway Volume mount point) if it exists, otherwise fall back to local
+_DEFAULT_DB_DIR = "/data" if os.path.isdir("/data") else "data"
+DB_PATH = os.environ.get("SANTIMENT_DB_PATH", f"{_DEFAULT_DB_DIR}/santiment_cache.db")
 
 
 class SantimentCache:
@@ -34,6 +36,8 @@ class SantimentCache:
         self._ensure_dir()
         self._connect()
         self._create_tables()
+        logger.info(f"SantimentCache initialized at {self._db_path} (exists: {os.path.exists(self._db_path)}, "
+                     f"size: {os.path.getsize(self._db_path) / 1024 / 1024:.1f}MB)")
 
     def _ensure_dir(self):
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
