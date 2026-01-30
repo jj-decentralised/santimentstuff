@@ -240,7 +240,302 @@ BELLWETHER_SLUGS = [
     "aave",
 ]
 
-# ── Thesis categorization ─────────────────────────────────────
+# ── Asset taxonomy ────────────────────────────────────────────
+#
+# Two-level classification:
+#   SECTOR (what it is) → CATEGORY (what it does)
+#   + THESIS (on-chain behavioral profile)
+#
+# Sector is structural (L1, L2, DeFi, etc.)
+# Category is functional (lending, DEX, payments, etc.)
+# Thesis is behavioral (accumulation, distribution, etc.)
+
+SECTORS = {
+    "l1": "Layer 1",
+    "l2": "Layer 2",
+    "defi": "DeFi",
+    "stablecoin": "Stablecoin",
+    "exchange": "Exchange Token",
+    "meme": "Meme",
+    "ai": "AI & Data",
+    "gaming": "Gaming & Metaverse",
+    "infrastructure": "Infrastructure",
+    "privacy": "Privacy",
+    "storage": "Storage",
+    "oracle": "Oracle",
+    "social": "Social & Identity",
+    "rwa": "Real World Assets",
+    "other": "Other",
+}
+
+CATEGORIES = {
+    # L1 subcategories
+    "smart_contract_platform": "Smart Contract Platform",
+    "payments": "Payments & Currency",
+    "pos_chain": "PoS Chain",
+    "pow_chain": "PoW Chain",
+    # L2
+    "rollup": "Rollup",
+    "sidechain": "Sidechain",
+    "state_channel": "State Channel",
+    # DeFi
+    "dex": "DEX",
+    "lending": "Lending & Borrowing",
+    "yield": "Yield & Staking",
+    "derivatives": "Derivatives",
+    "bridge": "Bridge",
+    "liquid_staking": "Liquid Staking",
+    "stablecoin_algo": "Algorithmic Stablecoin",
+    "stablecoin_fiat": "Fiat-Backed Stablecoin",
+    # Infrastructure
+    "interop": "Interoperability",
+    "compute": "Compute & Cloud",
+    "data_index": "Data & Indexing",
+    "identity": "Identity & DNS",
+    # Other
+    "governance": "Governance",
+    "nft_platform": "NFT Platform",
+    "launchpad": "Launchpad",
+    "cex_token": "CEX Token",
+    "dex_token": "DEX Token",
+    "meme_dog": "Dog Meme",
+    "meme_other": "Other Meme",
+    "ai_agent": "AI Agent",
+    "ai_compute": "AI Compute",
+    "depin": "DePIN",
+    "gaming_token": "Gaming Token",
+    "metaverse": "Metaverse",
+    "privacy_coin": "Privacy Coin",
+    "storage_token": "Decentralized Storage",
+    "oracle_token": "Oracle Network",
+    "rwa_token": "RWA Tokenization",
+    "social_token": "Social Token",
+    "other": "Uncategorized",
+}
+
+# Known slug → (sector, category) mappings for top projects
+# This covers ~200 important tokens; everything else is classified by heuristics
+SLUG_TAXONOMY = {
+    # ── Layer 1 ──
+    "bitcoin": ("l1", "pow_chain"),
+    "ethereum": ("l1", "smart_contract_platform"),
+    "solana": ("l1", "smart_contract_platform"),
+    "cardano": ("l1", "pos_chain"),
+    "avalanche": ("l1", "smart_contract_platform"),
+    "polkadot": ("l1", "interop"),
+    "cosmos": ("l1", "interop"),
+    "near-protocol": ("l1", "smart_contract_platform"),
+    "internet-computer": ("l1", "compute"),
+    "algorand": ("l1", "smart_contract_platform"),
+    "tezos": ("l1", "smart_contract_platform"),
+    "eos": ("l1", "smart_contract_platform"),
+    "flow": ("l1", "smart_contract_platform"),
+    "hedera": ("l1", "smart_contract_platform"),
+    "sui": ("l1", "smart_contract_platform"),
+    "aptos": ("l1", "smart_contract_platform"),
+    "sei": ("l1", "smart_contract_platform"),
+    "tron": ("l1", "smart_contract_platform"),
+    "fantom": ("l1", "smart_contract_platform"),
+    "harmony": ("l1", "smart_contract_platform"),
+    "zilliqa": ("l1", "smart_contract_platform"),
+    "elrond": ("l1", "smart_contract_platform"),
+    "celo": ("l1", "payments"),
+    "kaspa": ("l1", "pow_chain"),
+    "ton": ("l1", "smart_contract_platform"),
+    "injective": ("l1", "smart_contract_platform"),
+    "celestia": ("l1", "smart_contract_platform"),
+    "monad": ("l1", "smart_contract_platform"),
+    "berachain": ("l1", "smart_contract_platform"),
+
+    # ── Layer 2 ──
+    "polygon": ("l2", "sidechain"),
+    "arbitrum": ("l2", "rollup"),
+    "optimism": ("l2", "rollup"),
+    "starknet": ("l2", "rollup"),
+    "zksync": ("l2", "rollup"),
+    "base": ("l2", "rollup"),
+    "immutable-x": ("l2", "rollup"),
+    "mantle": ("l2", "rollup"),
+    "stacks": ("l2", "sidechain"),
+    "metis": ("l2", "rollup"),
+    "loopring": ("l2", "rollup"),
+    "skale": ("l2", "sidechain"),
+    "boba-network": ("l2", "rollup"),
+    "mina-protocol": ("l2", "rollup"),
+    "scroll": ("l2", "rollup"),
+    "linea": ("l2", "rollup"),
+    "blast": ("l2", "rollup"),
+
+    # ── Payments ──
+    "xrp": ("l1", "payments"),
+    "litecoin": ("l1", "payments"),
+    "bitcoin-cash": ("l1", "payments"),
+    "stellar": ("l1", "payments"),
+    "nano": ("l1", "payments"),
+    "dash": ("l1", "payments"),
+
+    # ── DeFi: DEX ──
+    "uniswap": ("defi", "dex"),
+    "sushiswap": ("defi", "dex"),
+    "curve-dao-token": ("defi", "dex"),
+    "pancakeswap": ("defi", "dex"),
+    "1inch": ("defi", "dex"),
+    "dydx": ("defi", "derivatives"),
+    "balancer": ("defi", "dex"),
+    "raydium": ("defi", "dex"),
+    "jupiter": ("defi", "dex"),
+    "orca": ("defi", "dex"),
+    "osmosis": ("defi", "dex"),
+    "camelot-token": ("defi", "dex"),
+    "trader-joe": ("defi", "dex"),
+    "aerodrome-finance": ("defi", "dex"),
+    "velodrome-finance": ("defi", "dex"),
+
+    # ── DeFi: Lending ──
+    "aave": ("defi", "lending"),
+    "compound": ("defi", "lending"),
+    "maker": ("defi", "lending"),
+    "venus": ("defi", "lending"),
+    "morpho": ("defi", "lending"),
+    "radiant-capital": ("defi", "lending"),
+    "benqi": ("defi", "lending"),
+
+    # ── DeFi: Yield / Liquid Staking ──
+    "lido-dao": ("defi", "liquid_staking"),
+    "rocket-pool": ("defi", "liquid_staking"),
+    "frax-share": ("defi", "yield"),
+    "convex-finance": ("defi", "yield"),
+    "yearn-finance": ("defi", "yield"),
+    "pendle": ("defi", "yield"),
+    "eigenlayer": ("defi", "yield"),
+    "ethena": ("defi", "yield"),
+    "jito": ("defi", "liquid_staking"),
+    "marinade-finance": ("defi", "liquid_staking"),
+
+    # ── DeFi: Derivatives ──
+    "synthetix-network-token": ("defi", "derivatives"),
+    "gmx": ("defi", "derivatives"),
+    "perpetual-protocol": ("defi", "derivatives"),
+    "gains-network": ("defi", "derivatives"),
+    "ribbon-finance": ("defi", "derivatives"),
+    "drift-protocol": ("defi", "derivatives"),
+    "hyperliquid": ("defi", "derivatives"),
+
+    # ── DeFi: Bridges ──
+    "wormhole": ("defi", "bridge"),
+    "layerzero": ("defi", "bridge"),
+    "stargate-finance": ("defi", "bridge"),
+    "across-protocol": ("defi", "bridge"),
+    "synapse-2": ("defi", "bridge"),
+    "axelar": ("infrastructure", "interop"),
+
+    # ── Stablecoins ──
+    "tether": ("stablecoin", "stablecoin_fiat"),
+    "usd-coin": ("stablecoin", "stablecoin_fiat"),
+    "dai": ("stablecoin", "stablecoin_algo"),
+    "binance-usd": ("stablecoin", "stablecoin_fiat"),
+    "trueusd": ("stablecoin", "stablecoin_fiat"),
+    "first-digital-usd": ("stablecoin", "stablecoin_fiat"),
+    "frax": ("stablecoin", "stablecoin_algo"),
+    "ethena-usde": ("stablecoin", "stablecoin_algo"),
+    "paypal-usd": ("stablecoin", "stablecoin_fiat"),
+
+    # ── Exchange Tokens ──
+    "binance-coin": ("exchange", "cex_token"),
+    "crypto-com-chain": ("exchange", "cex_token"),
+    "okb": ("exchange", "cex_token"),
+    "kucoin-shares": ("exchange", "cex_token"),
+    "gate-token": ("exchange", "cex_token"),
+    "bitget-token": ("exchange", "cex_token"),
+    "huobi-token": ("exchange", "cex_token"),
+    "leo": ("exchange", "cex_token"),
+    "mx-token": ("exchange", "cex_token"),
+
+    # ── Meme ──
+    "dogecoin": ("meme", "meme_dog"),
+    "shiba-inu": ("meme", "meme_dog"),
+    "pepe": ("meme", "meme_other"),
+    "bonk": ("meme", "meme_dog"),
+    "floki": ("meme", "meme_dog"),
+    "memecoin": ("meme", "meme_other"),
+    "dogwifhat": ("meme", "meme_dog"),
+    "brett": ("meme", "meme_other"),
+    "cat-in-a-dogs-world": ("meme", "meme_other"),
+    "book-of-meme": ("meme", "meme_other"),
+    "turbo": ("meme", "meme_other"),
+    "wojak": ("meme", "meme_other"),
+    "neiro": ("meme", "meme_dog"),
+    "mog-coin": ("meme", "meme_other"),
+    "popcat": ("meme", "meme_other"),
+
+    # ── AI & Data ──
+    "fetch": ("ai", "ai_agent"),
+    "singularitynet": ("ai", "ai_agent"),
+    "ocean-protocol": ("ai", "ai_compute"),
+    "render-token": ("ai", "ai_compute"),
+    "bittensor": ("ai", "ai_compute"),
+    "worldcoin": ("ai", "identity"),
+    "arkham": ("ai", "data_index"),
+    "numeraire": ("ai", "ai_compute"),
+    "akash-network": ("ai", "ai_compute"),
+    "artificial-superintelligence-alliance": ("ai", "ai_agent"),
+    "io-net": ("ai", "ai_compute"),
+    "virtual-protocol": ("ai", "ai_agent"),
+    "ai16z": ("ai", "ai_agent"),
+    "grass": ("ai", "data_index"),
+    "golem": ("ai", "ai_compute"),
+
+    # ── Gaming & Metaverse ──
+    "the-sandbox": ("gaming", "metaverse"),
+    "decentraland": ("gaming", "metaverse"),
+    "axie-infinity": ("gaming", "gaming_token"),
+    "gala": ("gaming", "gaming_token"),
+    "illuvium": ("gaming", "gaming_token"),
+    "beam": ("gaming", "gaming_token"),
+    "ronin": ("gaming", "gaming_token"),
+    "gods-unchained": ("gaming", "gaming_token"),
+    "ultra": ("gaming", "gaming_token"),
+    "enjin-coin": ("gaming", "nft_platform"),
+    "pixels": ("gaming", "gaming_token"),
+    "xai": ("gaming", "gaming_token"),
+
+    # ── Infrastructure ──
+    "chainlink": ("oracle", "oracle_token"),
+    "pyth-network": ("oracle", "oracle_token"),
+    "band-protocol": ("oracle", "oracle_token"),
+    "api3": ("oracle", "oracle_token"),
+    "uma": ("oracle", "oracle_token"),
+    "the-graph": ("infrastructure", "data_index"),
+    "arweave": ("storage", "storage_token"),
+    "filecoin": ("storage", "storage_token"),
+    "theta-token": ("infrastructure", "compute"),
+    "quant": ("infrastructure", "interop"),
+    "vechain": ("infrastructure", "data_index"),
+    "iota": ("infrastructure", "data_index"),
+    "helium": ("infrastructure", "depin"),
+
+    # ── Privacy ──
+    "monero": ("privacy", "privacy_coin"),
+    "zcash": ("privacy", "privacy_coin"),
+    "secret": ("privacy", "privacy_coin"),
+    "oasis-network": ("privacy", "privacy_coin"),
+
+    # ── Social & Identity ──
+    "ens": ("social", "identity"),
+    "lens-protocol": ("social", "social_token"),
+    "galxe": ("social", "identity"),
+    "mask-network": ("social", "social_token"),
+    "cyberconnect": ("social", "social_token"),
+
+    # ── RWA ──
+    "ondo-finance": ("rwa", "rwa_token"),
+    "centrifuge": ("rwa", "rwa_token"),
+    "polymesh": ("rwa", "rwa_token"),
+    "maple-finance": ("rwa", "rwa_token"),
+    "goldfinch": ("rwa", "rwa_token"),
+    "mantra": ("rwa", "rwa_token"),
+    "tokenfi": ("rwa", "rwa_token"),
+}
 
 THESIS_DEFS = {
     "smart_money": "Smart Money Accumulating",
@@ -294,11 +589,16 @@ def _build_bulk_token_data(metrics_list: list[str]) -> list[dict]:
         slug = project.get("slug")
         if not slug:
             continue
+        name = project.get("name", slug)
+        infra = project.get("infrastructure", "")
+        sector, category = _classify_sector_category(slug, infra, name)
         slug_map[slug] = {
             "slug": slug,
-            "name": project.get("name", slug),
+            "name": name,
             "ticker": project.get("ticker", ""),
-            "infrastructure": project.get("infrastructure", ""),
+            "infrastructure": infra,
+            "sector": sector,
+            "category": category,
         }
     for metric in metrics_list:
         bulk = _san_cache.get_latest_values(metric)
@@ -349,6 +649,16 @@ def _build_economy_briefing() -> dict:
         pos = sum(1 for t in tokens if (t.get("price_usd_change") or 0) > 0)
         neg = sum(1 for t in tokens if (t.get("price_usd_change") or 0) < 0)
         flat = len(tokens) - pos - neg
+
+        # ── 1b. Sector distribution ──
+        sector_data = {}
+        for t in tokens:
+            sec = t.get("sector", "other")
+            if sec not in sector_data:
+                sector_data[sec] = {"count": 0, "mcap": 0, "vol": 0}
+            sector_data[sec]["count"] += 1
+            sector_data[sec]["mcap"] += t.get("marketcap_usd") or 0
+            sector_data[sec]["vol"] += t.get("volume_usd") or 0
 
         # ── 2. MVRV zone distribution ──
         zones = {"deep_value": 0, "undervalued": 0, "fair": 0, "elevated": 0, "overvalued": 0, "euphoria": 0}
@@ -482,6 +792,7 @@ def _build_economy_briefing() -> dict:
             "breadth": {"up": pos, "down": neg, "flat": flat},
             "mvrv_zones": zones,
             "mvrv_total": len(mvrv_vals),
+            "sector_data": sector_data,
 
             # Capital flows
             "vol_concentration_top10": vol_concentration,
@@ -517,7 +828,79 @@ def _build_economy_briefing() -> dict:
     return _cached("economy_briefing", _compute)
 
 
-# ── Thesis classification ─────────────────────────────────────
+# ── Asset classification ──────────────────────────────────────
+
+def _classify_sector_category(slug: str, infra: str = "", name: str = "") -> tuple:
+    """Classify a token into (sector, category) using known mappings + heuristics."""
+    # 1. Known slug mapping
+    if slug in SLUG_TAXONOMY:
+        return SLUG_TAXONOMY[slug]
+
+    # 2. Name/slug heuristics
+    slug_lower = slug.lower()
+    name_lower = (name or "").lower()
+
+    # Stablecoin detection
+    for kw in ("usd", "usdt", "usdc", "dai", "busd", "tusd", "stable"):
+        if kw in slug_lower and ("coin" in slug_lower or "dollar" in slug_lower or "usd" in slug_lower):
+            return ("stablecoin", "stablecoin_fiat")
+
+    # Meme detection
+    for kw in ("doge", "shib", "pepe", "bonk", "floki", "meme", "inu", "wojak", "chad", "frog"):
+        if kw in slug_lower or kw in name_lower:
+            if "dog" in slug_lower or "inu" in slug_lower or "doge" in slug_lower or "shib" in slug_lower:
+                return ("meme", "meme_dog")
+            return ("meme", "meme_other")
+
+    # DeFi detection
+    for kw in ("swap", "finance", "protocol", "lend", "yield", "stake", "vault", "pool"):
+        if kw in slug_lower or kw in name_lower:
+            if "swap" in slug_lower or "dex" in slug_lower:
+                return ("defi", "dex")
+            if "lend" in slug_lower or "borrow" in slug_lower:
+                return ("defi", "lending")
+            if "stake" in slug_lower or "liquid" in slug_lower:
+                return ("defi", "liquid_staking")
+            return ("defi", "yield")
+
+    # Gaming detection
+    for kw in ("game", "play", "metaverse", "nft", "pixel", "world"):
+        if kw in slug_lower or kw in name_lower:
+            if "meta" in slug_lower or "land" in slug_lower or "world" in slug_lower:
+                return ("gaming", "metaverse")
+            return ("gaming", "gaming_token")
+
+    # AI detection
+    for kw in ("ai", "neural", "intelligence", "machine", "data", "compute"):
+        if kw in slug_lower or kw in name_lower:
+            return ("ai", "ai_compute")
+
+    # Infrastructure by chain
+    infra_lower = (infra or "").lower()
+    if infra_lower in ("ethereum", "eth"):
+        return ("defi", "other")  # Default ERC-20 tokens to DeFi/Other
+    if infra_lower in ("binance smart chain", "bsc"):
+        return ("defi", "other")
+    if infra_lower in ("solana",):
+        return ("defi", "other")
+
+    # L2 detection
+    for kw in ("layer-2", "l2", "rollup", "zk"):
+        if kw in slug_lower:
+            return ("l2", "rollup")
+
+    # Privacy detection
+    for kw in ("privacy", "private", "anonymous", "zero-knowledge"):
+        if kw in slug_lower or kw in name_lower:
+            return ("privacy", "privacy_coin")
+
+    # Storage detection
+    for kw in ("storage", "file", "store"):
+        if kw in slug_lower or kw in name_lower:
+            return ("storage", "storage_token")
+
+    return ("other", "other")
+
 
 def _classify_thesis(t: dict) -> str:
     """Classify a token into a thesis category based on on-chain signals."""
@@ -582,6 +965,9 @@ def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
         # Thesis counts
         thesis_counts = {}
         thesis_tokens = {}
+        # Sector counts
+        sector_counts = {}
+        category_counts = {}
         for t in tokens:
             th = t["thesis"]
             thesis_counts[th] = thesis_counts.get(th, 0) + 1
@@ -594,7 +980,14 @@ def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
                     "marketcap_usd": t.get("marketcap_usd"),
                     "mvrv_usd": t.get("mvrv_usd"),
                     "price_usd_change": t.get("price_usd_change"),
+                    "sector": t.get("sector", "other"),
+                    "category": t.get("category", "other"),
                 })
+            # Sector/category counts
+            sec = t.get("sector", "other")
+            cat = t.get("category", "other")
+            sector_counts[sec] = sector_counts.get(sec, 0) + 1
+            category_counts[cat] = category_counts.get(cat, 0) + 1
 
         # Build scatter points (only tokens with the needed metrics)
         # Find the view definition
@@ -618,6 +1011,8 @@ def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
                 "x": xv, "y": yv,
                 "slug": t["slug"], "name": t["name"], "ticker": t["ticker"],
                 "thesis": t["thesis"],
+                "sector": t.get("sector", "other"),
+                "category": t.get("category", "other"),
                 "marketcap_usd": t.get("marketcap_usd") or 0,
             })
 
@@ -625,6 +1020,8 @@ def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
             "points": points,
             "thesis_counts": thesis_counts,
             "thesis_tokens": thesis_tokens,
+            "sector_counts": sector_counts,
+            "category_counts": category_counts,
             "total_tokens": len(tokens),
         }
 
@@ -633,8 +1030,12 @@ def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
 
 # ── Page-specific data builders ──────────────────────────────
 
-def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
+def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE, sector: str = "all", category: str = "all"):
     tokens = _get_all_tokens()
+    if sector != "all":
+        tokens = [t for t in tokens if t.get("sector") == sector]
+    if category != "all":
+        tokens = [t for t in tokens if t.get("category") == category]
     total = len(tokens)
     start = (page - 1) * per_page
     end = start + per_page
@@ -678,6 +1079,7 @@ def _build_screener_tokens(
     min_mcap=0, max_mcap=float("inf"),
     min_change=-999, max_change=999,
     sort_by="marketcap_usd", order="desc",
+    sector="all", category="all",
 ):
     tokens = _get_all_tokens()
     filtered = []
@@ -687,6 +1089,10 @@ def _build_screener_tokens(
             continue
         pct = t.get("price_usd_change", 0) or 0
         if pct < min_change or pct > max_change:
+            continue
+        if sector != "all" and t.get("sector") != sector:
+            continue
+        if category != "all" and t.get("category") != category:
             continue
         filtered.append(t)
     filtered.sort(key=lambda x: x.get(sort_by) or 0, reverse=(order == "desc"))
@@ -749,24 +1155,33 @@ def create_app() -> FastAPI:
         status = _san_pull_status.get("status", "unknown")
         cache_stats = _san_cache.get_pull_stats() if _san_cache else {}
         universe_size = _san_pull_status.get("universe_size", 0)
-        return render_briefing_page(briefing, status, cache_stats, universe_size)
+        return render_briefing_page(briefing, status, cache_stats, universe_size, sectors=SECTORS)
 
     @app.get("/explore", response_class=HTMLResponse)
     async def get_explore_page(
         page: int = Query(default=1, ge=1),
         per_page: int = Query(default=DEFAULT_PAGE_SIZE, ge=10, le=MAX_PAGE_SIZE),
+        sector: str = Query(default="all"),
+        category: str = Query(default="all"),
     ):
         """Full token explorer with pagination."""
-        tokens, total = _build_token_list(page, per_page)
-        return render_explore_page(tokens, page=page, per_page=per_page, total=total)
+        tokens, total = _build_token_list(page, per_page, sector=sector, category=category)
+        return render_explore_page(tokens, page=page, per_page=per_page, total=total,
+                                   sector=sector, category=category, sectors=SECTORS, categories=CATEGORIES)
 
     @app.get("/insights", response_class=HTMLResponse)
     async def get_insights_page(
         view: str = Query(default="mvrv_nvt", description="Scatter plot view ID"),
+        sector: str = Query(default="all"),
     ):
         """On-chain insights — scatter plots and thesis categorization."""
         insights = _build_insights_data(view)
-        return render_insights_page(insights, view_id=view, scatter_views=SCATTER_VIEWS)
+        # Filter scatter points by sector if requested
+        if sector != "all" and insights.get("points"):
+            insights = dict(insights)  # shallow copy
+            insights["points"] = [p for p in insights["points"] if p.get("sector") == sector]
+        return render_insights_page(insights, view_id=view, scatter_views=SCATTER_VIEWS,
+                                    sector=sector, sectors=SECTORS)
 
     @app.get("/valuation", response_class=HTMLResponse)
     async def get_valuation_page():
@@ -799,6 +1214,8 @@ def create_app() -> FastAPI:
         max_change: float = Query(default=999),
         sort: str = Query(default="marketcap_usd"),
         order: str = Query(default="desc"),
+        sector: str = Query(default="all"),
+        category: str = Query(default="all"),
     ):
         """Token screener with filters."""
         tier_ranges = {
@@ -810,10 +1227,11 @@ def create_app() -> FastAPI:
             "all": (0, float("inf")),
         }
         min_mcap, max_mcap = tier_ranges.get(tier, (0, float("inf")))
-        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order)
+        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order, sector, category)
         return render_screener_page(
             tokens, tier=tier, min_change=min_change, max_change=max_change,
-            sort_by=sort, order=order,
+            sort_by=sort, order=order, sector=sector, category=category,
+            sectors=SECTORS, categories=CATEGORIES,
         )
 
     @app.get("/token/{slug}", response_class=HTMLResponse)

@@ -170,7 +170,7 @@ def _signal_css(signal_type: str) -> str:
     return "down"
 
 
-def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, universe_size: int) -> str:
+def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, universe_size: int, sectors: dict = None) -> str:
     if not briefing:
         return page_shell("Briefing", '<div class="empty-state"><h2>Loading data...</h2><p>Data is being pulled from Santiment. Check the <a href="/sync">Sync</a> page for progress.</p></div>', active_nav="briefing")
 
@@ -301,6 +301,40 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         <div class="zone-distribution">{zone_bars}</div>
         <div class="card-footer">
             <a href="/valuation">View full valuation scanner &rarr;</a>
+        </div>
+    </section>""")
+
+    # ── Section 2b: Sector Breakdown ──
+    sector_data = b.get("sector_data", {})
+    _sectors = sectors or {}
+    if sector_data:
+        # Sort sectors by market cap
+        sorted_sectors = sorted(sector_data.items(), key=lambda x: x[1].get("mcap", 0), reverse=True)
+        total_sec_mcap = sum(v["mcap"] for _, v in sorted_sectors) or 1
+
+        sector_items = ""
+        for sec_key, sec_vals in sorted_sectors:
+            if sec_vals["count"] == 0:
+                continue
+            sec_label = _sectors.get(sec_key, sec_key.replace("_", " ").title())
+            mcap_pct = sec_vals["mcap"] / total_sec_mcap * 100
+            sector_items += f"""
+            <a href="/explore?sector={sec_key}" class="sector-card sector-{sec_key}">
+                <span class="sector-card-name">{_esc(sec_label)}</span>
+                <span class="sector-card-count">{sec_vals["count"]}</span>
+                <span class="sector-card-mcap">{fmt_usd(sec_vals["mcap"])}</span>
+                <div class="sector-card-bar"><div class="sector-card-fill" style="width:{mcap_pct:.0f}%"></div></div>
+            </a>"""
+
+        parts.append(f"""
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title">Sector Breakdown</h2>
+            <span class="card-badge">{len(sorted_sectors)} sectors</span>
+        </div>
+        <div class="sector-grid">{sector_items}</div>
+        <div class="card-footer">
+            <a href="/insights">View thesis analysis &rarr;</a>
         </div>
     </section>""")
 
@@ -529,31 +563,43 @@ def render_insights_page(
     insights: dict,
     view_id: str = "mvrv_nvt",
     scatter_views: list = None,
+    sector: str = "all",
+    sectors: dict = None,
 ) -> str:
     if not insights or not insights.get("points"):
         return page_shell("Insights", '<div class="empty-state"><h2>Loading insights...</h2><p>Data is being computed. Try again shortly.</p></div>', active_nav="insights")
 
+    _sectors = sectors or {}
     parts = []
 
     # Header
+    sector_label = _sectors.get(sector, "") if sector != "all" else ""
+    subtitle_extra = f" — {sector_label}" if sector_label else ""
     parts.append(f"""
     <h1 class="page-title">On-Chain Insights</h1>
-    <p class="page-subtitle">Cross-metric scatter plots and thesis categorization across {insights.get("total_tokens", 0)} tokens</p>""")
+    <p class="page-subtitle">Cross-metric scatter plots and thesis categorization{subtitle_extra} &middot; {len(insights.get("points", []))} tokens plotted</p>""")
 
     # ── Scatter plot view selector ──
+    filter_rows = ""
     if scatter_views:
         view_tabs = ""
         for vid, vtitle, *_ in scatter_views:
             active = " active" if vid == view_id else ""
             short_title = vtitle.split(":")[0] if ":" in vtitle else vtitle
-            view_tabs += f'<a href="/insights?view={vid}" class="filter-btn{active}">{_esc(short_title)}</a>'
-        parts.append(f"""
-    <div class="filter-bar">
-        <div class="filter-group">
-            <span class="filter-label">View:</span>
-            {view_tabs}
-        </div>
-    </div>""")
+            sec_qs = f"&sector={sector}" if sector != "all" else ""
+            view_tabs += f'<a href="/insights?view={vid}{sec_qs}" class="filter-btn{active}">{_esc(short_title)}</a>'
+        filter_rows += f'<div class="filter-group"><span class="filter-label">View:</span>{view_tabs}</div>'
+
+    # Sector filter
+    if _sectors:
+        sector_btns = f'<a href="/insights?view={view_id}" class="filter-btn{" active" if sector == "all" else ""}">All Sectors</a>'
+        for key in ["l1", "l2", "defi", "stablecoin", "exchange", "meme", "ai", "gaming", "infrastructure", "oracle", "privacy", "storage", "rwa"]:
+            label = _sectors.get(key, key.title())
+            sector_btns += f'<a href="/insights?view={view_id}&sector={key}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
+        filter_rows += f'<div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>'
+
+    if filter_rows:
+        parts.append(f'<div class="filter-bar filter-bar-stacked">{filter_rows}</div>')
 
     # ── Scatter plot ──
     current_view = None
@@ -689,14 +735,30 @@ def render_explore_page(
     page: int = 1,
     per_page: int = 100,
     total: int = 0,
+    sector: str = "all",
+    category: str = "all",
+    sectors: dict = None,
+    categories: dict = None,
 ) -> str:
     total_pages = max(1, (total + per_page - 1) // per_page)
     start = (page - 1) * per_page
 
     parts = []
+    sector_label = (sectors or {}).get(sector, "All Sectors") if sector != "all" else ""
+    subtitle = f"{total} tokens" + (f" in {sector_label}" if sector_label else "") + " ranked by market cap"
     parts.append(f"""
     <h1 class="page-title">Explore</h1>
-    <p class="page-subtitle">All {total} tokens ranked by market cap</p>""")
+    <p class="page-subtitle">{subtitle}</p>""")
+
+    # Sector filter bar
+    if sectors:
+        sector_btns = f'<a href="/explore?per_page={per_page}" class="filter-btn{"  active" if sector == "all" else ""}">All</a>'
+        for key, label in sorted(sectors.items(), key=lambda x: x[1]):
+            sector_btns += f'<a href="/explore?sector={key}&per_page={per_page}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
+        parts.append(f"""
+    <div class="filter-bar">
+        <div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>
+    </div>""")
 
     # Table
     parts.append(f"""
@@ -705,20 +767,21 @@ def render_explore_page(
             <thead><tr>
                 <th class="col-rank">#</th>
                 <th>Name</th>
+                <th class="col-tag hide-mobile">Sector</th>
                 <th class="col-num">Price</th>
                 <th class="col-num">24h</th>
                 <th class="col-spark hide-mobile">7d</th>
                 <th class="col-num">Market Cap</th>
-                <th class="col-num">Volume</th>
+                <th class="col-num hide-mobile">Volume</th>
                 <th class="col-num hide-mobile">MVRV</th>
                 <th class="col-tag hide-mobile">Zone</th>
-                <th class="col-num hide-mobile">Active Addr</th>
             </tr></thead>
             <tbody>""")
 
     if not tokens:
         parts.append('<tr><td colspan="10" class="empty-cell">Data is being pulled. Refresh shortly.</td></tr>')
     else:
+        _sector_labels = sectors or {}
         for i, t in enumerate(tokens):
             rank = start + i + 1
             slug = t.get("slug", "")
@@ -727,33 +790,40 @@ def render_explore_page(
             zone_html = f'<span class="zone {mvrv_zone(mvrv)[1]}">{mvrv_zone(mvrv)[0]}</span>' if mvrv is not None else "&mdash;"
             spark = t.get("sparkline_7d", [])
             spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
+            sec = t.get("sector", "other")
+            sec_label = _sector_labels.get(sec, sec.replace("_", " ").title())
             parts.append(f"""<tr>
                 <td class="col-rank">{rank}</td>
                 <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+                <td class="col-tag hide-mobile"><a href="/explore?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
                 <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
                 <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
                 <td class="col-spark hide-mobile">{spark_html}</td>
                 <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
-                <td class="col-num">{fmt_usd(t.get("volume_usd"))}</td>
+                <td class="col-num hide-mobile">{fmt_usd(t.get("volume_usd"))}</td>
                 <td class="col-num hide-mobile">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td>
                 <td class="col-tag hide-mobile">{zone_html}</td>
-                <td class="col-num hide-mobile">{fmt_num(t.get("daily_active_addresses"))}</td>
             </tr>""")
 
     parts.append("</tbody></table></div>")
 
     # Pagination
     if total_pages > 1:
+        qs = f"per_page={per_page}"
+        if sector != "all":
+            qs += f"&sector={sector}"
+        if category != "all":
+            qs += f"&category={category}"
         pg = []
-        pg.append(f'<a href="/explore?page={page-1}&per_page={per_page}" class="page-btn">&laquo;</a>' if page > 1 else '<span class="page-btn disabled">&laquo;</span>')
+        pg.append(f'<a href="/explore?page={page-1}&{qs}" class="page-btn">&laquo;</a>' if page > 1 else '<span class="page-btn disabled">&laquo;</span>')
         for p in range(1, total_pages + 1):
             if p == page:
                 pg.append(f'<span class="page-btn active">{p}</span>')
             elif p <= 2 or p > total_pages - 1 or abs(p - page) <= 2:
-                pg.append(f'<a href="/explore?page={p}&per_page={per_page}" class="page-btn">{p}</a>')
+                pg.append(f'<a href="/explore?page={p}&{qs}" class="page-btn">{p}</a>')
             elif (p == 3 and page > 5) or (p == total_pages - 1 and page < total_pages - 4):
                 pg.append('<span class="page-btn ellipsis">&hellip;</span>')
-        pg.append(f'<a href="/explore?page={page+1}&per_page={per_page}" class="page-btn">&raquo;</a>' if page < total_pages else '<span class="page-btn disabled">&raquo;</span>')
+        pg.append(f'<a href="/explore?page={page+1}&{qs}" class="page-btn">&raquo;</a>' if page < total_pages else '<span class="page-btn disabled">&raquo;</span>')
         parts.append(f'<div class="pagination">{"".join(pg)}</div>')
 
     return page_shell("Explore", "\n".join(parts), active_nav="explore")
@@ -970,21 +1040,38 @@ def render_screener_page(
     tokens: list, tier: str = "all",
     min_change: float = None, max_change: float = None,
     sort_by: str = "marketcap_usd", order: str = "desc",
+    sector: str = "all", category: str = "all",
+    sectors: dict = None, categories: dict = None,
 ) -> str:
+    _sectors = sectors or {}
+    _categories = categories or {}
+
+    # Build query string base for filter links
+    def _qs(**overrides):
+        params = {"tier": tier, "sort": sort_by, "order": order, "sector": sector, "category": category}
+        params.update(overrides)
+        return "&".join(f"{k}={v}" for k, v in params.items() if v not in ("all", None, -999, 999) or k in ("tier",))
+
     tiers = [
         ("all", "All"), ("mega", "Mega >$100B"), ("large", "Large $10B+"),
         ("mid", "Mid $1B+"), ("small", "Small $100M+"), ("micro", "Micro <$100M"),
     ]
     tier_btns = "".join(
-        f'<a href="/screener?tier={key}&sort={sort_by}&order={order}" '
+        f'<a href="/screener?{_qs(tier=key)}" '
         f'class="filter-btn{" active" if key == tier else ""}">{label}</a>'
         for key, label in tiers
     )
 
+    # Sector filter
+    sector_btns = f'<a href="/screener?{_qs(sector="all", category="all")}" class="filter-btn{" active" if sector == "all" else ""}">All</a>'
+    for key in ["l1", "l2", "defi", "stablecoin", "exchange", "meme", "ai", "gaming", "infrastructure", "oracle", "privacy", "storage", "social", "rwa", "other"]:
+        label = _sectors.get(key, key.title())
+        sector_btns += f'<a href="/screener?{_qs(sector=key, category="all")}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
+
     def sort_link(col, label):
         new_order = "asc" if sort_by == col and order == "desc" else "desc"
         arrow = " &darr;" if sort_by == col and order == "desc" else " &uarr;" if sort_by == col else ""
-        return f'<a href="/screener?tier={tier}&sort={col}&order={new_order}" class="sort-link">{label}{arrow}</a>'
+        return f'<a href="/screener?{_qs(sort=col, order=new_order)}" class="sort-link">{label}{arrow}</a>'
 
     rows = []
     for i, t in enumerate(tokens[:200]):
@@ -992,16 +1079,20 @@ def render_screener_page(
         pct = t.get("price_usd_change")
         mvrv = t.get("mvrv_usd")
         zone_html = f'<span class="zone {mvrv_zone(mvrv)[1]}">{mvrv_zone(mvrv)[0]}</span>' if mvrv else "&mdash;"
+        sec = t.get("sector", "other")
+        cat = t.get("category", "other")
+        sec_label = _sectors.get(sec, sec.replace("_", " ").title())
+        cat_label = _categories.get(cat, cat.replace("_", " ").title())
         rows.append(f"""<tr>
             <td class="col-rank">{i+1}</td>
             <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+            <td class="col-tag hide-mobile"><span class="sector-tag sector-{sec}">{_esc(sec_label)}</span></td>
             <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
             <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
             <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
-            <td class="col-num">{fmt_usd(t.get("volume_usd"))}</td>
+            <td class="col-num hide-mobile">{fmt_usd(t.get("volume_usd"))}</td>
             <td class="col-num hide-mobile">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td>
             <td class="col-tag hide-mobile">{zone_html}</td>
-            <td class="col-num hide-mobile">{fmt_num(t.get("daily_active_addresses"))}</td>
         </tr>""")
 
     body = f"""
@@ -1010,17 +1101,20 @@ def render_screener_page(
     <div class="filter-bar">
         <div class="filter-group"><span class="filter-label">Tier:</span>{tier_btns}</div>
     </div>
+    <div class="filter-bar">
+        <div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>
+    </div>
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
                 <th class="col-rank">#</th><th>Name</th>
+                <th class="col-tag hide-mobile">Sector</th>
                 <th class="col-num">{sort_link("price_usd", "Price")}</th>
                 <th class="col-num">{sort_link("price_usd_change", "24h")}</th>
                 <th class="col-num">{sort_link("marketcap_usd", "Mkt Cap")}</th>
-                <th class="col-num">{sort_link("volume_usd", "Volume")}</th>
+                <th class="col-num hide-mobile">{sort_link("volume_usd", "Volume")}</th>
                 <th class="col-num hide-mobile">{sort_link("mvrv_usd", "MVRV")}</th>
                 <th class="col-tag hide-mobile">Zone</th>
-                <th class="col-num hide-mobile">{sort_link("daily_active_addresses", "Active Addr")}</th>
             </tr></thead>
             <tbody>{"".join(rows) if rows else '<tr><td colspan="9" class="empty-cell">No tokens match.</td></tr>'}</tbody>
         </table>

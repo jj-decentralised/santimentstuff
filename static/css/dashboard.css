@@ -1259,6 +1259,122 @@ a { color: inherit; text-decoration: none; }
 .empty-state a { font-weight: 600; text-decoration: underline; }
 
 /* ================================================================
+   SECTOR & CATEGORY SYSTEM
+   ================================================================ */
+
+/* Sector tags — small colored pills in tables */
+.sector-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  background: var(--bg-alt);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  transition: all 0.1s;
+}
+.sector-tag:hover { border-color: var(--text-muted); }
+
+/* Sector-specific colors */
+.sector-l1 { background: #EDE9FE; color: #7C3AED; border-color: #DDD6FE; }
+.sector-l2 { background: #DBEAFE; color: #2563EB; border-color: #BFDBFE; }
+.sector-defi { background: #D1FAE5; color: #059669; border-color: #A7F3D0; }
+.sector-stablecoin { background: #F3F4F6; color: #6B7280; border-color: #E5E7EB; }
+.sector-exchange { background: #FEF3C7; color: #D97706; border-color: #FDE68A; }
+.sector-meme { background: #FEE2E2; color: #DC2626; border-color: #FECACA; }
+.sector-ai { background: #CFFAFE; color: #0891B2; border-color: #A5F3FC; }
+.sector-gaming { background: #FCE7F3; color: #DB2777; border-color: #FBCFE8; }
+.sector-infrastructure { background: #F0F9FF; color: #0369A1; border-color: #BAE6FD; }
+.sector-oracle { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+.sector-privacy { background: #F5F3FF; color: #6D28D9; border-color: #DDD6FE; }
+.sector-storage { background: #ECFDF5; color: #047857; border-color: #A7F3D0; }
+.sector-social { background: #FFF7ED; color: #C2410C; border-color: #FED7AA; }
+.sector-rwa { background: #FDF4FF; color: #A21CAF; border-color: #F5D0FE; }
+.sector-other { background: var(--bg-alt); color: var(--text-muted); }
+
+/* Sector grid — on briefing page */
+.sector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+.sector-card {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all 0.12s;
+}
+.sector-card:hover {
+  border-color: var(--text-muted);
+  background: var(--bg-alt);
+}
+.sector-card-name {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.sector-card-count {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.sector-card-count::after { content: " tokens"; }
+.sector-card-mcap {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  margin-top: 2px;
+}
+.sector-card-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--border-light);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.sector-card-fill {
+  height: 100%;
+  background: var(--text);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+/* Sector-specific card fill colors */
+.sector-l1 .sector-card-fill { background: #7C3AED; }
+.sector-l2 .sector-card-fill { background: #2563EB; }
+.sector-defi .sector-card-fill { background: #059669; }
+.sector-exchange .sector-card-fill { background: #D97706; }
+.sector-meme .sector-card-fill { background: #DC2626; }
+.sector-ai .sector-card-fill { background: #0891B2; }
+.sector-gaming .sector-card-fill { background: #DB2777; }
+.sector-oracle .sector-card-fill { background: #1D4ED8; }
+
+/* Filter bar stacked variant */
+.filter-bar-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.filter-bar-stacked .filter-group {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .sector-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .sector-grid { grid-template-columns: 1fr 1fr; }
+  .sector-card-mcap { font-size: 0.82rem; }
+}
+
+/* ================================================================
    INSIGHTS — Scatter plots + Thesis categories
    ================================================================ */
 
