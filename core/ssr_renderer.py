@@ -909,8 +909,13 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             )
         return rows
 
-    if top_vol or top_daa or top_dev:
+    # Top by market cap from all_tokens
+    top_mcap = sorted(all_tokens, key=lambda t: t.get("marketcap_usd") or 0, reverse=True)[:8] if all_tokens else []
+
+    if top_vol or top_daa or top_dev or top_mcap:
         cols = []
+        if top_mcap:
+            cols.append(f'<section class="card"><div class="card-header"><h2 class="card-title">By Market Cap</h2></div>{_top_list(top_mcap, "marketcap_usd", fmt_usd)}</section>')
         if top_vol:
             cols.append(f'<section class="card"><div class="card-header"><h2 class="card-title">By Volume</h2></div>{_top_list(top_vol, "volume_usd", fmt_usd)}</section>')
         if top_daa:
