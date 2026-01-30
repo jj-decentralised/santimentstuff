@@ -105,7 +105,7 @@ def set_ticker_data_fn(fn):
     _ticker_data_fn = fn
 
 
-def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None) -> str:
+def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None, auto_refresh: int = 0) -> str:
     nav_items = [
         ("briefing", "/", "Briefing"),
         ("explore", "/explore", "Explore"),
@@ -150,6 +150,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{_esc(title)} — Onchain Pulse</title>
+    {f'<meta http-equiv="refresh" content="{auto_refresh}">' if auto_refresh > 0 else ''}
     <meta name="description" content="Real-time on-chain crypto analytics powered by Santiment. MVRV, active addresses, exchange flows, dev activity across 3500+ tokens.">
     <meta property="og:title" content="{_esc(title)} — Onchain Pulse">
     <meta property="og:description" content="On-chain crypto analytics dashboard. MVRV zones, network health, smart money signals.">
@@ -593,7 +594,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         </a>
     </div>""")
 
-    return page_shell("Daily Briefing", "\n".join(parts), active_nav="briefing")
+    return page_shell("Daily Briefing", "\n".join(parts), active_nav="briefing", auto_refresh=300)
 
 
 # ================================================================
@@ -1204,6 +1205,34 @@ def render_compare_page(tokens: list) -> str:
                 show_min_max=False,
             ))
 
+    # Summary cards for each token
+    summary_cards = ""
+    for t in tokens:
+        m = t.get("metrics", {})
+        price = m.get("price_usd", {}).get("latest")
+        mcap = m.get("marketcap_usd", {}).get("latest")
+        mvrv = m.get("mvrv_usd", {}).get("latest")
+        daa = m.get("daily_active_addresses", {}).get("latest")
+        zone_html = ""
+        if mvrv is not None:
+            zl, zc, _ = mvrv_zone(mvrv)
+            zone_html = f'<span class="zone {zc}">{zl}</span>'
+        summary_cards += f"""
+        <div class="compare-summary-card">
+            <div class="compare-summary-name">{_esc(t.get("name", ""))}</div>
+            <div class="compare-summary-ticker">{_esc(t.get("ticker", ""))}</div>
+            <div class="compare-summary-price">{fmt_usd(price)}</div>
+            <div class="compare-summary-stats">
+                <span>MCap: {fmt_usd(mcap)}</span>
+                <span>MVRV: {f"{mvrv:.2f}" if mvrv else "&mdash;"}</span>
+                {f"<span>DAA: {int(daa):,}</span>" if daa else ""}
+            </div>
+            {zone_html}
+        </div>"""
+
+    # Current slugs for watchlist link
+    slug_list = ",".join(t.get("slug", "") for t in tokens)
+
     body = f"""
     <h1 class="page-title">Compare Tokens</h1>
     <p class="page-subtitle">Side-by-side on-chain comparison</p>
@@ -1211,13 +1240,19 @@ def render_compare_page(tokens: list) -> str:
         <span class="compare-bar-label">Quick:</span>
         {chips}
     </div>
+    <div class="compare-summary-grid">{summary_cards}</div>
+    <div class="compare-actions">
+        <a href="/watchlist?tokens={_esc(slug_list)}" class="filter-btn">Save as Watchlist</a>
+    </div>
     <div class="section">
         <div class="section-title">Metrics</div>
         {comp_table}
     </div>
     <div class="section">
         <div class="section-title">Charts</div>
-        {"".join(f'<div class="chart-wrap">{c}</div>' for c in overlay_charts) if overlay_charts else '<p class="chart-empty">Not enough data yet.</p>'}
+        <div class="chart-grid chart-grid-2">
+            {"".join(f'<div class="chart-cell">{c}</div>' for c in overlay_charts) if overlay_charts else '<p class="chart-empty">Not enough data yet.</p>'}
+        </div>
     </div>
     """
     return page_shell("Compare", body, active_nav="compare")
@@ -1451,7 +1486,7 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
     {error_html}
     <p class="sync-hint">Snapshot — refresh for latest.</p>
     """
-    return page_shell("Sync", body, active_nav="sync")
+    return page_shell("Sync", body, active_nav="sync", auto_refresh=30)
 
 
 # ================================================================
