@@ -487,11 +487,36 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         )
     mvrv_heatmap = f'<div class="mvrv-heatmap">{mvrv_tiles}</div>' if mvrv_tiles else ""
 
+    # Valuation opportunity score: weighted by zone
+    # Deep Value=5, Undervalued=4, Fair=3, Elevated=2, Overvalued=1, Euphoria=0
+    zone_weights = {"deep_value": 5, "undervalued": 4, "fair": 3, "elevated": 2, "overvalued": 1, "euphoria": 0}
+    weighted_sum = sum(zones.get(k, 0) * w for k, w in zone_weights.items())
+    val_score = weighted_sum / max(zone_total, 1)
+    if val_score >= 3.5:
+        val_verdict = "Strong opportunity"
+        val_cls = "up"
+    elif val_score >= 2.5:
+        val_verdict = "Moderate opportunity"
+        val_cls = "muted"
+    else:
+        val_verdict = "Elevated valuations"
+        val_cls = "down"
+
     parts.append(f"""
     <section class="card">
         <div class="card-header">
             <h2 class="card-title" id="valuation">Valuation Landscape</h2>
             <span class="card-badge">{zone_total} tokens with MVRV data</span>
+        </div>
+        <div class="valuation-score-row">
+            <div class="valuation-score">
+                <span class="valuation-score-num">{val_score:.1f}</span>
+                <span class="valuation-score-max">/ 5.0</span>
+            </div>
+            <div class="valuation-score-bar">
+                <div class="valuation-score-fill" style="width:{val_score/5*100:.0f}%"></div>
+            </div>
+            <span class="valuation-verdict {val_cls}">{val_verdict}</span>
         </div>
         <div class="zone-distribution">{zone_bars}</div>
         {mvrv_heatmap}
