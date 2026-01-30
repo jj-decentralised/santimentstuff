@@ -1009,19 +1009,29 @@ def render_explore_page(
 
     parts.append("</tbody></table></div>")
 
-    # Pagination
+    # Page size selector + Pagination
+    base_qs_parts = []
+    if sector != "all":
+        base_qs_parts.append(f"sector={sector}")
+    if category != "all":
+        base_qs_parts.append(f"category={category}")
+    if search:
+        base_qs_parts.append(f"q={_esc(search)}")
+    if sort_by != "marketcap_usd":
+        base_qs_parts.append(f"sort={sort_by}")
+    if order != "desc":
+        base_qs_parts.append(f"order={order}")
+    base_qs = "&".join(base_qs_parts)
+
+    size_options = ""
+    for sz in [25, 50, 100, 200]:
+        active = " active" if sz == per_page else ""
+        sz_qs = f"per_page={sz}" + (f"&{base_qs}" if base_qs else "")
+        size_options += f'<a href="/explore?{sz_qs}" class="page-size-btn{active}">{sz}</a>'
+    parts.append(f'<div class="page-controls"><div class="page-size-selector"><span class="page-size-label">Show:</span>{size_options}</div>')
+
     if total_pages > 1:
-        qs = f"per_page={per_page}"
-        if sector != "all":
-            qs += f"&sector={sector}"
-        if category != "all":
-            qs += f"&category={category}"
-        if search:
-            qs += f"&q={_esc(search)}"
-        if sort_by != "marketcap_usd":
-            qs += f"&sort={sort_by}"
-        if order != "desc":
-            qs += f"&order={order}"
+        qs = f"per_page={per_page}" + (f"&{base_qs}" if base_qs else "")
         pg = []
         pg.append(f'<a href="/explore?page={page-1}&{qs}" class="page-btn">&laquo;</a>' if page > 1 else '<span class="page-btn disabled">&laquo;</span>')
         for p in range(1, total_pages + 1):
@@ -1033,6 +1043,8 @@ def render_explore_page(
                 pg.append('<span class="page-btn ellipsis">&hellip;</span>')
         pg.append(f'<a href="/explore?page={page+1}&{qs}" class="page-btn">&raquo;</a>' if page < total_pages else '<span class="page-btn disabled">&raquo;</span>')
         parts.append(f'<div class="pagination">{"".join(pg)}</div>')
+
+    parts.append('</div>')  # close page-controls
 
     return page_shell("Explore", "\n".join(parts), active_nav="explore")
 

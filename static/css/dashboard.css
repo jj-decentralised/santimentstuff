@@ -579,12 +579,40 @@ a { color: inherit; text-decoration: none; }
 /* ================================================================
    PAGINATION
    ================================================================ */
+.page-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.page-size-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+}
+.page-size-label {
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+.page-size-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  text-decoration: none;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.page-size-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
+.page-size-btn.active { background: var(--text-primary); color: var(--bg); border-color: var(--text-primary); }
 .pagination {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 3px;
-  margin-top: 16px;
   flex-wrap: wrap;
 }
 .page-btn {
