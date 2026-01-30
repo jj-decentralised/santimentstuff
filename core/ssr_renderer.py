@@ -1908,6 +1908,33 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             <div class="vol-hint">Annualized from daily return standard deviation</div>
         </div>"""
 
+    # Social sentiment bar
+    sentiment_bar_html = ""
+    sent_val = _latest("sentiment_balance_total")
+    soc_vol = _latest("social_volume_total")
+    if sent_val is not None:
+        # Map sentiment from -10..+10 to 0%..100% on bar
+        sent_pct = max(0, min(100, (sent_val + 10) / 20 * 100))
+        if sent_val > 3:
+            s_label, s_cls = "Very Positive", "sent-vpos"
+        elif sent_val > 1:
+            s_label, s_cls = "Positive", "sent-pos"
+        elif sent_val > -1:
+            s_label, s_cls = "Neutral", "sent-neutral"
+        elif sent_val > -3:
+            s_label, s_cls = "Negative", "sent-neg"
+        else:
+            s_label, s_cls = "Very Negative", "sent-vneg"
+        soc_vol_note = f'<span class="sent-vol">Social Volume: {int(soc_vol):,}</span>' if soc_vol else ""
+        sentiment_bar_html = f"""<div class="sentiment-bar-wrap">
+            <div class="sent-header"><span class="sent-title">Social Sentiment</span><span class="sent-val">{sent_val:+.1f}</span><span class="sent-tag {s_cls}">{s_label}</span></div>
+            <div class="sent-track">
+                <div class="sent-marker" style="left:{sent_pct:.1f}%"></div>
+            </div>
+            <div class="sent-labels"><span>Bearish</span><span>Neutral</span><span>Bullish</span></div>
+            {soc_vol_note}
+        </div>"""
+
     # Metric cards with tooltip explanations
     _metric_tips = {
         "marketcap_usd": "Total supply × current price",
@@ -2109,6 +2136,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {vol_mcap_html}
     {volatility_html}
     {supply_html}
+    {sentiment_bar_html}
     {signal_html}
 
     {_render_token_description(token)}

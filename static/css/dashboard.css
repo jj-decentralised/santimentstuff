@@ -1299,6 +1299,49 @@ html.dark .spark-grid-cell { background: #161B22; border-color: #30363D; }
 .vm-hint { font-size: 0.62rem; color: var(--text-muted); }
 
 /* Volatility indicator */
+.sentiment-bar-wrap {
+  padding: 10px 14px; margin-bottom: 14px;
+  background: var(--bg-alt); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+.sent-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.sent-title { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); }
+.sent-val { font-family: var(--mono); font-size: 0.75rem; font-weight: 800; }
+.sent-tag {
+  font-size: 0.62rem; font-weight: 700; padding: 1px 6px;
+  border-radius: 3px; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.sent-vpos { background: #dcfce7; color: #166534; }
+.sent-pos { background: #e0f2fe; color: #0c4a6e; }
+.sent-neutral { background: #f3f4f6; color: #6b7280; }
+.sent-neg { background: #fef3c7; color: #92400e; }
+.sent-vneg { background: #fecaca; color: #991b1b; }
+.sent-track {
+  position: relative; height: 8px; border-radius: 4px;
+  background: linear-gradient(to right, #ef4444, #eab308 40%, #22c55e);
+}
+.sent-marker {
+  position: absolute; top: -3px; width: 4px; height: 14px;
+  background: var(--text-primary); border-radius: 2px;
+  transform: translateX(-2px); box-shadow: 0 0 0 2px var(--bg);
+}
+.sent-labels {
+  display: flex; justify-content: space-between;
+  font-size: 0.55rem; color: var(--text-muted); margin-top: 2px;
+}
+.sent-vol {
+  display: block; font-size: 0.65rem; color: var(--text-muted);
+  margin-top: 4px; font-family: var(--mono);
+}
+html.dark .sentiment-bar-wrap { background: #161B22; border-color: #30363D; }
+html.dark .sent-vpos { background: #064e3b; color: #6ee7b7; }
+html.dark .sent-pos { background: #0c4a6e; color: #7dd3fc; }
+html.dark .sent-neutral { background: #374151; color: #9ca3af; }
+html.dark .sent-neg { background: #451a03; color: #fbbf24; }
+html.dark .sent-vneg { background: #450a0a; color: #fca5a5; }
+
 .volatility-indicator {
   padding: 10px 14px; margin-bottom: 14px;
   background: var(--bg-alt); border-radius: var(--radius-sm);
