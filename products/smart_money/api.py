@@ -32,6 +32,7 @@ from core.santiment_data_puller import (
 from core.ssr_renderer import (
     render_briefing_page,
     render_explore_page,
+    render_insights_page,
     render_valuation_page,
     render_token_profile,
     render_sync_page,
@@ -237,6 +238,28 @@ BELLWETHER_SLUGS = [
     "chainlink", "polkadot", "polygon", "litecoin", "uniswap",
     "stellar", "near-protocol", "internet-computer", "cosmos",
     "aave",
+]
+
+# ── Thesis categorization ─────────────────────────────────────
+
+THESIS_DEFS = {
+    "smart_money": "Smart Money Accumulating",
+    "builder_momentum": "Builder Momentum",
+    "deep_value": "Deep Value",
+    "distribution_warning": "Distribution Warning",
+    "hodler": "HODLer Coins",
+    "high_utility": "High Utility",
+    "speculative": "Speculative",
+    "uncategorized": "Uncategorized",
+}
+
+# Scatter plot view definitions: (id, title, x_metric, y_metric, x_label, y_label, log_x, log_y)
+SCATTER_VIEWS = [
+    ("mvrv_nvt", "Value Map: MVRV vs NVT", "mvrv_usd", "nvt", "MVRV Ratio", "NVT Ratio", False, True),
+    ("daa_mcap", "Usage vs Valuation: DAA vs Market Cap", "daily_active_addresses", "marketcap_usd", "Active Addresses", "Market Cap (USD)", True, True),
+    ("exch_price", "Smart Money: Exchange Bal Change vs Price Change", "exchange_balance_change", "price_usd_change", "Exchange Balance Change %", "Price Change %", False, False),
+    ("dev_growth", "Builder Momentum: Dev Activity vs Network Growth", "dev_activity", "network_growth", "Dev Activity", "Network Growth", True, True),
+    ("vol_mcap", "Speculation: Volume/MCap Ratio vs Active Addresses", "vol_mcap_ratio", "daily_active_addresses", "Volume / Market Cap", "Active Addresses", True, True),
 ]
 
 DEFAULT_PAGE_SIZE = 100
@@ -494,6 +517,120 @@ def _build_economy_briefing() -> dict:
     return _cached("economy_briefing", _compute)
 
 
+# ── Thesis classification ─────────────────────────────────────
+
+def _classify_thesis(t: dict) -> str:
+    """Classify a token into a thesis category based on on-chain signals."""
+    mvrv = t.get("mvrv_usd")
+    exch_ch = t.get("exchange_balance_change") or 0
+    dev = t.get("dev_activity") or 0
+    dev_ch = t.get("dev_activity_change") or 0
+    daa = t.get("daily_active_addresses") or 0
+    daa_ch = t.get("daily_active_addresses_change") or 0
+    growth_ch = t.get("network_growth_change") or 0
+    price_ch = t.get("price_usd_change") or 0
+    vol = t.get("volume_usd") or 0
+    mcap = t.get("marketcap_usd") or 0
+
+    vol_mcap = vol / mcap if mcap > 0 else 0
+
+    # Smart Money Accumulating: exchange balance dropping, price flat/down
+    if exch_ch < -2 and price_ch < 5:
+        return "smart_money"
+
+    # Distribution Warning: exchange balance rising + high MVRV
+    if exch_ch > 2 and mvrv is not None and mvrv > 1.8:
+        return "distribution_warning"
+
+    # Builder Momentum: dev activity rising + network growth positive
+    if dev > 5 and (dev_ch > 10 or growth_ch > 10):
+        return "builder_momentum"
+
+    # Deep Value: MVRV below 0.7 + some DAA
+    if mvrv is not None and mvrv < 0.7 and daa > 50:
+        return "deep_value"
+
+    # High Utility: high DAA relative to market cap (top usage tokens)
+    if daa > 1000 and mcap > 0 and (daa / (mcap / 1e6)) > 0.5:
+        return "high_utility"
+
+    # Speculative: high volume/mcap + low active addresses
+    if vol_mcap > 0.3 and daa < 200:
+        return "speculative"
+
+    # HODLer Coins: low volume/mcap, moderate MVRV
+    if vol_mcap < 0.05 and mvrv is not None and 0.8 < mvrv < 2.0:
+        return "hodler"
+
+    return "uncategorized"
+
+
+def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
+    """Build scatter plot data + thesis categories for the insights page."""
+    def _compute():
+        tokens = _get_all_tokens()
+        if not tokens:
+            return {"points": [], "thesis_counts": {}, "thesis_tokens": {}}
+
+        # Classify all tokens
+        for t in tokens:
+            t["thesis"] = _classify_thesis(t)
+            mcap = t.get("marketcap_usd") or 0
+            vol = t.get("volume_usd") or 0
+            t["vol_mcap_ratio"] = vol / mcap if mcap > 0 else 0
+
+        # Thesis counts
+        thesis_counts = {}
+        thesis_tokens = {}
+        for t in tokens:
+            th = t["thesis"]
+            thesis_counts[th] = thesis_counts.get(th, 0) + 1
+            if th not in thesis_tokens:
+                thesis_tokens[th] = []
+            if len(thesis_tokens[th]) < 10:  # top 10 per category
+                thesis_tokens[th].append({
+                    "slug": t["slug"], "name": t["name"], "ticker": t["ticker"],
+                    "price_usd": t.get("price_usd"),
+                    "marketcap_usd": t.get("marketcap_usd"),
+                    "mvrv_usd": t.get("mvrv_usd"),
+                    "price_usd_change": t.get("price_usd_change"),
+                })
+
+        # Build scatter points (only tokens with the needed metrics)
+        # Find the view definition
+        view = None
+        for v in SCATTER_VIEWS:
+            if v[0] == view_id:
+                view = v
+                break
+        if not view:
+            view = SCATTER_VIEWS[0]
+
+        _, _, x_metric, y_metric, _, _, _, _ = view
+
+        points = []
+        for t in tokens:
+            xv = t.get(x_metric)
+            yv = t.get(y_metric)
+            if xv is None or yv is None:
+                continue
+            points.append({
+                "x": xv, "y": yv,
+                "slug": t["slug"], "name": t["name"], "ticker": t["ticker"],
+                "thesis": t["thesis"],
+                "marketcap_usd": t.get("marketcap_usd") or 0,
+            })
+
+        return {
+            "points": points,
+            "thesis_counts": thesis_counts,
+            "thesis_tokens": thesis_tokens,
+            "total_tokens": len(tokens),
+        }
+
+    return _cached(f"insights_{view_id}", _compute)
+
+
 # ── Page-specific data builders ──────────────────────────────
 
 def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
@@ -622,6 +759,14 @@ def create_app() -> FastAPI:
         """Full token explorer with pagination."""
         tokens, total = _build_token_list(page, per_page)
         return render_explore_page(tokens, page=page, per_page=per_page, total=total)
+
+    @app.get("/insights", response_class=HTMLResponse)
+    async def get_insights_page(
+        view: str = Query(default="mvrv_nvt", description="Scatter plot view ID"),
+    ):
+        """On-chain insights — scatter plots and thesis categorization."""
+        insights = _build_insights_data(view)
+        return render_insights_page(insights, view_id=view, scatter_views=SCATTER_VIEWS)
 
     @app.get("/valuation", response_class=HTMLResponse)
     async def get_valuation_page():

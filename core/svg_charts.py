@@ -843,6 +843,229 @@ def sentiment_gauge_svg(
 # MINI TREND — Small area chart for stat cards
 # ============================================================
 
+# ============================================================
+# SCATTER PLOT — Cross-metric analysis (e.g., MVRV vs NVT)
+# ============================================================
+
+THESIS_COLORS = {
+    "smart_money": "#10B981",      # emerald
+    "builder_momentum": "#3B82F6",  # blue
+    "deep_value": "#059669",        # deep green
+    "distribution_warning": "#EF4444",  # red
+    "hodler": "#8B5CF6",           # violet
+    "high_utility": "#06B6D4",      # cyan
+    "speculative": "#F97316",       # orange
+    "uncategorized": "#9CA3AF",     # gray
+}
+
+
+def scatter_plot_svg(
+    points: list[dict],
+    width: int = 700,
+    height: int = 400,
+    title: str = "",
+    x_key: str = "x",
+    y_key: str = "y",
+    x_label: str = "",
+    y_label: str = "",
+    color_key: str = "",
+    size_key: str = "",
+    log_x: bool = False,
+    log_y: bool = False,
+) -> str:
+    """
+    Render a scatter plot SVG.
+
+    points: list of dicts with x_key, y_key values + optional 'slug', 'name', 'ticker', 'thesis'
+    color_key: if set, color dots by this field (e.g. 'thesis')
+    size_key: if set, scale dot radius by this field (e.g. 'marketcap_usd')
+    log_x/log_y: use log scale for better spread on power-law data
+    """
+    if not points:
+        return '<div class="chart-empty">No data for scatter plot</div>'
+
+    # Filter out invalid points
+    valid = [p for p in points if p.get(x_key) is not None and p.get(y_key) is not None]
+    if len(valid) < 3:
+        return '<div class="chart-empty">Insufficient data for scatter plot</div>'
+
+    # Log transform if requested
+    import math as _math
+
+    def _safe_log(v):
+        if v is None or v <= 0:
+            return None
+        return _math.log10(v)
+
+    x_vals = []
+    y_vals = []
+    for p in valid:
+        xv = _safe_log(p[x_key]) if log_x else p[x_key]
+        yv = _safe_log(p[y_key]) if log_y else p[y_key]
+        if xv is not None and yv is not None:
+            x_vals.append(xv)
+            y_vals.append(yv)
+
+    if len(x_vals) < 3:
+        return '<div class="chart-empty">Insufficient valid data</div>'
+
+    # Chart dimensions
+    pad_left = 70
+    pad_right = 20
+    pad_top = 35 if title else 16
+    pad_bottom = 55
+    chart_w = width - pad_left - pad_right
+    chart_h = height - pad_top - pad_bottom
+
+    # Ranges with 5% padding
+    x_min, x_max = min(x_vals), max(x_vals)
+    y_min, y_max = min(y_vals), max(y_vals)
+    x_range = x_max - x_min if x_max != x_min else 1
+    y_range = y_max - y_min if y_max != y_min else 1
+    x_pad = x_range * 0.05
+    y_pad = y_range * 0.05
+    x_min -= x_pad
+    x_max += x_pad
+    y_min -= y_pad
+    y_max += y_pad
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+
+    def scale_x(v):
+        return pad_left + ((v - x_min) / x_range) * chart_w
+
+    def scale_y(v):
+        return pad_top + chart_h - ((v - y_min) / y_range) * chart_h
+
+    # Size scaling
+    size_vals = []
+    if size_key:
+        size_vals = [p.get(size_key) or 0 for p in valid]
+        max_size = max(size_vals) if size_vals else 1
+    min_r, max_r = 3, 12
+
+    elements = [
+        f'<svg width="100%" viewBox="0 0 {width} {height}" '
+        f'preserveAspectRatio="xMidYMid meet" class="chart-svg scatter-chart">'
+    ]
+
+    # Background
+    elements.append(
+        f'<rect x="{pad_left}" y="{pad_top}" width="{chart_w}" height="{chart_h}" '
+        f'fill="{BG_COLOR}" rx="4"/>'
+    )
+
+    # Title
+    if title:
+        elements.append(
+            f'<text x="{pad_left}" y="20" font-size="13" font-weight="700" '
+            f'fill="#111827" font-family="Inter,system-ui,sans-serif">{html_mod.escape(title)}</text>'
+        )
+
+    # Grid lines
+    for i in range(5):
+        frac = i / 4
+        # Y grid
+        y = pad_top + chart_h - frac * chart_h
+        y_val = y_min + frac * y_range
+        label = _fmt_val(10 ** y_val if log_y else y_val, y_key)
+        elements.append(
+            f'<line x1="{pad_left}" y1="{y:.1f}" x2="{pad_left + chart_w}" y2="{y:.1f}" '
+            f'stroke="{GRID_COLOR}" stroke-width="1"/>'
+        )
+        elements.append(
+            f'<text x="{pad_left - 10}" y="{y + 4:.1f}" text-anchor="end" '
+            f'font-size="9" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
+        )
+        # X grid
+        x = pad_left + frac * chart_w
+        x_val = x_min + frac * x_range
+        xlabel = _fmt_val(10 ** x_val if log_x else x_val, x_key)
+        elements.append(
+            f'<line x1="{x:.1f}" y1="{pad_top}" x2="{x:.1f}" y2="{pad_top + chart_h}" '
+            f'stroke="{GRID_COLOR}" stroke-width="1"/>'
+        )
+        elements.append(
+            f'<text x="{x:.1f}" y="{pad_top + chart_h + 16}" text-anchor="middle" '
+            f'font-size="9" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{xlabel}</text>'
+        )
+
+    # Axis labels
+    if x_label:
+        elements.append(
+            f'<text x="{pad_left + chart_w / 2}" y="{height - 6}" text-anchor="middle" '
+            f'font-size="10" font-weight="600" fill="{LABEL_COLOR}" '
+            f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(x_label)}</text>'
+        )
+    if y_label:
+        elements.append(
+            f'<text x="14" y="{pad_top + chart_h / 2}" text-anchor="middle" '
+            f'font-size="10" font-weight="600" fill="{LABEL_COLOR}" '
+            f'font-family="Inter,system-ui,sans-serif" '
+            f'transform="rotate(-90, 14, {pad_top + chart_h / 2})">{html_mod.escape(y_label)}</text>'
+        )
+
+    # Axis lines
+    elements.append(
+        f'<line x1="{pad_left}" y1="{pad_top + chart_h}" '
+        f'x2="{pad_left + chart_w}" y2="{pad_top + chart_h}" '
+        f'stroke="{AXIS_COLOR}" stroke-width="1"/>'
+    )
+    elements.append(
+        f'<line x1="{pad_left}" y1="{pad_top}" '
+        f'x2="{pad_left}" y2="{pad_top + chart_h}" '
+        f'stroke="{AXIS_COLOR}" stroke-width="1"/>'
+    )
+
+    # Plot points
+    for idx, p in enumerate(valid):
+        xv = _safe_log(p[x_key]) if log_x else p[x_key]
+        yv = _safe_log(p[y_key]) if log_y else p[y_key]
+        if xv is None or yv is None:
+            continue
+
+        cx = scale_x(xv)
+        cy = scale_y(yv)
+
+        # Color
+        if color_key and p.get(color_key):
+            color = THESIS_COLORS.get(p[color_key], "#9CA3AF")
+        else:
+            color = "#111111"
+
+        # Radius
+        if size_key and max_size > 0 and size_vals:
+            sv = size_vals[idx] if idx < len(size_vals) else 0
+            r = min_r + (sv / max_size) * (max_r - min_r) if max_size else min_r
+        else:
+            r = 4
+
+        slug = p.get("slug", "")
+        ticker = html_mod.escape(p.get("ticker", "")[:6])
+        name = html_mod.escape(p.get("name", "")[:20])
+
+        # Clickable dot with tooltip via title
+        elements.append(
+            f'<a href="/token/{slug}">'
+            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" '
+            f'fill="{color}" opacity="0.65" class="scatter-dot">'
+            f'<title>{name} ({ticker})</title>'
+            f'</circle>'
+            f'</a>'
+        )
+
+        # Label for large dots only (top tokens)
+        if r > 8 and ticker:
+            elements.append(
+                f'<text x="{cx:.1f}" y="{cy - r - 3:.1f}" text-anchor="middle" '
+                f'font-size="8" font-weight="600" fill="{color}" '
+                f'font-family="Inter,system-ui,sans-serif">{ticker}</text>'
+            )
+
+    elements.append('</svg>')
+    return "\n".join(elements)
+
+
 def mini_trend_svg(
     data: list[dict],
     width: int = 140,

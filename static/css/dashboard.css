@@ -1259,6 +1259,144 @@ a { color: inherit; text-decoration: none; }
 .empty-state a { font-weight: 600; text-decoration: underline; }
 
 /* ================================================================
+   INSIGHTS — Scatter plots + Thesis categories
+   ================================================================ */
+
+/* Scatter plot */
+.scatter-wrap {
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.scatter-dot { cursor: pointer; transition: opacity 0.12s; }
+.scatter-dot:hover { opacity: 1 !important; }
+.scatter-chart a:hover circle { opacity: 1; stroke: #111; stroke-width: 1.5; }
+
+.scatter-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
+.scatter-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.1s;
+}
+.scatter-legend-item:hover { background: var(--bg-alt); }
+.scatter-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.scatter-legend-count {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Thesis categories */
+.thesis-explainer {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+.thesis-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.thesis-row {
+  padding: 12px 14px;
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+  scroll-margin-top: 64px;
+}
+.thesis-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.thesis-row-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.thesis-row-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.thesis-row-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.thesis-row-bar-wrap {
+  width: 80px;
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.thesis-row-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+.thesis-row-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+.thesis-token-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.thesis-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  transition: all 0.1s;
+}
+.thesis-token-chip:hover {
+  border-color: var(--text-muted);
+  background: #fff;
+}
+.thesis-token-name {
+  font-weight: 700;
+  font-family: var(--mono);
+}
+.thesis-token-pct {
+  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+}
+
+@media (max-width: 640px) {
+  .thesis-row-bar-wrap { width: 50px; }
+  .scatter-legend { gap: 4px; }
+}
+
+/* ================================================================
    FOOTER
    ================================================================ */
 .footer {

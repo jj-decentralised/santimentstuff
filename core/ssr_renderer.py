@@ -15,6 +15,7 @@ from typing import Optional
 from .svg_charts import (
     sparkline_svg, line_chart_svg, chart_panel, comparison_table,
     market_heatmap_svg, dominance_bar_svg, sentiment_gauge_svg, mini_trend_svg,
+    scatter_plot_svg, THESIS_COLORS,
 )
 
 
@@ -98,6 +99,7 @@ def _esc(s):
 def page_shell(title: str, body: str, active_nav: str = "") -> str:
     nav_items = [
         ("briefing", "/", "Briefing"),
+        ("insights", "/insights", "Insights"),
         ("explore", "/explore", "Explore"),
         ("screener", "/screener", "Screener"),
         ("valuation", "/valuation", "Valuation"),
@@ -471,6 +473,10 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     # ── Footer nav ──
     parts.append("""
     <div class="briefing-footer-nav">
+        <a href="/insights" class="footer-nav-card">
+            <strong>Insights</strong>
+            <span>Scatter plots and thesis categorization</span>
+        </a>
         <a href="/explore" class="footer-nav-card">
             <strong>Explore</strong>
             <span>Browse all tokens with full metrics table</span>
@@ -490,6 +496,188 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     </div>""")
 
     return page_shell("Daily Briefing", "\n".join(parts), active_nav="briefing")
+
+
+# ================================================================
+# INSIGHTS PAGE (Scatter plots + Thesis categories)
+# ================================================================
+
+THESIS_LABELS = {
+    "smart_money": "Smart Money Accumulating",
+    "builder_momentum": "Builder Momentum",
+    "deep_value": "Deep Value",
+    "distribution_warning": "Distribution Warning",
+    "hodler": "HODLer Coins",
+    "high_utility": "High Utility",
+    "speculative": "Speculative",
+    "uncategorized": "Uncategorized",
+}
+
+THESIS_DESCRIPTIONS = {
+    "smart_money": "Exchange balance dropping while price is flat — insiders may be accumulating off-exchange.",
+    "builder_momentum": "Rising developer activity and network growth — the builders are shipping.",
+    "deep_value": "MVRV well below realized value with active addresses — historically strong buying zones.",
+    "distribution_warning": "Exchange balance rising with elevated MVRV — potential distribution by large holders.",
+    "hodler": "Low velocity, moderate valuation — long-term holders dominating supply.",
+    "high_utility": "High active address count relative to market cap — real usage, not just speculation.",
+    "speculative": "High volume relative to market cap but low active addresses — trading-driven, not usage-driven.",
+    "uncategorized": "No strong on-chain signal pattern detected.",
+}
+
+
+def render_insights_page(
+    insights: dict,
+    view_id: str = "mvrv_nvt",
+    scatter_views: list = None,
+) -> str:
+    if not insights or not insights.get("points"):
+        return page_shell("Insights", '<div class="empty-state"><h2>Loading insights...</h2><p>Data is being computed. Try again shortly.</p></div>', active_nav="insights")
+
+    parts = []
+
+    # Header
+    parts.append(f"""
+    <h1 class="page-title">On-Chain Insights</h1>
+    <p class="page-subtitle">Cross-metric scatter plots and thesis categorization across {insights.get("total_tokens", 0)} tokens</p>""")
+
+    # ── Scatter plot view selector ──
+    if scatter_views:
+        view_tabs = ""
+        for vid, vtitle, *_ in scatter_views:
+            active = " active" if vid == view_id else ""
+            short_title = vtitle.split(":")[0] if ":" in vtitle else vtitle
+            view_tabs += f'<a href="/insights?view={vid}" class="filter-btn{active}">{_esc(short_title)}</a>'
+        parts.append(f"""
+    <div class="filter-bar">
+        <div class="filter-group">
+            <span class="filter-label">View:</span>
+            {view_tabs}
+        </div>
+    </div>""")
+
+    # ── Scatter plot ──
+    current_view = None
+    if scatter_views:
+        for v in scatter_views:
+            if v[0] == view_id:
+                current_view = v
+                break
+        if not current_view:
+            current_view = scatter_views[0]
+
+    if current_view:
+        _, chart_title, x_metric, y_metric, x_label, y_label, log_x, log_y = current_view
+        chart_svg = scatter_plot_svg(
+            insights["points"],
+            width=720, height=420,
+            title=chart_title,
+            x_key="x", y_key="y",
+            x_label=x_label, y_label=y_label,
+            color_key="thesis",
+            size_key="marketcap_usd",
+            log_x=log_x, log_y=log_y,
+        )
+
+        # Legend for thesis colors
+        legend_items = ""
+        thesis_counts = insights.get("thesis_counts", {})
+        for key in ["smart_money", "builder_momentum", "deep_value", "distribution_warning", "hodler", "high_utility", "speculative", "uncategorized"]:
+            cnt = thesis_counts.get(key, 0)
+            if cnt == 0:
+                continue
+            color = THESIS_COLORS.get(key, "#9CA3AF")
+            label = THESIS_LABELS.get(key, key)
+            legend_items += (
+                f'<a href="#thesis-{key}" class="scatter-legend-item">'
+                f'<span class="scatter-legend-dot" style="background:{color}"></span>'
+                f'{_esc(label)} <span class="scatter-legend-count">({cnt})</span>'
+                f'</a>'
+            )
+
+        parts.append(f"""
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title">{_esc(chart_title)}</h2>
+            <span class="card-badge">{len(insights["points"])} tokens plotted</span>
+        </div>
+        <div class="scatter-wrap">{chart_svg}</div>
+        <div class="scatter-legend">{legend_items}</div>
+    </section>""")
+
+    # ── Thesis categories ──
+    thesis_tokens = insights.get("thesis_tokens", {})
+    thesis_counts = insights.get("thesis_counts", {})
+
+    if thesis_counts:
+        # Summary bar
+        total_classified = sum(v for k, v in thesis_counts.items() if k != "uncategorized")
+        total_all = sum(thesis_counts.values())
+        parts.append(f"""
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title">Thesis Categories</h2>
+            <span class="card-badge">{total_classified} of {total_all} tokens classified</span>
+        </div>
+        <p class="thesis-explainer">Each token is classified into a thesis based on its on-chain profile: exchange flows, developer activity, valuation metrics, and usage patterns.</p>""")
+
+        # Thesis distribution bars
+        parts.append('<div class="thesis-distribution">')
+        for key in ["smart_money", "builder_momentum", "deep_value", "distribution_warning", "hodler", "high_utility", "speculative"]:
+            cnt = thesis_counts.get(key, 0)
+            if cnt == 0:
+                continue
+            pct = cnt / total_all * 100 if total_all else 0
+            color = THESIS_COLORS.get(key, "#9CA3AF")
+            label = THESIS_LABELS.get(key, key)
+            desc = THESIS_DESCRIPTIONS.get(key, "")
+            tokens_list = thesis_tokens.get(key, [])
+
+            token_chips = ""
+            for t in tokens_list[:8]:
+                slug = t.get("slug", "")
+                pct_ch = t.get("price_usd_change")
+                pct_cls = css_class(pct_ch)
+                token_chips += (
+                    f'<a href="/token/{slug}" class="thesis-token-chip">'
+                    f'<span class="thesis-token-name">{_esc(t.get("ticker", "")[:6])}</span>'
+                    f'<span class="thesis-token-pct {pct_cls}">{fmt_pct(pct_ch)}</span>'
+                    f'</a>'
+                )
+
+            parts.append(f"""
+        <div class="thesis-row" id="thesis-{key}">
+            <div class="thesis-row-header">
+                <span class="thesis-row-dot" style="background:{color}"></span>
+                <span class="thesis-row-label">{_esc(label)}</span>
+                <span class="thesis-row-count">{cnt}</span>
+                <div class="thesis-row-bar-wrap">
+                    <div class="thesis-row-bar" style="width:{pct:.0f}%;background:{color}"></div>
+                </div>
+            </div>
+            <p class="thesis-row-desc">{_esc(desc)}</p>
+            <div class="thesis-token-list">{token_chips}</div>
+        </div>""")
+
+        parts.append('</div></section>')
+
+    # ── Footer nav ──
+    parts.append("""
+    <div class="briefing-footer-nav">
+        <a href="/" class="footer-nav-card">
+            <strong>Briefing</strong>
+            <span>Daily economy dashboard</span>
+        </a>
+        <a href="/screener" class="footer-nav-card">
+            <strong>Screener</strong>
+            <span>Filter by tier, sort by any metric</span>
+        </a>
+        <a href="/valuation" class="footer-nav-card">
+            <strong>Valuation</strong>
+            <span>MVRV zone scanner</span>
+        </a>
+    </div>""")
+
+    return page_shell("Insights", "\n".join(parts), active_nav="insights")
 
 
 # ================================================================
