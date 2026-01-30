@@ -1451,6 +1451,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         </div>
         <div class="profile-price-block">
             <span class="profile-price">{fmt_usd(price)}</span>
+            {mini_trend_svg(_data("price_usd")[-30:], width=120, height=32, color="#0F1419") if len(_data("price_usd")) >= 5 else ""}
             <div class="profile-changes">{"".join(changes)}</div>
             {mvrv_html}
         </div>
