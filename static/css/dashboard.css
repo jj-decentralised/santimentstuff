@@ -700,6 +700,19 @@ a { color: inherit; text-decoration: none; }
   flex-wrap: wrap;
   gap: 12px;
 }
+.explore-footer-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
 .page-size-selector {
   display: flex;
   align-items: center;

@@ -1214,6 +1214,20 @@ def render_explore_page(
 
     parts.append('</div>')  # close page-controls
 
+    # Aggregate stats footer
+    if tokens:
+        total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
+        changes = [t.get("price_usd_change") for t in tokens if t.get("price_usd_change") is not None]
+        avg_change = sum(changes) / len(changes) if changes else 0
+        up_count = sum(1 for c in changes if c > 0)
+        parts.append(f"""
+    <div class="explore-footer-stats">
+        <span>Page MCap: {fmt_usd(total_mcap)}</span>
+        <span>Avg 24h: <span class="{css_class(avg_change)}">{fmt_pct(avg_change)}</span></span>
+        <span>{up_count}/{len(changes)} up</span>
+        <span>Showing {len(tokens)} of {total}</span>
+    </div>""")
+
     return page_shell("Explore", "\n".join(parts), active_nav="explore")
 
 
