@@ -1232,17 +1232,41 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(404)
     async def not_found_handler(request, exc):
-        body = """
+        path = request.url.path
+        suggestion = ""
+        if path.startswith("/token/"):
+            slug_attempt = path.replace("/token/", "").strip("/")
+            suggestion = f'<p>Looking for a token? <a href="/screener?q={slug_attempt}" class="filter-btn">{slug_attempt}</a></p>'
+
+        popular = ""
+        try:
+            tokens = _get_all_tokens()[:8]
+            if tokens:
+                chips = "".join(
+                    f'<a href="/token/{t["slug"]}" class="filter-btn">{t.get("name", t["slug"])[:16]}</a>'
+                    for t in tokens
+                )
+                popular = f'<div style="margin-top:12px"><p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">Popular tokens:</p><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">{chips}</div></div>'
+        except Exception:
+            pass
+
+        body = f"""
         <div class="empty-state" style="padding:60px 0">
             <div class="empty-state-icon" style="font-size:3rem">&#9888;</div>
             <h2>404 — Page Not Found</h2>
             <p>The page you're looking for doesn't exist or has been moved.</p>
-            <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            {suggestion}
+            <form action="/screener" method="get" style="margin:16px auto;max-width:300px;display:flex;gap:6px">
+                <input type="text" name="q" placeholder="Search tokens..." style="flex:1;padding:8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:0.85rem">
+                <button type="submit" class="filter-btn active">Search</button>
+            </form>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
                 <a href="/" class="filter-btn active">Briefing</a>
                 <a href="/explore" class="filter-btn">Explore</a>
                 <a href="/screener" class="filter-btn">Screener</a>
                 <a href="/sectors" class="filter-btn">Sectors</a>
             </div>
+            {popular}
         </div>"""
         return HTMLResponse(page_shell("404 Not Found", body), status_code=404)
 
