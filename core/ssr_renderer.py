@@ -1563,6 +1563,71 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             h_label, h_cls = "Weak", "health-weak"
         health_score_html = f'<div class="onchain-health"><span class="health-score-num {h_cls}">{h_score}</span><span class="health-score-label">{h_label}</span><span class="health-score-caption">On-chain Health</span></div>'
 
+    # Signal summary — bullish/bearish/neutral signal count
+    signal_items = []
+    # MVRV signal
+    if mvrv is not None:
+        if mvrv < 1.0:
+            signal_items.append(("MVRV", "bullish", f"{mvrv:.2f} — below realized value"))
+        elif mvrv > 2.5:
+            signal_items.append(("MVRV", "bearish", f"{mvrv:.2f} — significantly above realized value"))
+        else:
+            signal_items.append(("MVRV", "neutral", f"{mvrv:.2f}"))
+    # Exchange balance trend
+    if exch is not None and exch_ts and len(exch_ts) >= 7:
+        ex_7 = exch_ts[-7].get("value")
+        if ex_7 and ex_7 > 0:
+            ex_d = (exch - ex_7) / ex_7 * 100
+            if ex_d < -3:
+                signal_items.append(("Exchange Flow", "bullish", f"{ex_d:+.1f}% — accumulation"))
+            elif ex_d > 3:
+                signal_items.append(("Exchange Flow", "bearish", f"{ex_d:+.1f}% — distribution"))
+            else:
+                signal_items.append(("Exchange Flow", "neutral", f"{ex_d:+.1f}%"))
+    # DAA trend
+    daa_ts = _data("daily_active_addresses")
+    if daa_ts and len(daa_ts) >= 7:
+        daa_now = daa_ts[-1].get("value", 0)
+        daa_7 = daa_ts[-7].get("value", 0)
+        if daa_7 and daa_7 > 0:
+            daa_d = (daa_now - daa_7) / daa_7 * 100
+            if daa_d > 10:
+                signal_items.append(("Active Addresses", "bullish", f"{daa_d:+.1f}% 7d"))
+            elif daa_d < -10:
+                signal_items.append(("Active Addresses", "bearish", f"{daa_d:+.1f}% 7d"))
+            else:
+                signal_items.append(("Active Addresses", "neutral", f"{daa_d:+.1f}% 7d"))
+    # Dev activity
+    dev_ts_s = _data("dev_activity")
+    if dev_ts_s and len(dev_ts_s) >= 7:
+        dv_now = dev_ts_s[-1].get("value", 0)
+        dv_7 = dev_ts_s[-7].get("value", 0)
+        if dv_7 and dv_7 > 0:
+            dv_d = (dv_now - dv_7) / dv_7 * 100
+            if dv_d > 15:
+                signal_items.append(("Dev Activity", "bullish", f"{dv_d:+.1f}% 7d"))
+            elif dv_d < -15:
+                signal_items.append(("Dev Activity", "bearish", f"{dv_d:+.1f}% 7d"))
+            else:
+                signal_items.append(("Dev Activity", "neutral", f"{dv_d:+.1f}% 7d"))
+
+    signal_html = ""
+    if len(signal_items) >= 2:
+        bull_c = sum(1 for _, s, _ in signal_items if s == "bullish")
+        bear_c = sum(1 for _, s, _ in signal_items if s == "bearish")
+        neut_c = sum(1 for _, s, _ in signal_items if s == "neutral")
+        sig_rows = "".join(
+            f'<div class="signal-row"><span class="signal-name">{n}</span><span class="signal-dot signal-{s}"></span><span class="signal-detail">{d}</span></div>'
+            for n, s, d in signal_items
+        )
+        signal_html = f"""<div class="signal-summary">
+            <div class="signal-header">
+                <span class="signal-title">Signal Summary</span>
+                <span class="signal-counts"><span class="up">{bull_c} Bullish</span> <span class="muted">{neut_c} Neutral</span> <span class="down">{bear_c} Bearish</span></span>
+            </div>
+            {sig_rows}
+        </div>"""
+
     # Volume / Market Cap ratio indicator
     vol_mcap_html = ""
     vol = _latest("volume_usd")
@@ -1757,6 +1822,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {alerts_html}
     {health_score_html}
     {vol_mcap_html}
+    {signal_html}
 
     {_render_token_description(token)}
     {_onchain_narrative(name, ticker, price, mvrv, _latest, _data)}
