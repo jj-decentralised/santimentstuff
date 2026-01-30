@@ -2161,6 +2161,12 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
         <input type="text" name="tokens" value="{_esc(slugs_str)}" placeholder="Enter slugs: bitcoin,ethereum,solana..." class="search-input" autocomplete="off">
         <button type="submit" class="search-btn">Update</button>
     </form>""")
+    if slug_list:
+        parts.append(f"""
+    <div class="share-hint">
+        <span class="share-hint-icon">&#128279;</span>
+        <span>Share this watchlist — copy the URL from your browser's address bar. All tokens are encoded in the URL.</span>
+    </div>""")
 
     # Preset watchlists
     presets = [
