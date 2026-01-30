@@ -182,6 +182,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     {ticker_html}
     <header class="header">
         <div class="header-inner">
@@ -195,7 +196,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
             </div>
         </div>
     </header>
-    <main class="main">{body}</main>
+    <main class="main" id="main-content">{body}</main>
     <footer class="footer">
         <div class="footer-inner">
             <div class="footer-links">

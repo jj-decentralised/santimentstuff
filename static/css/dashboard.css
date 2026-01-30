@@ -3,6 +3,26 @@
    Design system: Dense, data-first, monochrome with signal colors
    ================================================================ */
 
+/* --- Skip link (accessibility) --- */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary, #111);
+  color: var(--bg, #fff);
+  padding: 8px 20px;
+  border-radius: 0 0 6px 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  z-index: 10000;
+  text-decoration: none;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
 /* --- Reset & Variables --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
