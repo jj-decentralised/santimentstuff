@@ -113,6 +113,7 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
         ("screener", "/screener", "Screener"),
         ("insights", "/insights", "Insights"),
         ("valuation", "/valuation", "Valuation"),
+        ("developers", "/developers", "Developers"),
         ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
         ("watchlist", "/watchlist?tokens=bitcoin,ethereum,solana,cardano,avalanche", "Watchlist"),
         ("sync", "/sync", "Sync"),
@@ -970,6 +971,22 @@ def render_explore_page(
 # TOKEN PROFILE
 # ================================================================
 
+def _render_token_description(token: dict) -> str:
+    desc = token.get("description", "")
+    website = token.get("website", "")
+    if not desc and not website:
+        return ""
+    parts = []
+    if desc:
+        # Truncate long descriptions
+        if len(desc) > 300:
+            desc = desc[:297] + "..."
+        parts.append(f'<p class="token-desc">{_esc(desc)}</p>')
+    if website:
+        parts.append(f'<a href="{_esc(website)}" class="token-website" target="_blank" rel="noopener">{_esc(website)}</a>')
+    return f'<div class="token-desc-block">{"".join(parts)}</div>'
+
+
 def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
@@ -1113,6 +1130,8 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             {mvrv_html}
         </div>
     </div>
+
+    {_render_token_description(token)}
 
     {f'<div class="metrics-grid">{"".join(metric_cards)}</div>' if metric_cards else ''}
 
@@ -1487,6 +1506,79 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
     <p class="sync-hint">Snapshot — refresh for latest.</p>
     """
     return page_shell("Sync", body, active_nav="sync", auto_refresh=30)
+
+
+# ================================================================
+# DEVELOPERS LEADERBOARD
+# ================================================================
+
+def render_developers_page(tokens: list, sector: str = "all", sectors: dict = None) -> str:
+    parts = []
+    sector_note = f' in {(sectors or {}).get(sector, sector)}' if sector != "all" else ""
+    parts.append(f"""
+    <h1 class="page-title">Developer Activity</h1>
+    <p class="page-subtitle">Top {len(tokens)} projects by dev activity{sector_note}</p>""")
+
+    # Sector filter
+    if sectors:
+        sector_btns = f'<a href="/developers" class="filter-btn{" active" if sector == "all" else ""}">All</a>'
+        for key, label in sorted(sectors.items(), key=lambda x: x[1]):
+            sector_btns += f'<a href="/developers?sector={key}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
+        parts.append(f'<div class="filter-bar"><div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div></div>')
+
+    # Summary stats
+    if tokens:
+        total_dev = sum(t.get("dev_activity") or 0 for t in tokens)
+        avg_dev = total_dev / len(tokens)
+        with_change = [t for t in tokens if t.get("dev_activity_change") is not None]
+        growing = sum(1 for t in with_change if (t.get("dev_activity_change") or 0) > 5)
+        declining = sum(1 for t in with_change if (t.get("dev_activity_change") or 0) < -5)
+        parts.append(f"""
+    <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Total Dev Activity</div><div class="stat-value">{total_dev:,.0f}</div></div>
+        <div class="stat-card"><div class="stat-label">Average</div><div class="stat-value">{avg_dev:,.1f}</div></div>
+        <div class="stat-card"><div class="stat-label">Growing (>5%)</div><div class="stat-value up">{growing}</div></div>
+        <div class="stat-card"><div class="stat-label">Declining (<-5%)</div><div class="stat-value down">{declining}</div></div>
+    </div>""")
+
+    # Leaderboard table
+    rows = ""
+    max_dev = max((t.get("dev_activity") or 0 for t in tokens), default=1) or 1
+    for i, t in enumerate(tokens):
+        dev = t.get("dev_activity") or 0
+        dev_ch = t.get("dev_activity_change")
+        bar_pct = min(100, dev / max_dev * 100)
+        slug = t.get("slug", "")
+        sec = t.get("sector", "other")
+        sec_label = (sectors or {}).get(sec, sec.replace("_", " ").title())
+        rows += f"""<tr>
+            <td class="col-rank">{i+1}</td>
+            <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+            <td class="col-tag hide-mobile"><a href="/developers?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
+            <td class="col-num bold">{dev:,.0f}</td>
+            <td class="col-num {css_class(dev_ch)} hide-mobile">{fmt_pct(dev_ch)}</td>
+            <td class="hide-mobile" style="min-width:100px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:{bar_pct:.0f}%"></div></div></td>
+            <td class="col-num hide-mobile">{fmt_usd(t.get("price_usd"))}</td>
+            <td class="col-num hide-mobile">{fmt_usd(t.get("marketcap_usd"))}</td>
+        </tr>"""
+
+    parts.append(f"""
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr>
+                <th class="col-rank">#</th><th>Name</th>
+                <th class="col-tag hide-mobile">Sector</th>
+                <th class="col-num">Dev Activity</th>
+                <th class="col-num hide-mobile">Change</th>
+                <th class="hide-mobile">Bar</th>
+                <th class="col-num hide-mobile">Price</th>
+                <th class="col-num hide-mobile">Mkt Cap</th>
+            </tr></thead>
+            <tbody>{rows if rows else '<tr><td colspan="8" class="empty-cell">No dev activity data available.</td></tr>'}</tbody>
+        </table>
+    </div>""")
+
+    return page_shell("Developers", "\n".join(parts), active_nav="developers")
 
 
 # ================================================================

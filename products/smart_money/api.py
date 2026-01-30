@@ -40,6 +40,7 @@ from core.ssr_renderer import (
     render_screener_page,
     render_watchlist_page,
     render_sectors_page,
+    render_developers_page,
     set_ticker_data_fn,
     fmt_usd,
     fmt_pct,
@@ -1310,6 +1311,18 @@ def create_app() -> FastAPI:
             sort_by=sort, order=order, sector=sector, category=category,
             sectors=SECTORS, categories=CATEGORIES, search=q,
         )
+
+    @app.get("/developers", response_class=HTMLResponse)
+    async def get_developers_page(
+        sector: str = Query(default="all"),
+    ):
+        """Developer activity leaderboard."""
+        tokens = _get_all_tokens()
+        dev_tokens = [t for t in tokens if t.get("dev_activity") is not None and (t.get("dev_activity") or 0) > 0]
+        if sector != "all":
+            dev_tokens = [t for t in dev_tokens if t.get("sector") == sector]
+        dev_tokens.sort(key=lambda t: t.get("dev_activity") or 0, reverse=True)
+        return render_developers_page(dev_tokens[:100], sector=sector, sectors=SECTORS)
 
     @app.get("/sectors", response_class=HTMLResponse)
     async def get_sectors_page():

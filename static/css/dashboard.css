@@ -700,6 +700,27 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-muted);
   margin-top: 1px;
 }
+.token-desc-block {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.token-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+.token-website {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.token-website:hover { color: var(--text); }
 .profile-nav-row {
   display: flex;
   gap: 8px;
