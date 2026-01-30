@@ -1566,7 +1566,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         is_usd = "usd" in key and "mvrv" not in key and "nvt" not in key
         val_str = fmt_usd(latest) if is_usd else f"{latest:,.2f}" if latest < 1000 else fmt_num(latest)
         tip = _metric_tips.get(key, "")
-        label_html = f'<abbr title="{_esc(tip)}" class="metric-abbr">{_esc(label)}</abbr>' if tip else _esc(label)
+        label_html = f'<span class="metric-tip-wrap"><span class="metric-abbr">{_esc(label)}</span><span class="metric-tip-card">{_esc(tip)}</span></span>' if tip else _esc(label)
         # 24h delta + sparkline
         delta_html = ""
         spark_html = ""
