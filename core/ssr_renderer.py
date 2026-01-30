@@ -1237,7 +1237,24 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         badges = "".join(f'<span class="alert-badge {cls}" title="{_esc(desc)}">{_esc(label)}</span>' for label, cls, desc in alerts)
         alerts_html = f'<div class="alert-badges">{badges}</div>'
 
-    # Metric cards
+    # Metric cards with tooltip explanations
+    _metric_tips = {
+        "marketcap_usd": "Total supply × current price",
+        "volume_usd": "USD trading volume in the last 24 hours",
+        "mvrv_usd": "Market Value to Realized Value — above 1 means holders are in profit on average",
+        "nvt": "Network Value to Transactions — high = overvalued relative to usage",
+        "daily_active_addresses": "Unique addresses active in the last 24h",
+        "transaction_volume": "Total on-chain transaction volume in USD",
+        "exchange_balance": "Tokens held on known exchange wallets — declining = accumulation",
+        "dev_activity": "GitHub development activity score",
+        "network_growth": "New addresses joining the network per day",
+        "circulation": "Tokens that moved on-chain in the past 24h",
+        "velocity": "How frequently tokens change hands — higher = more speculative",
+        "mean_age": "Average age of all dollars invested — rising = HODLing",
+        "whale_transaction_count_100k_usd_to_inf": "Transactions above $100K — whale activity signal",
+        "social_volume_total": "Mentions across social platforms",
+        "sentiment_balance_total": "Net positive vs negative social sentiment",
+    }
     metric_cards = []
     metric_defs = [
         ("marketcap_usd", "Market Cap"), ("volume_usd", "Volume 24h"),
@@ -1260,9 +1277,11 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             continue
         is_usd = "usd" in key and "mvrv" not in key and "nvt" not in key
         val_str = fmt_usd(latest) if is_usd else f"{latest:,.2f}" if latest < 1000 else fmt_num(latest)
+        tip = _metric_tips.get(key, "")
+        label_html = f'<abbr title="{_esc(tip)}" class="metric-abbr">{_esc(label)}</abbr>' if tip else _esc(label)
         metric_cards.append(f"""
         <div class="metric-card">
-            <div class="metric-label">{_esc(label)}</div>
+            <div class="metric-label">{label_html}</div>
             <div class="metric-value">{val_str}</div>
         </div>""")
 
