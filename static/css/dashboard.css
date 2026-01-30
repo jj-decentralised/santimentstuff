@@ -2913,10 +2913,13 @@ html.dark .data-table tbody tr:hover { background: #1C2128; }
   .header, .footer, .ticker-strip, .skip-link, .nav-toggle-label,
   .theme-toggle, .search-bar, .filter-bar, .pagination, .page-controls,
   .export-btn, .token-quick-nav, .breadcrumbs, .compare-bar,
-  .briefing-footer-nav, .sync-banner { display: none !important; }
+  .briefing-footer-nav, .sync-banner, .profile-actions, .profile-external-links,
+  .briefing-toc, .preset-filters, .share-hint, .search-suggestions { display: none !important; }
   .main { max-width: 100%; padding: 0; margin: 0; }
-  .card { border: 1px solid #ccc; break-inside: avoid; box-shadow: none; margin-bottom: 12pt; }
+  .card { border: 1px solid #ccc; break-inside: avoid; box-shadow: none; margin-bottom: 12pt; page-break-inside: avoid; }
+  .two-col { grid-template-columns: 1fr 1fr; }
   .stats-row, .health-grid { grid-template-columns: repeat(auto-fit, minmax(120pt, 1fr)); }
+  .metrics-grid { grid-template-columns: repeat(auto-fit, minmax(100pt, 1fr)); }
   a { color: black; text-decoration: none; }
   .zone { border: 1px solid #999; }
   .up { color: #059669 !important; }
@@ -2925,4 +2928,6 @@ html.dark .data-table tbody tr:hover { background: #1C2128; }
   th, td { border-bottom: 0.5pt solid #ccc; padding: 3pt 6pt; }
   .hide-mobile { display: table-cell !important; }
   svg { max-width: 100%; }
+  .chart-wrap, .chart-cell { break-inside: avoid; page-break-inside: avoid; }
+  .briefing-title::after { content: " — Printed Report"; font-weight: 400; font-size: 0.6em; color: #666; }
 }
