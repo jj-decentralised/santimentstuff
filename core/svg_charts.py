@@ -7,6 +7,7 @@ Premium chart engine with:
 - Min/max/current value markers
 - Refined typography and spacing
 - Heatmap grids, dominance bars, sentiment gauges
+- Outlier clamping, smart y-axis, clean labels
 """
 
 import html as html_mod
@@ -31,9 +32,9 @@ COLORS = [
     "#14B8A6",   # teal
 ]
 
-GRID_COLOR = "#F0F0F0"
+GRID_COLOR = "#F3F4F6"
 LABEL_COLOR = "#9CA3AF"
-AXIS_COLOR = "#D1D5DB"
+AXIS_COLOR = "#E5E7EB"
 BG_COLOR = "#FAFBFC"
 
 # Heatmap color scale (red -> gray -> green)
@@ -48,34 +49,73 @@ HEATMAP_COLORS = {
 }
 
 
+# ============================================================
+# FORMATTING — Clean, human-readable labels
+# ============================================================
+
 def _fmt_val(v: float, key: str = "") -> str:
-    """Format a value for axis labels."""
+    """Format a value for axis labels — clean, human-readable numbers."""
     if v is None:
         return ""
     a = abs(v)
-    if "usd" in key and "mvrv" not in key and "nvt" not in key and "percent" not in key:
+    sign = "-" if v < 0 else ""
+    is_dollar = "usd" in key and "mvrv" not in key and "nvt" not in key and "percent" not in key
+
+    if is_dollar:
         if a >= 1e12:
-            return f"${v/1e12:.1f}T"
+            return f"{sign}${a/1e12:.1f}T"
         if a >= 1e9:
-            return f"${v/1e9:.1f}B"
+            return f"{sign}${a/1e9:.1f}B"
         if a >= 1e6:
-            return f"${v/1e6:.1f}M"
+            return f"{sign}${a/1e6:.1f}M"
         if a >= 1e3:
-            return f"${v/1e3:.0f}K"
+            return f"{sign}${a/1e3:,.0f}"
         if a >= 1:
-            return f"${v:.2f}"
-        return f"${v:.4f}"
+            return f"{sign}${a:,.2f}"
+        return f"{sign}${a:.4f}"
+    # Non-dollar
     if a >= 1e9:
-        return f"{v/1e9:.1f}B"
+        return f"{sign}{a/1e9:.1f}B"
     if a >= 1e6:
-        return f"{v/1e6:.1f}M"
+        return f"{sign}{a/1e6:.1f}M"
     if a >= 1e3:
-        return f"{v/1e3:.0f}K"
+        return f"{sign}{a/1e3:.0f}K"
     if a >= 100:
-        return f"{v:.0f}"
+        return f"{sign}{a:.0f}"
+    if a >= 10:
+        return f"{sign}{a:.1f}"
     if a >= 1:
-        return f"{v:.2f}"
-    return f"{v:.4f}"
+        return f"{sign}{a:.2f}"
+    if a >= 0.01:
+        return f"{sign}{a:.3f}"
+    return f"{sign}{a:.4f}"
+
+
+def _nice_ticks(lo: float, hi: float, n_ticks: int = 5) -> list[float]:
+    """Generate 'nice' round tick values for an axis range."""
+    if hi <= lo:
+        return [lo]
+    raw_step = (hi - lo) / max(n_ticks - 1, 1)
+    # Find order of magnitude
+    mag = 10 ** math.floor(math.log10(raw_step)) if raw_step > 0 else 1
+    # Snap to nice step: 1, 2, 2.5, 5, 10 multiples
+    nice_steps = [1, 2, 2.5, 5, 10]
+    norm = raw_step / mag
+    step = mag
+    for ns in nice_steps:
+        if ns >= norm:
+            step = ns * mag
+            break
+
+    # Generate ticks
+    start = math.floor(lo / step) * step
+    ticks = []
+    v = start
+    while v <= hi + step * 0.01:
+        if v >= lo - step * 0.01:
+            ticks.append(round(v, 10))
+        v += step
+    return ticks if ticks else [lo, hi]
 
 
 def _fmt_date(dt_str: str) -> str:
@@ -98,6 +138,26 @@ def _fmt_date_year(dt_str: str) -> str:
         return f"{months[int(parts[1])]} '{parts[0][2:]}"
     except Exception:
         return dt_str[:7]
+
+
+def _clamp_outliers(values: list[float], pct: float = 2.0) -> tuple:
+    """Return (lo, hi) with extreme outliers clamped at percentile boundaries."""
+    if not values:
+        return (0, 1)
+    sv = sorted(values)
+    n = len(sv)
+    lo_idx = max(0, int(n * pct / 100))
+    hi_idx = min(n - 1, int(n * (100 - pct) / 100))
+    lo = sv[lo_idx]
+    hi = sv[hi_idx]
+    # Ensure some range
+    if hi <= lo:
+        lo = sv[0]
+        hi = sv[-1]
+    if hi <= lo:
+        lo -= 1
+        hi += 1
+    return (lo, hi)
 
 
 def _smooth_path(points: list[tuple[float, float]], tension: float = 0.3) -> str:
@@ -150,10 +210,7 @@ def sparkline_svg(
     color: str = "#000000",
     show_change_color: bool = True,
 ) -> str:
-    """
-    Generate a tiny inline sparkline SVG with gradient fill.
-    data: list of {"value": float} dicts (ordered chronologically)
-    """
+    """Tiny inline sparkline SVG with gradient fill."""
     values = [d.get("value") for d in data if d.get("value") is not None]
     if len(values) < 2:
         return ""
@@ -166,7 +223,6 @@ def sparkline_svg(
     if show_change_color:
         color = "#10B981" if values[-1] >= values[0] else "#EF4444"
 
-    # Unique gradient id
     gid = f"sg{abs(hash(str(values[:3]))) % 99999}"
 
     points = []
@@ -175,9 +231,7 @@ def sparkline_svg(
         y = height - ((v - min_v) / v_range) * (height - 4) - 2
         points.append((x, y))
 
-    # Smooth path
     line_d = _smooth_path(points, tension=0.25)
-    # Area path (close to bottom)
     area_d = line_d + f" L{points[-1][0]:.1f},{height} L{points[0][0]:.1f},{height} Z"
 
     return (
@@ -207,29 +261,30 @@ def line_chart_svg(
     show_grid: bool = True,
     show_min_max: bool = True,
     y_label_count: int = 5,
-    x_label_count: int = 6,
+    x_label_count: int = 5,
 ) -> str:
     """
     Generate a premium line chart SVG with smooth curves and gradient fills.
 
-    series: list of {
-        "label": str,
-        "data": [{"datetime": str, "value": float}, ...],
-        "color": str (optional),
-    }
+    Key improvements:
+    - Outlier clamping (2nd/98th percentile) for stable Y-axis
+    - Smart zero baseline: if all values are positive, Y starts at 0 or near-min
+    - Nice round tick numbers on Y-axis
+    - Fewer, cleaner date labels on X-axis
+    - Gradient fill clipped at chart bottom (not below zero)
     """
     if not series or not any(s.get("data") for s in series):
         return '<div class="chart-empty">No chart data available</div>'
 
     # Chart dimensions
     pad_left = 70
-    pad_right = 20
+    pad_right = 30
     pad_top = 35 if title else 16
-    pad_bottom = 45
+    pad_bottom = 40
     chart_w = width - pad_left - pad_right
     chart_h = height - pad_top - pad_bottom
 
-    # Compute global min/max across all series
+    # Collect all values
     all_values = []
     all_dates = []
     for s in series:
@@ -242,21 +297,30 @@ def line_chart_svg(
     if not all_values:
         return '<div class="chart-empty">No chart data available</div>'
 
-    min_v = min(all_values)
-    max_v = max(all_values)
-    if min_v == max_v:
-        min_v -= 1
-        max_v += 1
-    v_range = max_v - min_v
+    # ── Smart Y-axis range with outlier clamping ──
+    clamped_lo, clamped_hi = _clamp_outliers(all_values, pct=2.0)
 
-    # Add 8% padding to y range
-    padding = v_range * 0.08
-    min_v -= padding
-    max_v += padding
+    # If all values are positive, don't show negative Y
+    all_positive = min(all_values) >= 0
+    if all_positive:
+        clamped_lo = max(0, clamped_lo * 0.9)  # start near 0 or 90% of min
+        # If min is close to 0, just start at 0
+        if clamped_lo < clamped_hi * 0.15:
+            clamped_lo = 0
+
+    # Compute nice ticks
+    ticks = _nice_ticks(clamped_lo, clamped_hi, y_label_count)
+    min_v = ticks[0]
+    max_v = ticks[-1]
     v_range = max_v - min_v
+    if v_range == 0:
+        v_range = 1
+        max_v = min_v + 1
+        ticks = [min_v, max_v]
 
     def scale_y(v):
-        return pad_top + chart_h - ((v - min_v) / v_range) * chart_h
+        clamped = max(min_v, min(max_v, v))
+        return pad_top + chart_h - ((clamped - min_v) / v_range) * chart_h
 
     elements = []
     defs = []
@@ -266,7 +330,7 @@ def line_chart_svg(
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
     )
 
-    # Chart area background with subtle rounded rect
+    # Chart area background
     elements.append(
         f'<rect x="{pad_left}" y="{pad_top}" width="{chart_w}" height="{chart_h}" '
         f'fill="{BG_COLOR}" rx="4"/>'
@@ -279,24 +343,21 @@ def line_chart_svg(
             f'fill="#111827" font-family="Inter,system-ui,sans-serif">{html_mod.escape(title)}</text>'
         )
 
-    # Y-axis grid lines (subtle dashed)
+    # ── Y-axis: nice round tick lines ──
     if show_grid:
-        for i in range(y_label_count):
-            frac = i / (y_label_count - 1)
-            y = pad_top + chart_h - frac * chart_h
-            val = min_v + frac * v_range
-            label = _fmt_val(val, metric_key)
-
+        for tick in ticks:
+            y = scale_y(tick)
+            label = _fmt_val(tick, metric_key)
             elements.append(
                 f'<line x1="{pad_left}" y1="{y:.1f}" x2="{pad_left + chart_w}" y2="{y:.1f}" '
                 f'stroke="{GRID_COLOR}" stroke-width="1"/>'
             )
             elements.append(
-                f'<text x="{pad_left - 10}" y="{y + 4:.1f}" text-anchor="end" '
+                f'<text x="{pad_left - 8}" y="{y + 4:.1f}" text-anchor="end" '
                 f'font-size="10" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
             )
 
-    # Draw each series
+    # ── Draw each series ──
     for si, s in enumerate(series):
         data = s.get("data") or []
         if not data:
@@ -305,12 +366,12 @@ def line_chart_svg(
         color = s.get("color") or COLORS[si % len(COLORS)]
         n = len(data)
 
-        # Build points, tracking min/max positions
+        # Build points
         points = []
         min_pt = None
         max_pt = None
-        min_val = float('inf')
-        max_val = float('-inf')
+        local_min = float('inf')
+        local_max = float('-inf')
 
         for i, d in enumerate(data):
             v = d.get("value")
@@ -320,82 +381,64 @@ def line_chart_svg(
             y = scale_y(v)
             points.append((x, y))
 
-            if v < min_val:
-                min_val = v
+            if v < local_min:
+                local_min = v
                 min_pt = (x, y, v)
-            if v > max_val:
-                max_val = v
+            if v > local_max:
+                local_max = v
                 max_pt = (x, y, v)
 
         if not points:
             continue
 
-        # Gradient definition for area fill
+        # Gradient definition
         gid = f"grad_{si}_{abs(hash(color)) % 99999}"
-        defs.append(_gradient_def(gid, color, 0.20, 0.02))
+        defs.append(_gradient_def(gid, color, 0.15, 0.01))
 
         # Smooth path
         line_d = _smooth_path(points, tension=0.25)
 
-        # Area fill (single series or explicit)
+        # Area fill — clipped to chart bottom
         if show_area and len(series) <= 2:
+            clip_id = f"clip_{si}"
+            defs.append(
+                f'<clipPath id="{clip_id}">'
+                f'<rect x="{pad_left}" y="{pad_top}" width="{chart_w}" height="{chart_h}"/>'
+                f'</clipPath>'
+            )
             area_d = (
                 line_d +
                 f" L{points[-1][0]:.1f},{pad_top + chart_h:.1f}"
                 f" L{points[0][0]:.1f},{pad_top + chart_h:.1f} Z"
             )
             elements.append(
-                f'<path d="{area_d}" fill="url(#{gid})"/>'
+                f'<path d="{area_d}" fill="url(#{gid})" clip-path="url(#{clip_id})"/>'
             )
 
-        # Line (smooth curve)
-        stroke_w = "2.5" if len(series) == 1 else "2"
+        # Line
+        stroke_w = "2" if len(series) == 1 else "1.5"
         elements.append(
             f'<path d="{line_d}" fill="none" stroke="{color}" '
             f'stroke-width="{stroke_w}" stroke-linecap="round" stroke-linejoin="round"/>'
         )
 
-        # Dots (only for small datasets)
-        if show_dots and len(points) <= 60:
-            for px, py in points:
-                elements.append(
-                    f'<circle cx="{px:.1f}" cy="{py:.1f}" r="2.5" '
-                    f'fill="{color}" opacity="0.6"/>'
-                )
-
-        # Min/Max markers (single series only, enough data)
-        if show_min_max and len(series) == 1 and len(points) > 10 and min_pt and max_pt:
-            # Max marker
+        # Min/Max markers (single series, enough data)
+        if show_min_max and len(series) == 1 and len(points) > 20 and min_pt and max_pt:
             mx, my, mv = max_pt
-            if mx > pad_left + 30 and mx < pad_left + chart_w - 30:
+            if pad_left + 40 < mx < pad_left + chart_w - 40:
                 elements.append(
-                    f'<circle cx="{mx:.1f}" cy="{my:.1f}" r="4" '
-                    f'fill="white" stroke="{color}" stroke-width="2"/>'
-                )
-                label_y = my - 12 if my > pad_top + 30 else my + 18
-                elements.append(
-                    f'<text x="{mx:.1f}" y="{label_y:.1f}" text-anchor="middle" '
-                    f'font-size="9" font-weight="700" fill="{color}" '
-                    f'font-family="Inter,system-ui,sans-serif">'
-                    f'High {_fmt_val(mv, metric_key)}</text>'
+                    f'<circle cx="{mx:.1f}" cy="{my:.1f}" r="3" '
+                    f'fill="white" stroke="{color}" stroke-width="1.5"/>'
                 )
 
-            # Min marker
             nx, ny, nv = min_pt
-            if nx > pad_left + 30 and nx < pad_left + chart_w - 30:
+            if pad_left + 40 < nx < pad_left + chart_w - 40:
                 elements.append(
-                    f'<circle cx="{nx:.1f}" cy="{ny:.1f}" r="4" '
-                    f'fill="white" stroke="#EF4444" stroke-width="2"/>'
-                )
-                label_y = ny + 18 if ny < pad_top + chart_h - 30 else ny - 12
-                elements.append(
-                    f'<text x="{nx:.1f}" y="{label_y:.1f}" text-anchor="middle" '
-                    f'font-size="9" font-weight="700" fill="#EF4444" '
-                    f'font-family="Inter,system-ui,sans-serif">'
-                    f'Low {_fmt_val(nv, metric_key)}</text>'
+                    f'<circle cx="{nx:.1f}" cy="{ny:.1f}" r="3" '
+                    f'fill="white" stroke="#EF4444" stroke-width="1.5"/>'
                 )
 
-        # Latest value annotation (endpoint dot + label)
+        # Latest value endpoint
         if points:
             lx, ly = points[-1]
             lv = None
@@ -405,42 +448,45 @@ def line_chart_svg(
                     break
             if lv is not None:
                 label_text = _fmt_val(lv, metric_key)
-                # Glowing dot effect
-                elements.append(
-                    f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="6" '
-                    f'fill="{color}" opacity="0.15"/>'
-                )
                 elements.append(
                     f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="4" '
-                    f'fill="white" stroke="{color}" stroke-width="2.5"/>'
+                    f'fill="white" stroke="{color}" stroke-width="2"/>'
                 )
-                # Value label
-                anchor = "end" if lx > pad_left + chart_w * 0.7 else "start"
-                lbl_x = lx - 10 if anchor == "end" else lx + 10
+                # Position label to avoid clipping
+                lbl_x = lx - 8
+                anchor = "end"
+                if lx < pad_left + chart_w * 0.3:
+                    lbl_x = lx + 8
+                    anchor = "start"
+                lbl_y = ly - 8
+                if lbl_y < pad_top + 12:
+                    lbl_y = ly + 16
                 elements.append(
-                    f'<text x="{lbl_x:.1f}" y="{ly + 4:.1f}" text-anchor="{anchor}" '
-                    f'font-size="11" font-weight="700" fill="{color}" '
+                    f'<text x="{lbl_x:.1f}" y="{lbl_y:.1f}" text-anchor="{anchor}" '
+                    f'font-size="10" font-weight="700" fill="{color}" '
                     f'font-family="Inter,system-ui,sans-serif">{label_text}</text>'
                 )
 
-    # X-axis date labels
+    # ── X-axis date labels — smart spacing ──
     primary_data = series[0].get("data") or []
     if primary_data:
         n = len(primary_data)
-        use_year = n > 180  # Show year for >6 months of data
-        step = max(1, n // x_label_count)
-        for i in range(0, n, step):
-            dt = primary_data[i].get("datetime", "")
-            x = pad_left + (i / max(n - 1, 1)) * chart_w
+        use_year = n > 180
+        # Aim for ~5 labels max, evenly spaced
+        n_labels = min(x_label_count, max(2, n // 60))
+        step = max(1, (n - 1) // n_labels)
+        indices = list(range(0, n, step))
+        # Always include last point
+        if indices[-1] != n - 1:
+            indices.append(n - 1)
+
+        for idx in indices:
+            dt = primary_data[idx].get("datetime", "")
+            x = pad_left + (idx / max(n - 1, 1)) * chart_w
             label = _fmt_date_year(dt) if use_year else _fmt_date(dt)
-            # Tick mark
             elements.append(
-                f'<line x1="{x:.1f}" y1="{pad_top + chart_h}" x2="{x:.1f}" '
-                f'y2="{pad_top + chart_h + 5}" stroke="{AXIS_COLOR}" stroke-width="1"/>'
-            )
-            elements.append(
-                f'<text x="{x:.1f}" y="{pad_top + chart_h + 20}" text-anchor="middle" '
-                f'font-size="10" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
+                f'<text x="{x:.1f}" y="{pad_top + chart_h + 16}" text-anchor="middle" '
+                f'font-size="9" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
             )
 
     # X-axis line
@@ -450,14 +496,13 @@ def line_chart_svg(
         f'stroke="{AXIS_COLOR}" stroke-width="1"/>'
     )
 
-    # Legend (for multi-series)
+    # Legend (multi-series)
     if len(series) > 1:
-        leg_y = height - 8
+        leg_y = height - 6
         leg_x = pad_left
         for si, s in enumerate(series):
             color = s.get("color") or COLORS[si % len(COLORS)]
             label = s.get("label", f"Series {si+1}")
-            # Color dot instead of line
             elements.append(
                 f'<circle cx="{leg_x + 5}" cy="{leg_y - 3}" r="4" fill="{color}"/>'
             )
@@ -467,7 +512,7 @@ def line_chart_svg(
             )
             leg_x += len(label) * 6.5 + 30
 
-    # Insert defs at start
+    # Insert defs
     if defs:
         elements.insert(1, f'<defs>{"".join(defs)}</defs>')
 
@@ -497,16 +542,10 @@ def comparison_table(
     tokens: list[dict],
     metric_keys: list[tuple],
 ) -> str:
-    """
-    Render a side-by-side metric comparison table.
-
-    tokens: list of {"name", "ticker", "slug", "metrics": {key: {"latest", "avg_30d", ...}}}
-    metric_keys: list of (key, label) pairs
-    """
+    """Render a side-by-side metric comparison table."""
     if not tokens:
         return '<p>No tokens selected for comparison.</p>'
 
-    # Header row
     header_cells = '<th class="col-name">Metric</th>'
     for t in tokens:
         name = html_mod.escape(t.get("name", t.get("slug", "")))
@@ -542,7 +581,6 @@ def comparison_table(
 # ============================================================
 
 def _heatmap_color(pct_change: float) -> str:
-    """Return a color for a given percentage change."""
     if pct_change is None:
         return HEATMAP_COLORS["neutral"]
     if pct_change <= -10:
@@ -561,25 +599,18 @@ def _heatmap_color(pct_change: float) -> str:
 
 
 def _heatmap_text_color(pct_change: float) -> str:
-    """Return text color for readability on heatmap cell."""
     if pct_change is None:
         return "#6B7280"
-    if abs(pct_change) >= 10:
-        return "#FFFFFF"
     if abs(pct_change) >= 5:
         return "#FFFFFF"
     return "#374151"
 
 
 def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
-    """
-    Generate a treemap-style heatmap of token performance.
-    Each token gets a block sized roughly by market cap, colored by 24h change.
-    """
+    """Treemap-style heatmap of token performance."""
     if not tokens:
         return ""
 
-    # Use top N tokens by market cap
     sorted_tokens = sorted(tokens, key=lambda t: t.get("marketcap_usd") or 0, reverse=True)[:max_tokens]
     if not sorted_tokens:
         return ""
@@ -595,8 +626,6 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
     ]
 
-    # Simple row-based layout (not true treemap but visually similar)
-    # Split into rows, each token gets width proportional to its share of that row
     row_count = 5
     tokens_per_row = max(1, len(sorted_tokens) // row_count)
     row_h = height / row_count
@@ -604,7 +633,6 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
     idx = 0
     for row in range(row_count):
         y = row * row_h
-        # Get tokens for this row
         row_end = min(idx + tokens_per_row + (1 if row < len(sorted_tokens) % row_count else 0), len(sorted_tokens))
         row_tokens = sorted_tokens[idx:row_end]
         if not row_tokens:
@@ -630,7 +658,6 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
                 f'rx="4" fill="{bg}"/>'
             )
 
-            # Token ticker
             if w > 45:
                 cx = x + w / 2
                 cy = y + row_h / 2
@@ -649,18 +676,6 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
 
         idx = row_end
 
-    # Legend
-    leg_y = height - 4
-    leg_colors = [
-        ("<-10%", HEATMAP_COLORS["extreme_neg"]),
-        ("-5%", HEATMAP_COLORS["neg"]),
-        ("-1%", HEATMAP_COLORS["slight_neg"]),
-        ("0%", HEATMAP_COLORS["neutral"]),
-        ("+1%", HEATMAP_COLORS["slight_pos"]),
-        ("+5%", HEATMAP_COLORS["pos"]),
-        (">+10%", HEATMAP_COLORS["extreme_pos"]),
-    ]
-
     elements.append('</svg>')
     return "\n".join(elements)
 
@@ -670,10 +685,7 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
 # ============================================================
 
 def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) -> str:
-    """
-    Render a horizontal stacked bar showing market dominance.
-    tokens: sorted by market cap, each with 'name', 'ticker', 'marketcap_usd'
-    """
+    """Horizontal stacked bar showing market dominance."""
     if not tokens:
         return ""
 
@@ -715,7 +727,6 @@ def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) ->
             f'<rect x="{x:.1f}" y="{bar_y}" width="{w:.1f}" height="{bar_h}" '
             f'rx="{"4" if x == 0 else "0"}" fill="{seg["color"]}"/>'
         )
-        # Label if wide enough
         if w > 40:
             elements.append(
                 f'<text x="{x + w/2:.1f}" y="{bar_y + bar_h/2 + 4:.1f}" text-anchor="middle" '
@@ -724,7 +735,7 @@ def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) ->
             )
         x += w
 
-    # Legend below the bar
+    # Legend
     leg_x = 0
     for seg in segments:
         if seg["pct"] < 1:
@@ -755,11 +766,7 @@ def sentiment_gauge_svg(
     width: int = 240,
     height: int = 140,
 ) -> str:
-    """
-    Render a semicircle gauge SVG for a single value.
-    Useful for aggregate MVRV, fear/greed style gauges.
-    """
-    # Normalize to 0..1
+    """Semicircle gauge SVG for aggregate metrics."""
     norm = max(0, min(1, (value - min_val) / (max_val - min_val))) if (max_val - min_val) > 0 else 0.5
 
     cx = width / 2
@@ -771,18 +778,17 @@ def sentiment_gauge_svg(
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
     ]
 
-    # Background arc (full semi-circle)
+    # Background arc
     elements.append(
         f'<path d="M{cx - r:.1f},{cy:.1f} A{r:.1f},{r:.1f} 0 0 1 {cx + r:.1f},{cy:.1f}" '
         f'fill="none" stroke="#E5E7EB" stroke-width="12" stroke-linecap="round"/>'
     )
 
-    # Colored gradient arc (green -> amber -> red from left to right)
-    # We use 3 arcs for the gradient effect
+    # Color segments
     segments = [
-        (0, 0.33, "#10B981"),    # green
-        (0.33, 0.66, "#F59E0B"),  # amber
-        (0.66, 1.0, "#EF4444"),   # red
+        (0, 0.33, "#10B981"),
+        (0.33, 0.66, "#F59E0B"),
+        (0.66, 1.0, "#EF4444"),
     ]
     for start_frac, end_frac, color in segments:
         a1 = math.pi * (1 - start_frac)
@@ -804,21 +810,15 @@ def sentiment_gauge_svg(
         f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{nx:.1f}" y2="{ny:.1f}" '
         f'stroke="#111827" stroke-width="3" stroke-linecap="round"/>'
     )
-    elements.append(
-        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="6" fill="#111827"/>'
-    )
-    elements.append(
-        f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="3" fill="white"/>'
-    )
+    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="6" fill="#111827"/>')
+    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="3" fill="white"/>')
 
-    # Value text
+    # Value
     elements.append(
         f'<text x="{cx:.1f}" y="{cy - r/2 - 2:.1f}" text-anchor="middle" '
         f'font-size="22" font-weight="900" fill="#111827" '
         f'font-family="Inter,system-ui,sans-serif">{value:.2f}</text>'
     )
-
-    # Label below gauge
     elements.append(
         f'<text x="{cx:.1f}" y="{cy + 16:.1f}" text-anchor="middle" '
         f'font-size="10" font-weight="600" fill="#9CA3AF" '
@@ -843,19 +843,57 @@ def sentiment_gauge_svg(
 # MINI TREND — Small area chart for stat cards
 # ============================================================
 
+def mini_trend_svg(
+    data: list[dict],
+    width: int = 140,
+    height: int = 40,
+    color: str = "#111111",
+) -> str:
+    """Small area chart for embedding in stat cards / hero sections."""
+    values = [d.get("value") for d in data if d.get("value") is not None]
+    if len(values) < 3:
+        return ""
+
+    min_v = min(values)
+    max_v = max(values)
+    v_range = max_v - min_v if max_v != min_v else 1
+    n = len(values)
+
+    gid = f"mt{abs(hash(str(values[:3]))) % 99999}"
+
+    points = []
+    for i, v in enumerate(values):
+        x = (i / (n - 1)) * width
+        y = height - ((v - min_v) / v_range) * (height - 4) - 2
+        points.append((x, y))
+
+    line_d = _smooth_path(points, tension=0.25)
+    area_d = line_d + f" L{points[-1][0]:.1f},{height} L{points[0][0]:.1f},{height} Z"
+
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'style="vertical-align:middle">'
+        f'<defs>{_gradient_def(gid, color, 0.18, 0.0)}</defs>'
+        f'<path d="{area_d}" fill="url(#{gid})"/>'
+        f'<path d="{line_d}" fill="none" stroke="{color}" '
+        f'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        f'</svg>'
+    )
+
+
 # ============================================================
 # SCATTER PLOT — Cross-metric analysis (e.g., MVRV vs NVT)
 # ============================================================
 
 THESIS_COLORS = {
-    "smart_money": "#10B981",      # emerald
-    "builder_momentum": "#3B82F6",  # blue
-    "deep_value": "#059669",        # deep green
-    "distribution_warning": "#EF4444",  # red
-    "hodler": "#8B5CF6",           # violet
-    "high_utility": "#06B6D4",      # cyan
-    "speculative": "#F97316",       # orange
-    "uncategorized": "#9CA3AF",     # gray
+    "smart_money": "#10B981",
+    "builder_momentum": "#3B82F6",
+    "deep_value": "#059669",
+    "distribution_warning": "#EF4444",
+    "hodler": "#8B5CF6",
+    "high_utility": "#06B6D4",
+    "speculative": "#F97316",
+    "uncategorized": "#9CA3AF",
 }
 
 
@@ -873,29 +911,18 @@ def scatter_plot_svg(
     log_x: bool = False,
     log_y: bool = False,
 ) -> str:
-    """
-    Render a scatter plot SVG.
-
-    points: list of dicts with x_key, y_key values + optional 'slug', 'name', 'ticker', 'thesis'
-    color_key: if set, color dots by this field (e.g. 'thesis')
-    size_key: if set, scale dot radius by this field (e.g. 'marketcap_usd')
-    log_x/log_y: use log scale for better spread on power-law data
-    """
+    """Render a scatter plot SVG with log scales, color coding, and size scaling."""
     if not points:
         return '<div class="chart-empty">No data for scatter plot</div>'
 
-    # Filter out invalid points
     valid = [p for p in points if p.get(x_key) is not None and p.get(y_key) is not None]
     if len(valid) < 3:
         return '<div class="chart-empty">Insufficient data for scatter plot</div>'
 
-    # Log transform if requested
-    import math as _math
-
     def _safe_log(v):
         if v is None or v <= 0:
             return None
-        return _math.log10(v)
+        return math.log10(v)
 
     x_vals = []
     y_vals = []
@@ -939,6 +966,7 @@ def scatter_plot_svg(
 
     # Size scaling
     size_vals = []
+    max_size = 1
     if size_key:
         size_vals = [p.get(size_key) or 0 for p in valid]
         max_size = max(size_vals) if size_vals else 1
@@ -949,13 +977,11 @@ def scatter_plot_svg(
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg scatter-chart">'
     ]
 
-    # Background
     elements.append(
         f'<rect x="{pad_left}" y="{pad_top}" width="{chart_w}" height="{chart_h}" '
         f'fill="{BG_COLOR}" rx="4"/>'
     )
 
-    # Title
     if title:
         elements.append(
             f'<text x="{pad_left}" y="20" font-size="13" font-weight="700" '
@@ -965,7 +991,6 @@ def scatter_plot_svg(
     # Grid lines
     for i in range(5):
         frac = i / 4
-        # Y grid
         y = pad_top + chart_h - frac * chart_h
         y_val = y_min + frac * y_range
         label = _fmt_val(10 ** y_val if log_y else y_val, y_key)
@@ -974,10 +999,9 @@ def scatter_plot_svg(
             f'stroke="{GRID_COLOR}" stroke-width="1"/>'
         )
         elements.append(
-            f'<text x="{pad_left - 10}" y="{y + 4:.1f}" text-anchor="end" '
+            f'<text x="{pad_left - 8}" y="{y + 4:.1f}" text-anchor="end" '
             f'font-size="9" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
         )
-        # X grid
         x = pad_left + frac * chart_w
         x_val = x_min + frac * x_range
         xlabel = _fmt_val(10 ** x_val if log_x else x_val, x_key)
@@ -1024,16 +1048,14 @@ def scatter_plot_svg(
         if xv is None or yv is None:
             continue
 
-        cx = scale_x(xv)
-        cy = scale_y(yv)
+        dot_cx = scale_x(xv)
+        dot_cy = scale_y(yv)
 
-        # Color
         if color_key and p.get(color_key):
             color = THESIS_COLORS.get(p[color_key], "#9CA3AF")
         else:
             color = "#111111"
 
-        # Radius
         if size_key and max_size > 0 and size_vals:
             sv = size_vals[idx] if idx < len(size_vals) else 0
             r = min_r + (sv / max_size) * (max_r - min_r) if max_size else min_r
@@ -1044,61 +1066,21 @@ def scatter_plot_svg(
         ticker = html_mod.escape(p.get("ticker", "")[:6])
         name = html_mod.escape(p.get("name", "")[:20])
 
-        # Clickable dot with tooltip via title
         elements.append(
             f'<a href="/token/{slug}">'
-            f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" '
+            f'<circle cx="{dot_cx:.1f}" cy="{dot_cy:.1f}" r="{r:.1f}" '
             f'fill="{color}" opacity="0.65" class="scatter-dot">'
             f'<title>{name} ({ticker})</title>'
             f'</circle>'
             f'</a>'
         )
 
-        # Label for large dots only (top tokens)
         if r > 8 and ticker:
             elements.append(
-                f'<text x="{cx:.1f}" y="{cy - r - 3:.1f}" text-anchor="middle" '
+                f'<text x="{dot_cx:.1f}" y="{dot_cy - r - 3:.1f}" text-anchor="middle" '
                 f'font-size="8" font-weight="600" fill="{color}" '
                 f'font-family="Inter,system-ui,sans-serif">{ticker}</text>'
             )
 
     elements.append('</svg>')
     return "\n".join(elements)
-
-
-def mini_trend_svg(
-    data: list[dict],
-    width: int = 140,
-    height: int = 40,
-    color: str = "#111111",
-) -> str:
-    """Small area chart for embedding in stat cards / hero sections."""
-    values = [d.get("value") for d in data if d.get("value") is not None]
-    if len(values) < 3:
-        return ""
-
-    min_v = min(values)
-    max_v = max(values)
-    v_range = max_v - min_v if max_v != min_v else 1
-    n = len(values)
-
-    gid = f"mt{abs(hash(str(values[:3]))) % 99999}"
-
-    points = []
-    for i, v in enumerate(values):
-        x = (i / (n - 1)) * width
-        y = height - ((v - min_v) / v_range) * (height - 4) - 2
-        points.append((x, y))
-
-    line_d = _smooth_path(points, tension=0.25)
-    area_d = line_d + f" L{points[-1][0]:.1f},{height} L{points[0][0]:.1f},{height} Z"
-
-    return (
-        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
-        f'style="vertical-align:middle">'
-        f'<defs>{_gradient_def(gid, color, 0.18, 0.0)}</defs>'
-        f'<path d="{area_d}" fill="url(#{gid})"/>'
-        f'<path d="{line_d}" fill="none" stroke="{color}" '
-        f'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-        f'</svg>'
-    )
