@@ -1349,6 +1349,7 @@ def create_app() -> FastAPI:
     async def get_insights_page(
         view: str = Query(default="mvrv_nvt", description="Scatter plot view ID"),
         sector: str = Query(default="all"),
+        sort: str = Query(default="marketcap", description="Sort thesis tokens: marketcap, change, mvrv"),
     ):
         """On-chain insights — scatter plots and thesis categorization."""
         insights = _build_insights_data(view)
@@ -1356,8 +1357,22 @@ def create_app() -> FastAPI:
         if sector != "all" and insights.get("points"):
             insights = dict(insights)  # shallow copy
             insights["points"] = [p for p in insights["points"] if p.get("sector") == sector]
+        # Sort thesis token lists
+        sort_key_map = {
+            "marketcap": lambda t: t.get("marketcap_usd") or 0,
+            "change": lambda t: t.get("price_usd_change") or 0,
+            "mvrv": lambda t: t.get("mvrv_usd") or 0,
+        }
+        sfn = sort_key_map.get(sort, sort_key_map["marketcap"])
+        reverse = sort != "mvrv"  # MVRV ascending (undervalued first)
+        if insights.get("thesis_tokens"):
+            insights = dict(insights)
+            insights["thesis_tokens"] = {
+                k: sorted(v, key=sfn, reverse=reverse)
+                for k, v in insights["thesis_tokens"].items()
+            }
         return render_insights_page(insights, view_id=view, scatter_views=SCATTER_VIEWS,
-                                    sector=sector, sectors=SECTORS)
+                                    sector=sector, sectors=SECTORS, sort_by=sort)
 
     @app.get("/insights/export.csv")
     async def get_insights_csv(

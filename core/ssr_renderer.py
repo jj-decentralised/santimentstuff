@@ -962,6 +962,7 @@ def render_insights_page(
     scatter_views: list = None,
     sector: str = "all",
     sectors: dict = None,
+    sort_by: str = "marketcap",
 ) -> str:
     if not insights or not insights.get("points"):
         return page_shell("Insights", '<div class="empty-state"><h2>Loading insights...</h2><p>Data is being computed. Try again shortly.</p></div>', active_nav="insights")
@@ -995,6 +996,15 @@ def render_insights_page(
             label = _sectors.get(key, key.title())
             sector_btns += f'<a href="/insights?view={view_id}&sector={key}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
         filter_rows += f'<div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>'
+
+    # Sort options
+    sec_qs_sort = f"&sector={sector}" if sector != "all" else ""
+    sort_options = [("marketcap", "Market Cap"), ("change", "24h Change"), ("mvrv", "MVRV (Low First)")]
+    sort_btns = "".join(
+        f'<a href="/insights?view={view_id}{sec_qs_sort}&sort={sk}" class="filter-btn{" active" if sk == sort_by else ""}">{sl}</a>'
+        for sk, sl in sort_options
+    )
+    filter_rows += f'<div class="filter-group"><span class="filter-label">Sort:</span>{sort_btns}</div>'
 
     if filter_rows:
         parts.append(f'<div class="filter-bar filter-bar-stacked">{filter_rows}</div>')
