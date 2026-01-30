@@ -227,6 +227,18 @@ a { color: inherit; text-decoration: none; }
 .bc-link:hover { color: var(--text-primary); }
 .bc-sep { margin: 0 5px; opacity: 0.5; }
 .bc-current { color: var(--text-primary); font-weight: 500; }
+.mobile-back-btn {
+  display: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 4px 0;
+  margin-bottom: 6px;
+}
+@media (max-width: 640px) {
+  .mobile-back-btn { display: inline-block; }
+}
 
 /* Page title row with export */
 .page-title-row {

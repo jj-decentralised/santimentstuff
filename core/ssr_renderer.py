@@ -116,13 +116,18 @@ def _esc(s):
 def _breadcrumbs(*crumbs: tuple) -> str:
     """Generate a breadcrumb trail.  Each crumb is (label, url) or just (label,) for the current page."""
     items = ['<a href="/" class="bc-link">Home</a>']
+    back_url = "/"
+    back_label = "Home"
     for c in crumbs:
         if len(c) == 2:
             items.append(f'<a href="{c[1]}" class="bc-link">{_esc(c[0])}</a>')
+            back_url = c[1]
+            back_label = c[0]
         else:
             items.append(f'<span class="bc-current">{_esc(c[0])}</span>')
     sep = ' <span class="bc-sep">›</span> '
-    return f'<nav class="breadcrumbs" aria-label="Breadcrumb">{sep.join(items)}</nav>'
+    mobile_back = f'<a href="{back_url}" class="mobile-back-btn" aria-label="Back to {_esc(back_label)}">&larr; {_esc(back_label)}</a>'
+    return f'<nav class="breadcrumbs" aria-label="Breadcrumb">{sep.join(items)}</nav>{mobile_back}'
 
 
 # ================================================================
