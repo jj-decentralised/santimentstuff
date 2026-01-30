@@ -1690,6 +1690,15 @@ a { color: inherit; text-decoration: none; }
 .three-col > .card { margin-bottom: 0; }
 
 /* Briefing header */
+/* Briefing section separators — subtle top border between major sections */
+.briefing-toc ~ .card,
+.briefing-toc ~ .two-col,
+.briefing-toc ~ .three-col {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+.briefing-toc ~ .card:first-of-type { border-top: none; padding-top: 0; }
+
 .briefing-toc {
   display: flex;
   flex-wrap: wrap;
