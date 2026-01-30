@@ -1463,7 +1463,7 @@ def render_compare_page(tokens: list) -> str:
                 show_min_max=False,
             ))
 
-    # Summary cards for each token
+    # Summary cards for each token with sparkline
     summary_cards = ""
     for t in tokens:
         m = t.get("metrics", {})
@@ -1475,11 +1475,16 @@ def render_compare_page(tokens: list) -> str:
         if mvrv is not None:
             zl, zc, _ = mvrv_zone(mvrv)
             zone_html = f'<span class="zone {zc}">{zl}</span>'
+        # 7d sparkline from price data (last 7 entries)
+        price_data = m.get("price_usd", {}).get("data", [])
+        spark_data = price_data[-7:] if len(price_data) >= 7 else price_data
+        spark_svg = sparkline_svg(spark_data, width=120, height=28) if len(spark_data) >= 2 else ""
         summary_cards += f"""
         <div class="compare-summary-card">
-            <div class="compare-summary-name">{_esc(t.get("name", ""))}</div>
+            <div class="compare-summary-name"><a href="/token/{t.get('slug', '')}">{_esc(t.get("name", ""))}</a></div>
             <div class="compare-summary-ticker">{_esc(t.get("ticker", ""))}</div>
             <div class="compare-summary-price">{fmt_usd(price)}</div>
+            {f'<div class="compare-summary-spark">{spark_svg}</div>' if spark_svg else ""}
             <div class="compare-summary-stats">
                 <span>MCap: {fmt_usd(mcap)}</span>
                 <span>MVRV: {f"{mvrv:.2f}" if mvrv else "&mdash;"}</span>

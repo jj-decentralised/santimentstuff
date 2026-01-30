@@ -1255,6 +1255,15 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--mono);
   margin-bottom: 4px;
 }
+.compare-summary-spark {
+  margin: 4px 0;
+  line-height: 0;
+}
+.compare-summary-name a {
+  color: inherit;
+  text-decoration: none;
+}
+.compare-summary-name a:hover { color: var(--accent); }
 .compare-summary-stats {
   display: flex;
   flex-wrap: wrap;
