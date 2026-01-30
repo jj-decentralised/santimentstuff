@@ -163,6 +163,8 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
     <header class="header">
         <div class="header-inner">
             <a href="/" class="logo">Onchain<span>Pulse</span></a>
+            <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden>
+            <label for="nav-toggle" class="nav-toggle-label"><span></span></label>
             <nav class="header-nav">{nav_html}</nav>
         </div>
     </header>
@@ -210,7 +212,15 @@ def _signal_css(signal_type: str) -> str:
 
 def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, universe_size: int, sectors: dict = None) -> str:
     if not briefing:
-        return page_shell("Briefing", '<div class="empty-state"><h2>Loading data...</h2><p>Data is being pulled from Santiment. Check the <a href="/sync">Sync</a> page for progress.</p></div>', active_nav="briefing")
+        loading_cards = '<div class="loading-card"><div class="loading-bar w-50"></div><div class="loading-bar w-75"></div><div class="loading-bar w-full"></div></div>' * 4
+        return page_shell("Briefing", f"""
+        <div class="empty-state">
+            <div class="empty-state-icon">&#9201;</div>
+            <h2>Building your briefing...</h2>
+            <p>On-chain data is being pulled from Santiment. This takes a few minutes on first deploy.</p>
+            <p style="margin-top:8px"><a href="/sync">View sync progress &rarr;</a></p>
+        </div>
+        <div class="loading-grid">{loading_cards}</div>""", active_nav="briefing")
 
     b = briefing
     parts = []
