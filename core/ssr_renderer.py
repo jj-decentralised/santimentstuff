@@ -1525,6 +1525,29 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             h_label, h_cls = "Weak", "health-weak"
         health_score_html = f'<div class="onchain-health"><span class="health-score-num {h_cls}">{h_score}</span><span class="health-score-label">{h_label}</span><span class="health-score-caption">On-chain Health</span></div>'
 
+    # Volume / Market Cap ratio indicator
+    vol_mcap_html = ""
+    vol = _latest("volume_usd")
+    mcap_val = _latest("marketcap_usd")
+    if vol and mcap_val and mcap_val > 0:
+        ratio = vol / mcap_val
+        if ratio > 0.3:
+            vm_label, vm_cls = "Extremely High", "vm-extreme"
+        elif ratio > 0.1:
+            vm_label, vm_cls = "High", "vm-high"
+        elif ratio > 0.03:
+            vm_label, vm_cls = "Moderate", "vm-moderate"
+        elif ratio > 0.005:
+            vm_label, vm_cls = "Low", "vm-low"
+        else:
+            vm_label, vm_cls = "Very Low", "vm-vlow"
+        bar_w = min(100, ratio * 300)  # scale so 0.33 = 100%
+        vol_mcap_html = f"""<div class="vol-mcap-indicator">
+            <div class="vm-header"><span class="vm-title">Volume / MCap</span><span class="vm-ratio">{ratio:.4f}</span><span class="vm-tag {vm_cls}">{vm_label}</span></div>
+            <div class="vm-bar-track"><div class="vm-bar-fill {vm_cls}" style="width:{bar_w:.1f}%"></div></div>
+            <div class="vm-hint">Higher ratio = more liquid relative to size</div>
+        </div>"""
+
     # Metric cards with tooltip explanations
     _metric_tips = {
         "marketcap_usd": "Total supply × current price",
@@ -1695,6 +1718,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
 
     {alerts_html}
     {health_score_html}
+    {vol_mcap_html}
 
     {_render_token_description(token)}
     {_onchain_narrative(name, ticker, price, mvrv, _latest, _data)}
