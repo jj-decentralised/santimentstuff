@@ -781,6 +781,36 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         </section>
     </div>""")
 
+    # ── Section 6b: Market Cap Tier Distribution ──
+    if all_tokens:
+        tier_defs = [
+            ("Mega", 100e9, float("inf"), "#7C3AED"),
+            ("Large", 10e9, 100e9, "#2563EB"),
+            ("Mid", 1e9, 10e9, "#059669"),
+            ("Small", 100e6, 1e9, "#F59E0B"),
+            ("Micro", 0, 100e6, "#9CA3AF"),
+        ]
+        tier_rows = ""
+        for label, lo, hi, color in tier_defs:
+            cnt = sum(1 for t in all_tokens if lo <= (t.get("marketcap_usd") or 0) < hi)
+            tier_mcap = sum((t.get("marketcap_usd") or 0) for t in all_tokens if lo <= (t.get("marketcap_usd") or 0) < hi)
+            pct = cnt / len(all_tokens) * 100 if all_tokens else 0
+            tier_rows += f"""
+            <div class="tier-row">
+                <span class="tier-dot" style="background:{color}"></span>
+                <span class="tier-label">{label}</span>
+                <span class="tier-count">{cnt}</span>
+                <div class="tier-bar"><div class="tier-fill" style="width:{pct:.0f}%;background:{color}"></div></div>
+                <span class="tier-mcap">{fmt_usd(tier_mcap)}</span>
+            </div>"""
+
+        parts.append(f"""
+    <section class="card">
+        <div class="card-header"><h2 class="card-title">Market Cap Distribution</h2><span class="card-badge">{len(all_tokens)} tokens</span></div>
+        <div class="tier-breakdown">{tier_rows}</div>
+        <div class="card-footer"><a href="/screener">View screener with tier filters &rarr;</a></div>
+    </section>""")
+
     # ── Section 7: Top by metrics ──
     top_vol = b.get("top_volume", [])[:8]
     top_daa = b.get("top_daa", [])[:8]
@@ -1741,6 +1771,21 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             [{"label": "MVRV Ratio", "data": mvrv_data, "color": "#8B5CF6"}],
             width=340, height=200, title="MVRV Ratio", metric_key="mvrv_usd",
             show_min_max=False, show_area=True, ref_lines=mvrv_refs,
+        ))
+
+    # NVT chart with reference lines
+    nvt_data = _data("nvt")
+    if nvt_data and len(nvt_data) >= 3:
+        nvt_refs = [
+            (20, "Undervalued", "#059669"),
+            (50, "Fair", "#6B7280"),
+            (100, "Expensive", "#F59E0B"),
+            (150, "Overvalued", "#DC2626"),
+        ]
+        secondary_charts.append(line_chart_svg(
+            [{"label": "NVT Ratio", "data": nvt_data, "color": "#6366F1"}],
+            width=340, height=200, title="NVT Ratio", metric_key="nvt",
+            show_min_max=False, show_area=True, ref_lines=nvt_refs,
         ))
 
     chart_defs = [
