@@ -2040,8 +2040,8 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         mvrv_html = f'<div class="profile-mvrv"><span class="zone {zone_css}">{zone_label}</span> <span class="profile-mvrv-val">MVRV {mvrv:.2f}</span></div>'
 
     _bc = _breadcrumbs(("Explore", "/explore"), (f"{name} ({ticker})",))
-    prev_link = f'<a href="/token/{prev_token["slug"]}" class="token-nav-link" title="{_esc(prev_token.get("name",""))}">&larr; {_esc(prev_token.get("name","")[:20])}</a>' if prev_token else '<span></span>'
-    next_link = f'<a href="/token/{next_token["slug"]}" class="token-nav-link" title="{_esc(next_token.get("name",""))}">{_esc(next_token.get("name","")[:20])} &rarr;</a>' if next_token else '<span></span>'
+    prev_link = f'<a href="/token/{prev_token["slug"]}" class="token-nav-link" accesskey="p" title="Previous: {_esc(prev_token.get("name",""))} (Alt+P)">&larr; {_esc(prev_token.get("name","")[:20])}</a>' if prev_token else '<span></span>'
+    next_link = f'<a href="/token/{next_token["slug"]}" class="token-nav-link" accesskey="n" title="Next: {_esc(next_token.get("name",""))} (Alt+N)">{_esc(next_token.get("name","")[:20])} &rarr;</a>' if next_token else '<span></span>'
     body = f"""
     {_bc}
     <div class="token-quick-nav">{prev_link}{next_link}</div>
@@ -2157,6 +2157,15 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         ],
     }
     body += f'\n<script type="application/ld+json">{_json.dumps(breadcrumb_ld)}</script>'
+
+    # Add link rel prev/next for SEO and browser navigation
+    extra_head = ""
+    if prev_token:
+        extra_head += f'<link rel="prev" href="/token/{prev_token["slug"]}">'
+    if next_token:
+        extra_head += f'<link rel="next" href="/token/{next_token["slug"]}">'
+    if extra_head:
+        body = extra_head + body
 
     return page_shell(f"{name} ({ticker})", body, og_description=og_desc, canonical=f"/token/{slug}")
 
