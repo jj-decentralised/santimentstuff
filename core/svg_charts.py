@@ -293,6 +293,7 @@ def line_chart_svg(
     show_min_max: bool = True,
     y_label_count: int = 5,
     x_label_count: int = 5,
+    ref_lines: list[tuple] = None,
 ) -> str:
     """
     Generate a premium line chart SVG with smooth curves and gradient fills.
@@ -390,6 +391,21 @@ def line_chart_svg(
                 f'<text x="{pad_left - 8}" y="{y + 4:.1f}" text-anchor="end" '
                 f'font-size="10" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
             )
+
+    # ── Reference lines (horizontal annotations) ──
+    if ref_lines:
+        for ref_val, ref_label, ref_color in ref_lines:
+            if clamped_lo <= ref_val <= clamped_hi:
+                ry = scale_y(ref_val)
+                elements.append(
+                    f'<line x1="{pad_left}" y1="{ry:.1f}" x2="{pad_left + chart_w}" y2="{ry:.1f}" '
+                    f'stroke="{ref_color}" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>'
+                )
+                elements.append(
+                    f'<text x="{pad_left + chart_w + 4}" y="{ry + 3:.1f}" text-anchor="start" '
+                    f'font-size="8" font-weight="600" fill="{ref_color}" '
+                    f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(ref_label)}</text>'
+                )
 
     # ── Draw each series ──
     for si, s in enumerate(series):

@@ -1514,10 +1514,24 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     ) if price_data else ""
 
     secondary_charts = []
+    # MVRV chart gets reference lines for zone boundaries
+    mvrv_data = _data("mvrv_usd")
+    if mvrv_data and len(mvrv_data) >= 3:
+        mvrv_refs = [
+            (0.7, "Deep Value", "#059669"),
+            (1.0, "Fair", "#6B7280"),
+            (2.0, "Overvalued", "#F59E0B"),
+            (3.5, "Euphoria", "#DC2626"),
+        ]
+        secondary_charts.append(line_chart_svg(
+            [{"label": "MVRV Ratio", "data": mvrv_data, "color": "#8B5CF6"}],
+            width=340, height=200, title="MVRV Ratio", metric_key="mvrv_usd",
+            show_min_max=False, show_area=True, ref_lines=mvrv_refs,
+        ))
+
     chart_defs = [
         ("volume_usd", "Daily Volume", "#3B82F6"),
         ("marketcap_usd", "Market Cap", "#0F1419"),
-        ("mvrv_usd", "MVRV Ratio", "#8B5CF6"),
         ("daily_active_addresses", "Active Addresses", "#10B981"),
         ("exchange_balance", "Exchange Balance", "#EF4444"),
         ("dev_activity", "Dev Activity", "#F59E0B"),
