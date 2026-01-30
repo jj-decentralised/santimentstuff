@@ -1814,6 +1814,27 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
             <div class="vm-hint">Higher ratio = more liquid relative to size</div>
         </div>"""
 
+    # Supply info (derived from price + market cap)
+    supply_html = ""
+    if price and mcap_val and price > 0:
+        circ_supply = mcap_val / price
+        # Compute supply utilization from circulation metric
+        circ_24h = _latest("circulation")
+        supply_parts = [f'<div class="supply-row"><span class="supply-label">Circulating Supply</span><span class="supply-val">{fmt_num(circ_supply)}</span></div>']
+        if circ_24h and circ_24h > 0:
+            util_pct = circ_24h / circ_supply * 100
+            supply_parts.append(
+                f'<div class="supply-row"><span class="supply-label">24h Circulation</span>'
+                f'<span class="supply-val">{fmt_num(circ_24h)} ({util_pct:.2f}%)</span></div>'
+            )
+        mean_age_val = _latest("mean_age")
+        if mean_age_val:
+            supply_parts.append(f'<div class="supply-row"><span class="supply-label">Mean Dollar Age</span><span class="supply-val">{mean_age_val:.0f} days</span></div>')
+        velocity_val = _latest("velocity")
+        if velocity_val:
+            supply_parts.append(f'<div class="supply-row"><span class="supply-label">Velocity</span><span class="supply-val">{velocity_val:.2f}</span></div>')
+        supply_html = f'<div class="supply-info"><div class="supply-title">Supply Metrics</div>{"".join(supply_parts)}</div>'
+
     # Volatility indicator — annualized from daily returns std dev
     volatility_html = ""
     if price_ts and len(price_ts) >= 7:
@@ -2045,6 +2066,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {health_score_html}
     {vol_mcap_html}
     {volatility_html}
+    {supply_html}
     {signal_html}
 
     {_render_token_description(token)}

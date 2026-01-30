@@ -1262,6 +1262,24 @@ html.dark .spark-grid-cell { background: #161B22; border-color: #30363D; }
 }
 .vol-hint { font-size: 0.62rem; color: var(--text-muted); }
 
+/* Supply info widget */
+.supply-info {
+  padding: 10px 14px; margin-bottom: 14px;
+  background: var(--bg-alt); border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+.supply-title {
+  font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.supply-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 0; font-size: 0.72rem;
+}
+.supply-label { color: var(--text-secondary); }
+.supply-val { font-family: var(--mono); font-weight: 600; color: var(--text-primary); }
+html.dark .supply-info { background: #161B22; border-color: #30363D; }
+
 .signal-summary {
   padding: 10px 14px; margin-bottom: 14px;
   background: var(--bg-alt); border-radius: var(--radius-sm);
