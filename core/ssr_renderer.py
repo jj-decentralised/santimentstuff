@@ -2046,11 +2046,24 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         active = " active" if tf_key == timeframe else ""
         tf_btns += f'<a href="/token/{slug}?tf={tf_key}" class="tf-btn{active}">{tf_label}</a>'
 
-    # MVRV zone
+    # MVRV zone with gauge
     mvrv_html = ""
     if mvrv is not None:
         zone_label, zone_css, zone_desc = mvrv_zone(mvrv)
-        mvrv_html = f'<div class="profile-mvrv"><span class="zone {zone_css}">{zone_label}</span> <span class="profile-mvrv-val">MVRV {mvrv:.2f}</span></div>'
+        # Gauge: map MVRV 0..5 to 0%..100%
+        gauge_pct = max(0, min(100, (mvrv / 5) * 100))
+        mvrv_html = f"""<div class="profile-mvrv">
+            <span class="zone {zone_css}">{zone_label}</span>
+            <span class="profile-mvrv-val">MVRV {mvrv:.2f}</span>
+        </div>
+        <div class="mvrv-gauge">
+            <div class="mvrv-gauge-track">
+                <div class="mvrv-gauge-marker" style="left:{gauge_pct:.1f}%"></div>
+            </div>
+            <div class="mvrv-gauge-labels">
+                <span>0</span><span>Deep Value</span><span>1.0</span><span>Fair</span><span>2.5</span><span>Overvalued</span><span>5.0</span>
+            </div>
+        </div>"""
 
     _bc = _breadcrumbs(("Explore", "/explore"), (f"{name} ({ticker})",))
     prev_link = f'<a href="/token/{prev_token["slug"]}" class="token-nav-link" accesskey="p" title="Previous: {_esc(prev_token.get("name",""))} (Alt+P)">&larr; {_esc(prev_token.get("name","")[:20])}</a>' if prev_token else '<span></span>'

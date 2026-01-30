@@ -1106,6 +1106,33 @@ html.dark .spark-grid-cell { background: #161B22; border-color: #30363D; }
   color: var(--text-secondary);
   font-family: var(--mono);
 }
+.mvrv-gauge {
+  margin: 8px 0 4px;
+  max-width: 320px;
+}
+.mvrv-gauge-track {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #22c55e 0%, #22c55e 20%, #eab308 40%, #f97316 60%, #ef4444 80%, #991b1b 100%);
+}
+.mvrv-gauge-marker {
+  position: absolute;
+  top: -3px;
+  width: 4px;
+  height: 14px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transform: translateX(-2px);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.mvrv-gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
 /* Profile quick actions */
 .profile-actions {
   display: flex;
