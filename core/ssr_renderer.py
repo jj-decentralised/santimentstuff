@@ -576,12 +576,23 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
                 continue
             sec_label = _sectors.get(sec_key, sec_key.replace("_", " ").title())
             mcap_pct = sec_vals["mcap"] / total_sec_mcap * 100
+            s_up = sec_vals.get("up", 0)
+            s_down = sec_vals.get("down", 0)
+            s_total = sec_vals["count"]
+            s_up_pct = s_up / s_total * 100 if s_total else 0
+            s_avg = sec_vals.get("pct_sum", 0) / s_total if s_total else 0
+            s_avg_cls = "up" if s_avg > 0 else "down" if s_avg < 0 else "muted"
             sector_items += f"""
             <a href="/explore?sector={sec_key}" class="sector-card sector-{sec_key}">
                 <span class="sector-card-name">{_esc(sec_label)}</span>
                 <span class="sector-card-count">{sec_vals["count"]}</span>
                 <span class="sector-card-mcap">{fmt_usd(sec_vals["mcap"])}</span>
                 <div class="sector-card-bar"><div class="sector-card-fill" style="width:{mcap_pct:.0f}%"></div></div>
+                <div class="sector-breadth">
+                    <span class="sector-breadth-label {s_avg_cls}">{s_avg:+.1f}%</span>
+                    <div class="sector-breadth-bar"><div class="sector-breadth-up" style="width:{s_up_pct:.0f}%"></div></div>
+                    <span class="sector-breadth-ratio">{s_up}&#8593; {s_down}&#8595;</span>
+                </div>
             </a>"""
 
         parts.append(f"""

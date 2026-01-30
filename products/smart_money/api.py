@@ -705,10 +705,16 @@ def _build_economy_briefing() -> dict:
         for t in tokens:
             sec = t.get("sector", "other")
             if sec not in sector_data:
-                sector_data[sec] = {"count": 0, "mcap": 0, "vol": 0}
+                sector_data[sec] = {"count": 0, "mcap": 0, "vol": 0, "up": 0, "down": 0, "pct_sum": 0}
             sector_data[sec]["count"] += 1
             sector_data[sec]["mcap"] += t.get("marketcap_usd") or 0
             sector_data[sec]["vol"] += t.get("volume_usd") or 0
+            chg = t.get("price_usd_change") or 0
+            sector_data[sec]["pct_sum"] += chg
+            if chg > 0:
+                sector_data[sec]["up"] += 1
+            elif chg < 0:
+                sector_data[sec]["down"] += 1
 
         # ── 2. MVRV zone distribution ──
         zones = {"deep_value": 0, "undervalued": 0, "fair": 0, "elevated": 0, "overvalued": 0, "euphoria": 0}

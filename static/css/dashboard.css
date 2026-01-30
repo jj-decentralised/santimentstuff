@@ -2462,6 +2462,23 @@ a { color: inherit; text-decoration: none; }
 .sector-gaming .sector-card-fill { background: #DB2777; }
 .sector-oracle .sector-card-fill { background: #1D4ED8; }
 
+.sector-breadth {
+  display: flex; align-items: center; gap: 4px;
+  margin-top: 3px; font-size: 0.62rem;
+}
+.sector-breadth-label {
+  font-weight: 700; font-family: var(--mono); min-width: 38px;
+}
+.sector-breadth-bar {
+  flex: 1; height: 4px; background: #FCA5A5; border-radius: 2px; overflow: hidden;
+}
+.sector-breadth-up {
+  height: 100%; background: #34D399; border-radius: 2px;
+}
+.sector-breadth-ratio {
+  color: var(--text-muted); white-space: nowrap;
+}
+
 /* Sector overview page */
 .sector-overview-grid {
   display: grid;
