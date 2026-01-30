@@ -607,7 +607,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             s_avg = sec_vals.get("pct_sum", 0) / s_total if s_total else 0
             s_avg_cls = "up" if s_avg > 0 else "down" if s_avg < 0 else "muted"
             sector_items += f"""
-            <a href="/explore?sector={sec_key}" class="sector-card sector-{sec_key}">
+            <a href="/sector/{sec_key}" class="sector-card sector-{sec_key}">
                 <span class="sector-card-name">{_esc(sec_label)}</span>
                 <span class="sector-card-count">{sec_vals["count"]}</span>
                 <span class="sector-card-mcap">{fmt_usd(sec_vals["mcap"])}</span>
@@ -2916,7 +2916,7 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
         cards += f"""
         <div class="sector-overview-card">
             <div class="sector-overview-header">
-                <a href="/explore?sector={sec_key}" class="sector-tag sector-{sec_key}" style="font-size:0.72rem">{_esc(sec_label)}</a>
+                <a href="/sector/{sec_key}" class="sector-tag sector-{sec_key}" style="font-size:0.72rem">{_esc(sec_label)}</a>
                 <span class="sector-overview-change {ch_cls}">{fmt_pct(avg_ch)} avg</span>
             </div>
             <div class="sector-overview-stats">
@@ -2942,7 +2942,7 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
                 for t in data.get("all_tokens", data["top_tokens"])[:20]
             )}</div>
             <div class="sector-overview-actions">
-                <a href="/explore?sector={sec_key}" class="sector-overview-link">View all {data["count"]} &rarr;</a>
+                <a href="/sector/{sec_key}" class="sector-overview-link">View all {data["count"]} &rarr;</a>
                 <a href="/compare?tokens={','.join(t['slug'] for t in data['top_tokens'][:5])}" class="sector-overview-link">Compare top 5</a>
             </div>
         </div>"""
@@ -2958,7 +2958,7 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
         best_html = f'<a href="/token/{best["slug"]}">{_esc(best.get("ticker",""))}</a>' if best else "&mdash;"
         lb_rows += f"""<tr>
             <td class="col-rank">{rank}</td>
-            <td class="col-name"><a href="/explore?sector={sec_key}" class="sector-tag sector-{sec_key}">{_esc(sec_label)}</a></td>
+            <td class="col-name"><a href="/sector/{sec_key}" class="sector-tag sector-{sec_key}">{_esc(sec_label)}</a></td>
             <td class="col-num">{data["count"]}</td>
             <td class="col-num bold">{fmt_usd(data["mcap"])}</td>
             <td class="col-num">{pct:.1f}%</td>
@@ -2982,6 +2982,101 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
     parts.append(f'<div class="sector-overview-grid">{cards}</div>')
 
     return page_shell("Sectors", "\n".join(parts), active_nav="sectors")
+
+
+def render_sector_detail_page(tokens: list, sector_key: str, sector_label: str, sectors: dict = None) -> str:
+    """Dedicated sector detail page — tokens, stats, MVRV breakdown."""
+    total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
+    total_vol = sum(t.get("volume_usd") or 0 for t in tokens)
+    pcts = [t.get("price_usd_change") for t in tokens if t.get("price_usd_change") is not None]
+    avg_change = sum(pcts) / len(pcts) if pcts else 0
+    up_count = sum(1 for p in pcts if p > 0)
+    down_count = sum(1 for p in pcts if p < 0)
+
+    # MVRV zone breakdown
+    zone_counts = {}
+    for t in tokens:
+        mv = t.get("mvrv_usd")
+        if mv is not None:
+            zl, _, _ = mvrv_zone(mv)
+            zone_counts[zl] = zone_counts.get(zl, 0) + 1
+    zone_total = sum(zone_counts.values()) or 1
+    zone_order = [("Deep Value", "zone-deep-value"), ("Undervalued", "zone-undervalued"),
+                  ("Fair Value", "zone-fair"), ("Overvalued", "zone-overvalued"), ("Euphoria", "zone-euphoria")]
+    zone_bar_segs = ""
+    zone_legend = ""
+    for zl, zcls in zone_order:
+        cnt = zone_counts.get(zl, 0)
+        if cnt == 0:
+            continue
+        pct = cnt / zone_total * 100
+        zone_bar_segs += f'<div class="zone-bar-seg {zcls}" style="width:{pct:.1f}%" title="{zl}: {cnt}"></div>'
+        zone_legend += f'<span class="zone-legend-item"><span class="zone-legend-dot {zcls}"></span>{zl} {cnt}</span>'
+
+    # Token table
+    rows = ""
+    max_vol = max((t.get("volume_usd") or 0 for t in tokens), default=1) or 1
+    for i, t in enumerate(tokens):
+        slug = t.get("slug", "")
+        pct_val = t.get("price_usd_change")
+        mvrv = t.get("mvrv_usd")
+        zone_html = f'<span class="zone {mvrv_zone(mvrv)[1]}">{mvrv_zone(mvrv)[0]}</span>' if mvrv else "&mdash;"
+        spark = t.get("sparkline_7d", [])
+        spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
+        rows += f"""<tr>
+            <td class="col-rank">{i+1}</td>
+            <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+            <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
+            <td class="col-num {css_class(pct_val)}">{fmt_pct(pct_val)}</td>
+            <td class="col-spark hide-mobile">{spark_html}</td>
+            <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
+            <td class="col-num hide-mobile">{fmt_usd(t.get("volume_usd"))}</td>
+            <td class="col-num hide-mobile">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td>
+            <td class="col-tag hide-mobile">{zone_html}</td>
+        </tr>"""
+
+    ch_cls = "up" if avg_change > 0 else "down" if avg_change < 0 else "muted"
+    body = f"""
+    {_breadcrumbs(("Sectors", "/sectors"), (sector_label,))}
+    <h1 class="page-title"><span class="sector-tag sector-{sector_key}" style="font-size:1rem;margin-right:8px">{_esc(sector_label)}</span> Sector</h1>
+    <p class="page-subtitle">{len(tokens)} tokens in this sector</p>
+
+    <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Market Cap</div><div class="stat-value">{fmt_usd(total_mcap)}</div></div>
+        <div class="stat-card"><div class="stat-label">Volume 24h</div><div class="stat-value">{fmt_usd(total_vol)}</div></div>
+        <div class="stat-card"><div class="stat-label">Avg 24h Change</div><div class="stat-value {ch_cls}">{fmt_pct(avg_change)}</div></div>
+        <div class="stat-card"><div class="stat-label">Breadth</div><div class="stat-value"><span class="up">{up_count}</span> / <span class="down">{down_count}</span></div></div>
+    </div>
+
+    <div class="zone-distribution">
+        <div class="zone-bar">{zone_bar_segs}</div>
+        <div class="zone-legend">{zone_legend}</div>
+    </div>
+
+    <div class="sector-detail-actions">
+        <a href="/compare?tokens={','.join(t['slug'] for t in tokens[:5])}" class="filter-btn">Compare Top 5</a>
+        <a href="/screener?sector={sector_key}" class="filter-btn">View in Screener</a>
+        <a href="/valuation?sector={sector_key}" class="filter-btn">Valuation Scanner</a>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr>
+                <th class="col-rank">#</th><th>Name</th>
+                <th class="col-num">Price</th>
+                <th class="col-num">24h</th>
+                <th class="col-spark hide-mobile">7d</th>
+                <th class="col-num">Mkt Cap</th>
+                <th class="col-num hide-mobile">Volume</th>
+                <th class="col-num hide-mobile">MVRV</th>
+                <th class="col-tag hide-mobile">Zone</th>
+            </tr></thead>
+            <tbody>{rows if rows else '<tr><td colspan="9" class="empty-cell">No tokens found.</td></tr>'}</tbody>
+        </table>
+    </div>
+    <div class="scroll-hint">Scroll right for more columns &rarr;</div>
+    """
+    return page_shell(f"{sector_label} Sector", body, active_nav="sectors")
 
 
 # ================================================================

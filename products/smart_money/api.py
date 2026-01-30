@@ -48,6 +48,7 @@ from core.ssr_renderer import (
     fmt_pct,
     pct_class,
     render_glossary_page,
+    render_sector_detail_page,
 )
 
 logger = logging.getLogger(__name__)
@@ -1621,6 +1622,23 @@ def create_app() -> FastAPI:
             data["all_tokens"] = sorted_tokens[:20]
         return render_sectors_page(sector_details, SECTORS)
 
+    @app.get("/sector/{sector_key}", response_class=HTMLResponse)
+    async def get_sector_detail(sector_key: str):
+        """Sector detail page — tokens, stats, and MVRV breakdown for a specific sector."""
+        tokens = _get_all_tokens()
+        sector_tokens = [t for t in tokens if t.get("sector") == sector_key]
+        if not sector_tokens:
+            raise HTTPException(status_code=404, detail=f"Sector '{sector_key}' not found")
+        sector_tokens.sort(key=lambda t: t.get("marketcap_usd") or 0, reverse=True)
+        label = SECTORS.get(sector_key, sector_key.replace("_", " ").title())
+        # Add sparklines for top tokens
+        top_slugs = [t["slug"] for t in sector_tokens[:50]]
+        if top_slugs and _san_cache:
+            spark_data = _san_cache.get_timeseries_multi_slugs("price_usd", top_slugs, limit_per_slug=7)
+            for t in sector_tokens[:50]:
+                t["sparkline_7d"] = spark_data.get(t["slug"], [])
+        return render_sector_detail_page(sector_tokens, sector_key, label, SECTORS)
+
     @app.get("/sectors/export.csv")
     async def get_sectors_csv():
         """Export sector data as CSV."""
@@ -1936,8 +1954,12 @@ curl https://santimentstuff-production-2305.up.railway.app/api/v1/valuation/bitc
             (f"{base}/sectors", "daily", "0.7"),
             (f"{base}/developers", "daily", "0.7"),
             (f"{base}/compare", "weekly", "0.6"),
+            (f"{base}/glossary", "monthly", "0.5"),
             (f"{base}/sync", "always", "0.3"),
         ]
+        # Add sector detail pages
+        for sec_key in SECTORS:
+            urls.append((f"{base}/sector/{sec_key}", "daily", "0.6"))
         # Add individual token pages
         all_tokens = _get_all_tokens()
         for t in sorted(all_tokens, key=lambda x: x.get("marketcap_usd") or 0, reverse=True)[:200]:

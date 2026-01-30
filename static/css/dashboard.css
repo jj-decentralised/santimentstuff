@@ -2863,6 +2863,9 @@ html.dark .health-pulse circle[stroke="#E5E7EB"] { stroke: #30363D; }
   color: var(--text-primary);
   background: var(--border-light);
 }
+.sector-detail-actions {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+}
 .sector-overview-actions {
   display: flex;
   gap: 12px;
