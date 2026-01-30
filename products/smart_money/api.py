@@ -1076,8 +1076,8 @@ def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
 
 # ── Page-specific data builders ──────────────────────────────
 
-def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE, sector: str = "all", category: str = "all", search: str = ""):
-    tokens = _get_all_tokens()
+def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE, sector: str = "all", category: str = "all", search: str = "", sort_by: str = "marketcap_usd", order: str = "desc"):
+    tokens = list(_get_all_tokens())  # copy so we don't mutate cache
     if search:
         q = search.lower().strip()
         tokens = [t for t in tokens if q in t.get("name", "").lower() or q in t.get("slug", "").lower() or q in t.get("ticker", "").lower()]
@@ -1085,6 +1085,13 @@ def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE, sector: 
         tokens = [t for t in tokens if t.get("sector") == sector]
     if category != "all":
         tokens = [t for t in tokens if t.get("category") == category]
+    # Sort
+    valid_sorts = {"marketcap_usd", "price_usd", "price_usd_change", "volume_usd", "mvrv_usd", "daily_active_addresses", "dev_activity", "name"}
+    if sort_by in valid_sorts:
+        if sort_by == "name":
+            tokens.sort(key=lambda x: (x.get("name") or "").lower(), reverse=(order == "desc"))
+        else:
+            tokens.sort(key=lambda x: x.get(sort_by) or 0, reverse=(order == "desc"))
     total = len(tokens)
     start = (page - 1) * per_page
     end = start + per_page
@@ -1217,14 +1224,16 @@ def create_app() -> FastAPI:
         sector: str = Query(default="all"),
         category: str = Query(default="all"),
         q: str = Query(default=""),
+        sort: str = Query(default="marketcap_usd"),
+        order: str = Query(default="desc"),
     ):
-        """Full token explorer with pagination and search."""
-        tokens, total = _build_token_list(page, per_page, sector=sector, category=category, search=q)
+        """Full token explorer with pagination, search, and sorting."""
+        tokens, total = _build_token_list(page, per_page, sector=sector, category=category, search=q, sort_by=sort, order=order)
         # Get briefing data for movers summary (already cached)
         briefing = _build_economy_briefing()
         return render_explore_page(tokens, page=page, per_page=per_page, total=total,
                                    sector=sector, category=category, sectors=SECTORS, categories=CATEGORIES,
-                                   search=q, briefing=briefing)
+                                   search=q, briefing=briefing, sort_by=sort, order=order)
 
     @app.get("/insights", response_class=HTMLResponse)
     async def get_insights_page(

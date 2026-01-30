@@ -790,6 +790,8 @@ def render_explore_page(
     categories: dict = None,
     search: str = "",
     briefing: dict = None,
+    sort_by: str = "marketcap_usd",
+    order: str = "desc",
 ) -> str:
     total_pages = max(1, (total + per_page - 1) // per_page)
     start = (page - 1) * per_page
@@ -860,20 +862,33 @@ def render_explore_page(
         <div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>
     </div>""")
 
+    # Sort link helper
+    def _sort_link(field, label):
+        new_order = "asc" if sort_by == field and order == "desc" else "desc"
+        arrow = ""
+        if sort_by == field:
+            arrow = " &#9660;" if order == "desc" else " &#9650;"
+        qs = f"sort={field}&order={new_order}&per_page={per_page}"
+        if sector != "all":
+            qs += f"&sector={sector}"
+        if search:
+            qs += f"&q={_esc(search)}"
+        return f'<a href="/explore?{qs}" class="sort-link">{label}{arrow}</a>'
+
     # Table
     parts.append(f"""
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
                 <th class="col-rank">#</th>
-                <th>Name</th>
+                <th>{_sort_link("name", "Name")}</th>
                 <th class="col-tag hide-mobile">Sector</th>
-                <th class="col-num">Price</th>
-                <th class="col-num">24h</th>
+                <th class="col-num">{_sort_link("price_usd", "Price")}</th>
+                <th class="col-num">{_sort_link("price_usd_change", "24h")}</th>
                 <th class="col-spark hide-mobile">7d</th>
-                <th class="col-num">Market Cap</th>
-                <th class="col-num hide-mobile">Volume</th>
-                <th class="col-num hide-mobile">MVRV</th>
+                <th class="col-num">{_sort_link("marketcap_usd", "Mkt Cap")}</th>
+                <th class="col-num hide-mobile">{_sort_link("volume_usd", "Volume")}</th>
+                <th class="col-num hide-mobile">{_sort_link("mvrv_usd", "MVRV")}</th>
                 <th class="col-tag hide-mobile">Zone</th>
             </tr></thead>
             <tbody>""")
@@ -916,6 +931,10 @@ def render_explore_page(
             qs += f"&category={category}"
         if search:
             qs += f"&q={_esc(search)}"
+        if sort_by != "marketcap_usd":
+            qs += f"&sort={sort_by}"
+        if order != "desc":
+            qs += f"&order={order}"
         pg = []
         pg.append(f'<a href="/explore?page={page-1}&{qs}" class="page-btn">&laquo;</a>' if page > 1 else '<span class="page-btn disabled">&laquo;</span>')
         for p in range(1, total_pages + 1):
