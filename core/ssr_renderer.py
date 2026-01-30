@@ -1405,6 +1405,43 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         badges = "".join(f'<span class="alert-badge {cls}" title="{_esc(desc)}">{_esc(label)}</span>' for label, cls, desc in alerts)
         alerts_html = f'<div class="alert-badges">{badges}</div>'
 
+    # On-chain health score (0-100)
+    health_signals = []
+    # MVRV: 0.5-2.0 is healthy (score peaks at 1.0)
+    if mvrv is not None:
+        mvrv_health = max(0, 100 - abs(mvrv - 1.2) * 50)
+        health_signals.append(min(100, mvrv_health))
+    # Dev activity: any is good, more is better (log scale)
+    dev = _latest("dev_activity")
+    if dev is not None and dev > 0:
+        import math as _math
+        health_signals.append(min(100, _math.log10(dev + 1) * 40))
+    # DAA trend: growing is good
+    daa_ts = _data("daily_active_addresses")
+    if daa_ts and len(daa_ts) >= 7:
+        d_curr = daa_ts[-1].get("value") or 0
+        d_prev = daa_ts[-7].get("value") or 0
+        if d_prev > 0:
+            daa_chg = (d_curr - d_prev) / d_prev * 100
+            health_signals.append(min(100, max(0, 50 + daa_chg)))
+    # Exchange balance: declining is bullish
+    if exch is not None and exch_ts and len(exch_ts) >= 7:
+        ex_7d = exch_ts[-7].get("value")
+        if ex_7d and ex_7d > 0:
+            ex_chg = (exch - ex_7d) / ex_7d * 100
+            health_signals.append(min(100, max(0, 60 - ex_chg * 3)))
+
+    health_score_html = ""
+    if len(health_signals) >= 2:
+        h_score = int(sum(health_signals) / len(health_signals))
+        if h_score >= 70:
+            h_label, h_cls = "Strong", "health-strong"
+        elif h_score >= 45:
+            h_label, h_cls = "Moderate", "health-moderate"
+        else:
+            h_label, h_cls = "Weak", "health-weak"
+        health_score_html = f'<div class="onchain-health"><span class="health-score-num {h_cls}">{h_score}</span><span class="health-score-label">{h_label}</span><span class="health-score-caption">On-chain Health</span></div>'
+
     # Metric cards with tooltip explanations
     _metric_tips = {
         "marketcap_usd": "Total supply × current price",
@@ -1560,6 +1597,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     </div>
 
     {alerts_html}
+    {health_score_html}
 
     {_render_token_description(token)}
 

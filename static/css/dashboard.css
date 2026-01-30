@@ -1058,6 +1058,35 @@ a { color: inherit; text-decoration: none; }
 .alert-bearish { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
 .alert-warn { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
 
+.onchain-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 8px 0;
+}
+.health-score-num {
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-family: var(--mono);
+}
+.health-strong { color: #059669; }
+.health-moderate { color: #D97706; }
+.health-weak { color: #DC2626; }
+.health-score-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.health-score-caption {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
 .profile-section { margin-bottom: 24px; }
 .profile-section-header {
   display: flex;
