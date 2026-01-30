@@ -1802,9 +1802,15 @@ def create_app() -> FastAPI:
         ]
         rows = ""
         for method, path, desc, params, response in endpoints:
+            # Build a try-it link for simple GET endpoints
+            try_path = path.replace("{slug}", "bitcoin").replace("{metric}", "price_usd")
+            if "?" not in try_path and "csv" not in try_path:
+                try_link = f'<a href="{try_path}" class="api-try-link" target="_blank">Try it &rarr;</a>'
+            else:
+                try_link = ""
             rows += f"""<tr>
                 <td><span class="api-method">{method}</span></td>
-                <td class="col-name"><code>{_esc(path)}</code></td>
+                <td class="col-name"><code>{_esc(path)}</code> {try_link}</td>
                 <td>{_esc(desc)}</td>
                 <td class="hide-mobile"><code>{_esc(params)}</code></td>
                 <td class="hide-mobile"><code>{_esc(response)[:60]}...</code></td>
@@ -1839,6 +1845,30 @@ curl https://santimentstuff-production-2305.up.railway.app/api/v1/briefing
 curl https://santimentstuff-production-2305.up.railway.app/api/v1/sectors
 
 curl https://santimentstuff-production-2305.up.railway.app/api/v1/valuation/bitcoin</code></pre>
+        </div>
+        <div class="card" style="padding:16px;margin-top:16px">
+            <div class="section-title">Python Example</div>
+            <pre style="font-size:0.75rem;overflow-x:auto;padding:10px;background:var(--bg-alt);border-radius:4px"><code>import requests
+
+BASE = "https://santimentstuff-production-2305.up.railway.app"
+
+# Get market overview
+market = requests.get(f"{{BASE}}/api/v1/market?per_page=10").json()
+for token in market["tokens"]:
+    print(f"{{token['name']}}: ${{token['price_usd']:.2f}}")
+
+# Get Bitcoin profile
+btc = requests.get(f"{{BASE}}/api/v1/profile/bitcoin").json()
+print(f"BTC MVRV: {{btc['metrics']['mvrv_usd']['latest']:.2f}}")
+
+# Get MVRV timeseries for Ethereum
+eth_mvrv = requests.get(f"{{BASE}}/api/v1/metric/mvrv_usd?slug=ethereum").json()
+for d in eth_mvrv["data"][-5:]:
+    print(f"{{d['datetime']}}: {{d['value']:.2f}}")</code></pre>
+        </div>
+        <div class="card" style="padding:16px;margin-top:16px">
+            <div class="section-title">Rate Limits</div>
+            <p style="font-size:0.78rem;color:var(--text-secondary)">No authentication or API keys required. Data refreshes daily. Be reasonable with request frequency. All data sourced from <a href="https://santiment.net" target="_blank" rel="noopener">Santiment API</a>.</p>
         </div>"""
         return page_shell("API Documentation", body)
 
