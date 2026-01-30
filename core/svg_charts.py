@@ -825,6 +825,124 @@ def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) ->
 
 
 # ============================================================
+# DONUT CHART — Market dominance / allocation visualization
+# ============================================================
+
+def donut_chart_svg(
+    tokens: list[dict],
+    width: int = 260,
+    height: int = 260,
+    inner_ratio: float = 0.6,
+    max_slices: int = 8,
+) -> str:
+    """Donut chart showing market cap dominance as colored arcs."""
+    if not tokens:
+        return ""
+
+    total = sum(t.get("marketcap_usd") or 0 for t in tokens) or 1
+    sorted_tokens = sorted(tokens, key=lambda t: t.get("marketcap_usd") or 0, reverse=True)
+
+    slices = []
+    for i, t in enumerate(sorted_tokens[:max_slices]):
+        mcap = t.get("marketcap_usd") or 0
+        slices.append({
+            "label": t.get("ticker", "?"),
+            "value": mcap,
+            "pct": (mcap / total) * 100,
+            "color": COLORS[i % len(COLORS)],
+        })
+
+    others = sum(t.get("marketcap_usd") or 0 for t in sorted_tokens[max_slices:])
+    if others > 0:
+        slices.append({
+            "label": "Others",
+            "value": others,
+            "pct": (others / total) * 100,
+            "color": "#D1D5DB",
+        })
+
+    cx, cy = width / 2, height / 2 - 10
+    r_outer = min(width, height) / 2 - 20
+    r_inner = r_outer * inner_ratio
+
+    elements = [
+        f'<svg width="100%" viewBox="0 0 {width} {height}" '
+        f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
+    ]
+
+    # Watermark
+    elements.append(
+        f'<text x="{width - 6}" y="12" text-anchor="end" font-size="8" '
+        f'font-weight="500" fill="#D1D5DB" font-family="Inter,system-ui,sans-serif" '
+        f'opacity="0.5">santiment</text>'
+    )
+
+    angle = -math.pi / 2  # start at top
+    for s in slices:
+        if s["pct"] < 0.3:
+            continue
+        sweep = (s["value"] / total) * 2 * math.pi
+        # Outer arc
+        x1_o = cx + r_outer * math.cos(angle)
+        y1_o = cy + r_outer * math.sin(angle)
+        x2_o = cx + r_outer * math.cos(angle + sweep)
+        y2_o = cy + r_outer * math.sin(angle + sweep)
+        # Inner arc
+        x1_i = cx + r_inner * math.cos(angle + sweep)
+        y1_i = cy + r_inner * math.sin(angle + sweep)
+        x2_i = cx + r_inner * math.cos(angle)
+        y2_i = cy + r_inner * math.sin(angle)
+
+        large = 1 if sweep > math.pi else 0
+
+        d = (
+            f"M {x1_o:.2f} {y1_o:.2f} "
+            f"A {r_outer:.2f} {r_outer:.2f} 0 {large} 1 {x2_o:.2f} {y2_o:.2f} "
+            f"L {x1_i:.2f} {y1_i:.2f} "
+            f"A {r_inner:.2f} {r_inner:.2f} 0 {large} 0 {x2_i:.2f} {y2_i:.2f} Z"
+        )
+
+        elements.append(
+            f'<path d="{d}" fill="{s["color"]}" stroke="white" stroke-width="1.5">'
+            f'<title>{html_mod.escape(s["label"])}: {s["pct"]:.1f}%</title></path>'
+        )
+
+        # Label on the slice midpoint (outside)
+        mid_angle = angle + sweep / 2
+        label_r = r_outer + 14
+        lx = cx + label_r * math.cos(mid_angle)
+        ly = cy + label_r * math.sin(mid_angle)
+        anchor = "start" if lx > cx else "end"
+        if abs(lx - cx) < 10:
+            anchor = "middle"
+
+        if s["pct"] >= 4:
+            elements.append(
+                f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchor}" '
+                f'font-size="9" font-weight="600" fill="#374151" '
+                f'font-family="Inter,system-ui,sans-serif">'
+                f'{html_mod.escape(s["label"])} {s["pct"]:.1f}%</text>'
+            )
+
+        angle += sweep
+
+    # Center text
+    elements.append(
+        f'<text x="{cx}" y="{cy - 4}" text-anchor="middle" '
+        f'font-size="11" font-weight="700" fill="#111" '
+        f'font-family="Inter,system-ui,sans-serif">Market</text>'
+    )
+    elements.append(
+        f'<text x="{cx}" y="{cy + 10}" text-anchor="middle" '
+        f'font-size="9" font-weight="500" fill="#6B7280" '
+        f'font-family="Inter,system-ui,sans-serif">Dominance</text>'
+    )
+
+    elements.append('</svg>')
+    return "\n".join(elements)
+
+
+# ============================================================
 # SENTIMENT GAUGE — Semicircle gauge for market sentiment
 # ============================================================
 

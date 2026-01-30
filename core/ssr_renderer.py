@@ -14,7 +14,8 @@ from typing import Optional
 
 from .svg_charts import (
     sparkline_svg, line_chart_svg, chart_panel, comparison_table,
-    market_heatmap_svg, dominance_bar_svg, sentiment_gauge_svg, mini_trend_svg,
+    market_heatmap_svg, dominance_bar_svg, donut_chart_svg,
+    sentiment_gauge_svg, mini_trend_svg,
     scatter_plot_svg, THESIS_COLORS,
 )
 
@@ -674,6 +675,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     <div class="two-col">
         <section class="card">
             <div class="card-header"><h2 class="card-title" id="dominance">Market Dominance</h2></div>
+            <div class="dominance-donut-wrap">{donut_chart_svg(dom)}</div>
             <div class="dominance-wrap">{dominance_bar_svg(dom)}</div>
         </section>
         <section class="card">
