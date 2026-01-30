@@ -113,6 +113,41 @@ def _esc(s):
     return html_mod.escape(str(s)) if s else ""
 
 
+def _mvrv_histogram(tokens: list) -> str:
+    """Render a histogram of MVRV values across tokens."""
+    buckets = [
+        ("<0.5", 0, 0.5, "#166534"),
+        ("0.5-1.0", 0.5, 1.0, "#22c55e"),
+        ("1.0-1.5", 1.0, 1.5, "#84cc16"),
+        ("1.5-2.0", 1.5, 2.0, "#eab308"),
+        ("2.0-2.5", 2.0, 2.5, "#f97316"),
+        ("2.5-3.5", 2.5, 3.5, "#ef4444"),
+        (">3.5", 3.5, 999, "#991b1b"),
+    ]
+    counts = [0] * len(buckets)
+    for t in tokens:
+        mv = t.get("mvrv_usd")
+        if mv is None:
+            continue
+        for idx, (_, lo, hi, _) in enumerate(buckets):
+            if lo <= mv < hi:
+                counts[idx] += 1
+                break
+    max_c = max(counts) or 1
+    bars = ""
+    for idx, (label, _, _, color) in enumerate(buckets):
+        c = counts[idx]
+        h = max(2, c / max_c * 60)
+        bars += f'<div class="breadth-hist-col"><div class="breadth-hist-bar" style="height:{h:.0f}px;background:{color}"></div><div class="breadth-hist-count">{c}</div><div class="breadth-hist-label">{label}</div></div>'
+    if not any(counts):
+        return ""
+    return f"""
+    <div class="breadth-histogram">
+        <div class="section-label">MVRV Distribution</div>
+        <div class="breadth-hist-row">{bars}</div>
+    </div>"""
+
+
 def _sector_rotation_bar(sorted_sectors: list, sector_labels: dict, total_mcap: float) -> str:
     """Horizontal bar showing sector rotation — ranked by avg 24h performance."""
     ranked = []
@@ -2949,6 +2984,7 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
     <div class="val-legend">{legend}</div>
     {f'<div class="onchain-narrative"><p>{val_narrative}</p></div>' if val_narrative else ''}
     <div class="export-bar"><a href="/valuation/export.csv?sector={sector}&zone={zone_filter}" class="export-btn">&#8681; Export CSV</a></div>
+    {_mvrv_histogram(tokens)}
     {_valuation_heatmap(tokens)}
     <div class="table-wrap">
         <table class="data-table">
