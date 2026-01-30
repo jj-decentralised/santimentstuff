@@ -236,6 +236,49 @@ a { color: inherit; text-decoration: none; }
   background: var(--card-bg);
 }
 
+/* Page title actions row */
+.page-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* View toggle (full/compact) */
+.view-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.view-toggle-btn {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  text-decoration: none;
+  color: var(--text-muted);
+  background: transparent;
+  border-right: 1px solid var(--border);
+  transition: all 0.15s;
+  line-height: 1;
+}
+.view-toggle-btn:last-child { border-right: none; }
+.view-toggle-btn.active {
+  background: var(--text-primary);
+  color: var(--bg);
+}
+.view-toggle-btn:hover:not(.active) {
+  color: var(--text-primary);
+  background: var(--card-bg);
+}
+
+/* Compact table mode */
+.compact-table { font-size: 0.72rem; }
+.compact-table th,
+.compact-table td { padding: 4px 8px; }
+.compact-table .col-name { max-width: 160px; }
+.compact-table .col-name a { font-size: 0.72rem; }
+.compact-table .ticker { font-size: 0.62rem; }
+
 /* Token quick nav (prev/next) */
 .token-quick-nav {
   display: flex;

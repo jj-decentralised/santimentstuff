@@ -1262,6 +1262,7 @@ def create_app() -> FastAPI:
         q: str = Query(default=""),
         sort: str = Query(default="marketcap_usd"),
         order: str = Query(default="desc"),
+        view: str = Query(default="full"),
     ):
         """Full token explorer with pagination, search, and sorting."""
         tokens, total = _build_token_list(page, per_page, sector=sector, category=category, search=q, sort_by=sort, order=order)
@@ -1269,7 +1270,8 @@ def create_app() -> FastAPI:
         briefing = _build_economy_briefing()
         return render_explore_page(tokens, page=page, per_page=per_page, total=total,
                                    sector=sector, category=category, sectors=SECTORS, categories=CATEGORIES,
-                                   search=q, briefing=briefing, sort_by=sort, order=order)
+                                   search=q, briefing=briefing, sort_by=sort, order=order,
+                                   view=view)
 
     @app.get("/explore/csv")
     async def get_explore_csv(

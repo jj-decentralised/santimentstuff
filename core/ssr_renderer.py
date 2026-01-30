@@ -938,6 +938,7 @@ def render_explore_page(
     briefing: dict = None,
     sort_by: str = "marketcap_usd",
     order: str = "desc",
+    view: str = "full",
 ) -> str:
     total_pages = max(1, (total + per_page - 1) // per_page)
     start = (page - 1) * per_page
@@ -961,13 +962,23 @@ def render_explore_page(
     if order != "desc":
         csv_qs_parts.append(f"order={order}")
     csv_url = "/explore/csv" + ("?" + "&".join(csv_qs_parts) if csv_qs_parts else "")
+    compact = view == "compact"
+    view_qs_base = "&".join(csv_qs_parts)
+    full_url = "/explore?" + (view_qs_base + "&" if view_qs_base else "") + "view=full" + f"&per_page={per_page}"
+    compact_url = "/explore?" + (view_qs_base + "&" if view_qs_base else "") + "view=compact" + f"&per_page={per_page}"
     parts.append(f"""
     <div class="page-title-row">
         <div>
             <h1 class="page-title">Explore</h1>
             <p class="page-subtitle">{subtitle}</p>
         </div>
-        <a href="{csv_url}" class="export-btn" download>&#8681; Export CSV</a>
+        <div class="page-title-actions">
+            <div class="view-toggle">
+                <a href="{full_url}" class="view-toggle-btn{' active' if not compact else ''}" title="Full view">&#9776;</a>
+                <a href="{compact_url}" class="view-toggle-btn{' active' if compact else ''}" title="Compact view">&#9783;</a>
+            </div>
+            <a href="{csv_url}" class="export-btn" download>&#8681; Export CSV</a>
+        </div>
     </div>""")
 
     # Market summary bar (from briefing data)
@@ -1041,25 +1052,27 @@ def render_explore_page(
         return f'<a href="/explore?{qs}" class="sort-link">{label}{arrow}</a>'
 
     # Table
+    table_class = "data-table compact-table" if compact else "data-table"
     parts.append(f"""
     <div class="table-wrap">
-        <table class="data-table">
+        <table class="{table_class}">
             <thead><tr>
                 <th class="col-rank">#</th>
                 <th>{_sort_link("name", "Name")}</th>
                 <th class="col-tag hide-mobile">Sector</th>
                 <th class="col-num">{_sort_link("price_usd", "Price")}</th>
                 <th class="col-num">{_sort_link("price_usd_change", "24h")}</th>
-                <th class="col-spark hide-mobile">7d</th>
+                {"" if compact else f'<th class="col-spark hide-mobile">7d</th>'}
                 <th class="col-num">{_sort_link("marketcap_usd", "Mkt Cap")}</th>
-                <th class="col-num hide-mobile">{_sort_link("volume_usd", "Volume")}</th>
+                {"" if compact else f'<th class="col-num hide-mobile">{_sort_link("volume_usd", "Volume")}</th>'}
                 <th class="col-num hide-mobile">{_sort_link("mvrv_usd", "MVRV")}</th>
                 <th class="col-tag hide-mobile">Zone</th>
             </tr></thead>
             <tbody>""")
 
+    col_count = 8 if compact else 10
     if not tokens:
-        parts.append('<tr><td colspan="10" class="empty-cell">Data is being pulled. Refresh shortly.</td></tr>')
+        parts.append(f'<tr><td colspan="{col_count}" class="empty-cell">Data is being pulled. Refresh shortly.</td></tr>')
     else:
         _sector_labels = sectors or {}
         for i, t in enumerate(tokens):
@@ -1068,11 +1081,23 @@ def render_explore_page(
             pct = t.get("price_usd_change")
             mvrv = t.get("mvrv_usd")
             zone_html = f'<span class="zone {mvrv_zone(mvrv)[1]}">{mvrv_zone(mvrv)[0]}</span>' if mvrv is not None else "&mdash;"
-            spark = t.get("sparkline_7d", [])
-            spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
             sec = t.get("sector", "other")
             sec_label = _sector_labels.get(sec, sec.replace("_", " ").title())
-            parts.append(f"""<tr>
+            if compact:
+                parts.append(f"""<tr>
+                <td class="col-rank">{rank}</td>
+                <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
+                <td class="col-tag hide-mobile"><a href="/explore?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
+                <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
+                <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
+                <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
+                <td class="col-num hide-mobile">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td>
+                <td class="col-tag hide-mobile">{zone_html}</td>
+            </tr>""")
+            else:
+                spark = t.get("sparkline_7d", [])
+                spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
+                parts.append(f"""<tr>
                 <td class="col-rank">{rank}</td>
                 <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
                 <td class="col-tag hide-mobile"><a href="/explore?sector={sec}" class="sector-tag sector-{sec}">{_esc(sec_label)}</a></td>
@@ -1099,6 +1124,8 @@ def render_explore_page(
         base_qs_parts.append(f"sort={sort_by}")
     if order != "desc":
         base_qs_parts.append(f"order={order}")
+    if compact:
+        base_qs_parts.append("view=compact")
     base_qs = "&".join(base_qs_parts)
 
     size_options = ""
