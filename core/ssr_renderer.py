@@ -1199,12 +1199,20 @@ def render_insights_page(
                     f'</a>'
                 )
 
+            # Avg performance of thesis tokens
+            changes_th = [t.get("price_usd_change") for t in tokens_list if t.get("price_usd_change") is not None]
+            avg_ch_th = sum(changes_th) / len(changes_th) if changes_th else 0
+            avg_ch_cls = css_class(avg_ch_th)
+            avg_mcap_th = sum(t.get("marketcap_usd") or 0 for t in tokens_list)
+
             parts.append(f"""
         <div class="thesis-row" id="thesis-{key}">
             <div class="thesis-row-header">
                 <span class="thesis-row-dot" style="background:{color}"></span>
                 <span class="thesis-row-label">{_esc(label)}</span>
                 <span class="thesis-row-count">{cnt}</span>
+                <span class="thesis-row-avg {avg_ch_cls}">avg {fmt_pct(avg_ch_th)}</span>
+                <span class="thesis-row-mcap">{fmt_usd(avg_mcap_th)}</span>
                 <div class="thesis-row-bar-wrap">
                     <div class="thesis-row-bar" style="width:{pct:.0f}%;background:{color}"></div>
                 </div>
