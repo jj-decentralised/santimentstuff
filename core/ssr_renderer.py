@@ -316,6 +316,29 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     btc_trend = b.get("trends", {}).get("btc_price", [])
     btc_chart = mini_trend_svg(btc_trend, width=200, height=50) if btc_trend and len(btc_trend) > 5 else ""
 
+    # Build narrative summary
+    narrative_parts = []
+    if breadth_pct >= 60:
+        narrative_parts.append(f"Broad strength — {breadth_pct:.0f}% of tokens are up over 24h")
+    elif breadth_pct <= 40:
+        narrative_parts.append(f"Broad weakness — only {breadth_pct:.0f}% of tokens are up over 24h")
+    else:
+        narrative_parts.append(f"Mixed market — {breadth_pct:.0f}% of tokens rising")
+
+    vol_conc = b.get("vol_concentration_top10", 0)
+    if vol_conc > 70:
+        narrative_parts.append(f"Volume heavily concentrated in top 10 ({vol_conc:.0f}%)")
+    elif vol_conc < 40:
+        narrative_parts.append(f"Volume broadly distributed across the market ({vol_conc:.0f}% in top 10)")
+
+    if avg_mvrv is not None:
+        if avg_mvrv < 1.0:
+            narrative_parts.append("Aggregate MVRV below 1.0 suggests undervaluation relative to realized value")
+        elif avg_mvrv > 2.5:
+            narrative_parts.append("Elevated MVRV signals potential overheating — historically a distribution zone")
+
+    regime_narrative = ". ".join(narrative_parts) + "." if narrative_parts else ""
+
     parts.append(f"""
     <section class="card regime-card">
         <div class="card-header">
@@ -358,6 +381,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             </div>
         </div>
         <p class="regime-desc">{zone_desc}</p>
+        {f'<p class="regime-narrative">{regime_narrative}</p>' if regime_narrative else ''}
     </section>""")
 
     # ── Section 2: Valuation Landscape ──
@@ -480,6 +504,24 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
                 <span class="flow-item muted">(exchange balance shift &gt; 1%)</span>
             </div>"""
 
+        # Network health narrative
+        health_notes = []
+        if daa_ch is not None:
+            if daa_ch > 5:
+                health_notes.append(f"Active addresses growing ({fmt_pct(daa_ch)} avg) — rising user engagement")
+            elif daa_ch < -5:
+                health_notes.append(f"Active addresses declining ({fmt_pct(daa_ch)} avg) — reduced on-chain activity")
+        if dev_ch is not None:
+            if dev_ch > 5:
+                health_notes.append(f"Developer activity trending up ({fmt_pct(dev_ch)} avg)")
+            elif dev_ch < -5:
+                health_notes.append(f"Developer activity declining ({fmt_pct(dev_ch)} avg)")
+        if accum > distrib and accum > 5:
+            health_notes.append(f"Net accumulation pattern — {accum} tokens seeing exchange outflows")
+        elif distrib > accum and distrib > 5:
+            health_notes.append(f"Distribution pressure — {distrib} tokens seeing exchange inflows")
+        health_narrative = ". ".join(health_notes) + "." if health_notes else ""
+
         parts.append(f"""
     <section class="card">
         <div class="card-header">
@@ -488,6 +530,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         </div>
         <div class="health-grid">{health_cards}</div>
         {flow_html}
+        {f'<p class="health-narrative">{health_narrative}</p>' if health_narrative else ''}
     </section>""")
 
     # ── Section 4: On-Chain Signals ──
