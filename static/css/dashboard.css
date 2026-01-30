@@ -2782,6 +2782,19 @@ html.dark .health-pulse circle[stroke="#E5E7EB"] { stroke: #30363D; }
 }
 
 /* Sector overview page */
+.sector-dominance-wrap {
+  margin: 18px 0;
+  text-align: center;
+}
+.sector-dominance-donut {
+  display: inline-block;
+  max-width: 320px;
+}
+.sector-dominance-donut svg {
+  width: 100%;
+  height: auto;
+}
+
 .sector-overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));

@@ -2965,6 +2965,18 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
     <p class="page-subtitle">Performance breakdown by sector</p>
     <div class="export-bar"><a href="/sectors/export.csv" class="export-btn">&#8681; Export CSV</a></div>""")
 
+    # Dominance donut chart
+    donut_tokens = []
+    for sec_key, data in sorted_sectors:
+        sec_label = sector_labels.get(sec_key, sec_key.replace("_", " ").title())
+        donut_tokens.append({"ticker": sec_label, "marketcap_usd": data["mcap"]})
+    if donut_tokens:
+        parts.append(f"""
+    <div class="sector-dominance-wrap">
+        <h2 class="section-label">Market Cap Dominance</h2>
+        <div class="sector-dominance-donut">{donut_chart_svg(donut_tokens, width=300, height=300, max_slices=10)}</div>
+    </div>""")
+
     # Sector cards grid
     cards = ""
     for sec_key, data in sorted_sectors:
