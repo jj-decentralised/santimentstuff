@@ -2947,6 +2947,61 @@ html.dark .onchain-narrative { background: #161B22; border-left-color: #58A6FF; 
 html.dark .composite-score { background: #161B22; }
 html.dark .onchain-health { background: #161B22; }
 
+/* Dark mode — signal summary */
+html.dark .signal-summary { background: #161B22; border-color: #30363D; }
+html.dark .signal-header { color: #C9D1D9; }
+html.dark .signal-row { color: #8B949E; }
+
+/* Dark mode — vol/mcap indicator */
+html.dark .vol-mcap-indicator { background: #161B22; border-color: #30363D; }
+html.dark .vm-header { color: #C9D1D9; }
+html.dark .vm-bar-track { background: #21262D; }
+
+/* Dark mode — tooltip hover cards */
+html.dark .metric-tip-card {
+  background: #1C2128;
+  color: #C9D1D9;
+  border-color: #30363D;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+html.dark .metric-tip-card::after { border-bottom-color: #1C2128; }
+html.dark .metric-abbr { border-bottom-color: #30363D; }
+
+/* Dark mode — tier breakdown */
+html.dark .tier-breakdown { background: #161B22; border-color: #30363D; }
+html.dark .tier-row { color: #8B949E; }
+html.dark .tier-bar { background: #21262D; }
+
+/* Dark mode — compare best highlight */
+html.dark .compare-best { background: rgba(16,185,129,0.12) !important; }
+
+/* Dark mode — allocation bar */
+html.dark .alloc-fill { opacity: 0.85; }
+html.dark .alloc-bar { background: #21262D; }
+
+/* Dark mode — header search */
+html.dark .header-search-input {
+  background: #0D1117;
+  border-color: #30363D;
+  color: #C9D1D9;
+}
+html.dark .header-search-input:focus {
+  border-color: #58A6FF;
+  background: #161B22;
+}
+
+/* Dark mode — sector breadth */
+html.dark .sector-breadth { color: #8B949E; }
+html.dark .sector-breadth-bar { background: #21262D; }
+
+/* Dark mode — sync progress */
+html.dark .sync-progress-wrap { background: #161B22; border-color: #30363D; }
+html.dark .sync-progress-bar { background: #21262D; }
+
+/* Dark mode — table hover */
+html.dark .data-table tbody tr:hover { background: #161B22; }
+html.dark .screener-table tbody tr:hover { background: #161B22; }
+
 /* Theme toggle in header */
 .theme-toggle {
   display: inline-flex;
