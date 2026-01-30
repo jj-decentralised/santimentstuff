@@ -1484,6 +1484,60 @@ def create_app() -> FastAPI:
     # JSON API ENDPOINTS (for programmatic access)
     # ============================================================
 
+    @app.get("/api", response_class=HTMLResponse)
+    async def get_api_docs():
+        """API documentation page."""
+        endpoints = [
+            ("GET", "/api/v1/market", "Paginated token list with latest metrics",
+             "page=1, per_page=100", '{"tokens": [...], "total": 3500, "page": 1}'),
+            ("GET", "/api/v1/profile/{slug}", "Full token profile with all metrics",
+             "slug (path)", '{"project": {...}, "metrics": {...}}'),
+            ("GET", "/api/v1/metric/{metric}", "Timeseries data for a specific metric",
+             "metric (path), slug (required), from_date, to_date",
+             '{"metric": "...", "slug": "...", "data": [...]}'),
+            ("GET", "/api/v1/valuation/{slug}", "Valuation summary with 90d/365d averages",
+             "slug (path)", '{"slug": "...", "valuation": {...}}'),
+            ("GET", "/api/v1/status", "System status and data pull progress",
+             "none", '{"pull_status": {...}, "cache_stats": {...}}'),
+            ("GET", "/explore/csv", "Export explore data as CSV download",
+             "sector, category, q, sort, order", "CSV file download"),
+        ]
+        rows = ""
+        for method, path, desc, params, response in endpoints:
+            rows += f"""<tr>
+                <td><span class="api-method">{method}</span></td>
+                <td class="col-name"><code>{_esc(path)}</code></td>
+                <td>{_esc(desc)}</td>
+                <td class="hide-mobile"><code>{_esc(params)}</code></td>
+                <td class="hide-mobile"><code>{_esc(response)[:60]}...</code></td>
+            </tr>"""
+        body = f"""
+        {_breadcrumbs(("API",))}
+        <h1 class="page-title">API Documentation</h1>
+        <p class="page-subtitle">JSON endpoints for programmatic access to on-chain data</p>
+        <div class="card" style="padding:16px">
+            <p style="font-size:0.8rem;margin-bottom:12px">Base URL: <code>https://santimentstuff-production-2305.up.railway.app</code></p>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px">All endpoints return JSON unless otherwise noted. No authentication required.</p>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr>
+                    <th>Method</th><th>Endpoint</th><th>Description</th>
+                    <th class="hide-mobile">Parameters</th><th class="hide-mobile">Response</th>
+                </tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+        <div class="card" style="padding:16px;margin-top:16px">
+            <div class="section-title">Example Usage</div>
+            <pre style="font-size:0.75rem;overflow-x:auto;padding:10px;background:var(--bg-alt);border-radius:4px"><code>curl https://santimentstuff-production-2305.up.railway.app/api/v1/market?page=1&amp;per_page=10
+
+curl https://santimentstuff-production-2305.up.railway.app/api/v1/profile/bitcoin
+
+curl https://santimentstuff-production-2305.up.railway.app/api/v1/metric/mvrv_usd?slug=ethereum</code></pre>
+        </div>"""
+        return page_shell("API Documentation", body)
+
     @app.get("/api/v1/market")
     async def get_market_overview(
         page: int = Query(default=1, ge=1),
