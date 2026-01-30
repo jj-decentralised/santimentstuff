@@ -547,6 +547,7 @@ a { color: inherit; text-decoration: none; }
 .mover-name .ticker { font-weight: 500; color: var(--text-muted); font-size: 0.72rem; }
 .mover-price { font-weight: 600; font-family: var(--mono); font-size: 0.78rem; }
 .mover-pct { font-weight: 700; font-family: var(--mono); font-size: 0.78rem; text-align: right; min-width: 52px; }
+.mover-spark { line-height: 0; flex-shrink: 0; }
 
 /* ================================================================
    TOP LISTS — Volume / Active Addresses

@@ -646,11 +646,14 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             for i, t in enumerate(items[:8]):
                 slug = t.get("slug", "")
                 pct = t.get("price_usd_change")
+                spark = t.get("sparkline_7d", [])
+                spark_html = sparkline_svg(spark, width=60, height=20) if spark and len(spark) >= 2 else ""
                 rows += (
                     f'<a href="/token/{slug}" class="mover-row">'
                     f'<span class="mover-rank">{i+1}</span>'
                     f'<span class="mover-name">{_esc(t.get("name", slug)[:18])} '
                     f'<span class="ticker">{_esc(t.get("ticker", ""))}</span></span>'
+                    f'<span class="mover-spark">{spark_html}</span>'
                     f'<span class="mover-price">{fmt_usd(t.get("price_usd"))}</span>'
                     f'<span class="mover-pct {css_class(pct)}">{fmt_pct(pct)}</span>'
                     f'</a>'
