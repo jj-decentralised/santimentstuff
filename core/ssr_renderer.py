@@ -788,9 +788,11 @@ def render_explore_page(
     sectors: dict = None,
     categories: dict = None,
     search: str = "",
+    briefing: dict = None,
 ) -> str:
     total_pages = max(1, (total + per_page - 1) // per_page)
     start = (page - 1) * per_page
+    briefing = briefing or {}
 
     parts = []
     sector_label = (sectors or {}).get(sector, "All Sectors") if sector != "all" else ""
@@ -799,6 +801,43 @@ def render_explore_page(
     parts.append(f"""
     <h1 class="page-title">Explore</h1>
     <p class="page-subtitle">{subtitle}</p>""")
+
+    # Market summary bar (from briefing data)
+    if briefing and page == 1 and not search:
+        total_mcap = briefing.get("total_mcap")
+        total_vol = briefing.get("total_vol")
+        breadth = briefing.get("breadth", {})
+        avg_mvrv = briefing.get("avg_mvrv")
+        up, down = breadth.get("up", 0), breadth.get("down", 0)
+        total_b = up + down + breadth.get("flat", 0)
+        up_pct = round(up / total_b * 100) if total_b else 0
+
+        # Top movers
+        gainers = briefing.get("gainers", [])[:5]
+        losers = briefing.get("losers", [])[:5]
+
+        gainer_chips = "".join(
+            f'<a href="/token/{g["slug"]}" class="mover-chip up">{_esc(g.get("ticker", ""))}: {fmt_pct(g.get("price_usd_change"))}</a>'
+            for g in gainers
+        )
+        loser_chips = "".join(
+            f'<a href="/token/{g["slug"]}" class="mover-chip down">{_esc(g.get("ticker", ""))}: {fmt_pct(g.get("price_usd_change"))}</a>'
+            for g in losers
+        )
+
+        parts.append(f"""
+    <div class="explore-summary">
+        <div class="explore-summary-stats">
+            <div class="explore-stat"><span class="explore-stat-label">Total MCap</span><span class="explore-stat-value">{fmt_usd(total_mcap)}</span></div>
+            <div class="explore-stat"><span class="explore-stat-label">24h Volume</span><span class="explore-stat-value">{fmt_usd(total_vol)}</span></div>
+            <div class="explore-stat"><span class="explore-stat-label">Breadth</span><span class="explore-stat-value">{up_pct}% up</span></div>
+            <div class="explore-stat"><span class="explore-stat-label">Avg MVRV</span><span class="explore-stat-value">{f"{avg_mvrv:.2f}" if avg_mvrv else "&mdash;"}</span></div>
+        </div>
+        <div class="explore-movers">
+            <div class="explore-movers-row"><span class="explore-movers-label up">Top Gainers</span>{gainer_chips}</div>
+            <div class="explore-movers-row"><span class="explore-movers-label down">Top Losers</span>{loser_chips}</div>
+        </div>
+    </div>""")
 
     # Search bar
     parts.append(f"""

@@ -1219,9 +1219,11 @@ def create_app() -> FastAPI:
     ):
         """Full token explorer with pagination and search."""
         tokens, total = _build_token_list(page, per_page, sector=sector, category=category, search=q)
+        # Get briefing data for movers summary (already cached)
+        briefing = _build_economy_briefing()
         return render_explore_page(tokens, page=page, per_page=per_page, total=total,
                                    sector=sector, category=category, sectors=SECTORS, categories=CATEGORIES,
-                                   search=q)
+                                   search=q, briefing=briefing)
 
     @app.get("/insights", response_class=HTMLResponse)
     async def get_insights_page(

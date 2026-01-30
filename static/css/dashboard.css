@@ -761,6 +761,78 @@ a { color: inherit; text-decoration: none; }
 .tf-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
 
 /* ================================================================
+   EXPLORE SUMMARY BAR
+   ================================================================ */
+.explore-summary {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+.explore-summary-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.explore-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.explore-stat-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.explore-stat-value {
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-family: var(--mono);
+}
+.explore-movers {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light);
+}
+.explore-movers-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.explore-movers-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.explore-movers-label.up { color: var(--green); }
+.explore-movers-label.down { color: var(--red); }
+.mover-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  transition: opacity 0.1s;
+}
+.mover-chip:hover { opacity: 0.8; }
+.mover-chip.up { background: var(--green-dim); color: var(--green); }
+.mover-chip.down { background: var(--red-dim); color: var(--red); }
+
+@media (max-width: 640px) {
+  .explore-summary-stats { gap: 12px; }
+  .explore-movers { flex-direction: column; gap: 6px; }
+}
+
+/* ================================================================
    SEARCH BAR
    ================================================================ */
 .search-bar {
