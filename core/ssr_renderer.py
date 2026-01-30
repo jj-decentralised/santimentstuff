@@ -1896,7 +1896,10 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
                 <div class="sector-overview-bar-fill" style="width:{min(pct_of_total, 100):.1f}%"></div>
             </div>
             <div class="sector-top-tokens">{top_list}</div>
-            <a href="/explore?sector={sec_key}" class="sector-overview-link">View all {data["count"]} tokens &rarr;</a>
+            <div class="sector-overview-actions">
+                <a href="/explore?sector={sec_key}" class="sector-overview-link">View all {data["count"]} &rarr;</a>
+                <a href="/compare?tokens={','.join(t['slug'] for t in data['top_tokens'][:5])}" class="sector-overview-link">Compare top 5</a>
+            </div>
         </div>"""
 
     parts.append(f'<div class="sector-overview-grid">{cards}</div>')

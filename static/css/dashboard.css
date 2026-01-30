@@ -2040,13 +2040,16 @@ a { color: inherit; text-decoration: none; }
   min-width: 48px;
   text-align: right;
 }
+.sector-overview-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-light);
+}
 .sector-overview-link {
-  display: block;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--text-secondary);
-  padding-top: 6px;
-  border-top: 1px solid var(--border-light);
   transition: color 0.1s;
 }
 .sector-overview-link:hover { color: var(--text); }
