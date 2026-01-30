@@ -1323,6 +1323,18 @@ def render_explore_page(
         <div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>
     </div>""")
 
+    # Category filter bar
+    if categories:
+        q_param = f"&q={_esc(search)}" if search else ""
+        sec_param = f"&sector={_esc(sector)}" if sector != "all" else ""
+        cat_btns = f'<a href="/explore?per_page={per_page}{sec_param}{q_param}" class="filter-btn{" active" if category == "all" else ""}">All</a>'
+        for key, label in sorted(categories.items(), key=lambda x: x[1]):
+            cat_btns += f'<a href="/explore?category={key}&per_page={per_page}{sec_param}{q_param}" class="filter-btn{" active" if key == category else ""}">{_esc(label)}</a>'
+        parts.append(f"""
+    <div class="filter-bar">
+        <div class="filter-group"><span class="filter-label">Category:</span>{cat_btns}</div>
+    </div>""")
+
     # Sort link helper
     def _sort_link(field, label):
         new_order = "asc" if sort_by == field and order == "desc" else "desc"
