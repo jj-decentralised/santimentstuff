@@ -1718,6 +1718,25 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
                     cls = "up" if v > 0 else "down" if v < 0 else "flat"
                     changes.append(f'<span class="change-pill {cls}">{label} {fmt_pct(v)}</span>')
 
+    # 52w (all-data) High/Low range indicator
+    range_html = ""
+    if price and price_ts and len(price_ts) >= 30:
+        all_prices = [d.get("value") for d in price_ts if d.get("value") is not None and d.get("value") > 0]
+        if all_prices:
+            hi = max(all_prices)
+            lo = min(all_prices)
+            rng = hi - lo
+            pos_pct = ((price - lo) / rng * 100) if rng > 0 else 50
+            from_hi = ((price - hi) / hi * 100) if hi else 0
+            from_lo = ((price - lo) / lo * 100) if lo else 0
+            range_html = f"""<div class="price-range-wrap">
+                <div class="price-range-labels"><span>{fmt_usd(lo)}</span><span class="price-range-title">Price Range ({len(all_prices)}d)</span><span>{fmt_usd(hi)}</span></div>
+                <div class="price-range-track">
+                    <div class="price-range-marker" style="left:{pos_pct:.1f}%"></div>
+                </div>
+                <div class="price-range-dist"><span class="up">{from_lo:+.1f}% from low</span><span class="down">{from_hi:+.1f}% from high</span></div>
+            </div>"""
+
     # Alert badges — highlight notable metric thresholds
     alerts = []
     if mvrv is not None:
@@ -2198,6 +2217,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         </div>
     </div>
 
+    {range_html}
     {alerts_html}
     {health_score_html}
     {vol_mcap_html}

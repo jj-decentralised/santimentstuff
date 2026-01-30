@@ -1228,6 +1228,48 @@ html.dark .spark-grid-cell { background: #161B22; border-color: #30363D; }
   border-color: var(--accent);
 }
 
+/* Price range indicator */
+.price-range-wrap {
+  margin: 8px 0 12px;
+  max-width: 360px;
+}
+.price-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  font-family: var(--mono);
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.price-range-title {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.price-range-track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--red), var(--yellow) 50%, var(--green));
+  opacity: 0.7;
+}
+.price-range-marker {
+  position: absolute;
+  top: -4px;
+  width: 4px;
+  height: 14px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transform: translateX(-2px);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.price-range-dist {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.58rem;
+  font-family: var(--mono);
+  margin-top: 2px;
+}
+
 /* Alert badges */
 .alert-badges {
   display: flex;
