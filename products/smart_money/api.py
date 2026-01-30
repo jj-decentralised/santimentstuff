@@ -723,10 +723,17 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/status")
     async def get_status():
         """System status and pull progress."""
+        db_path = _san_cache._db_path if _san_cache else None
+        volume_mounted = os.path.isdir("/data")
         return {
             "pull_status": _san_pull_status,
             "cache_stats": _san_cache.get_pull_stats() if _san_cache else None,
             "client_stats": _san_client.stats if _san_client else None,
+            "storage": {
+                "db_path": db_path,
+                "volume_mounted": volume_mounted,
+                "persistent": db_path.startswith("/data") if db_path else False,
+            },
         }
 
     @app.post("/api/v1/retry")
