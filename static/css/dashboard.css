@@ -47,6 +47,53 @@ body {
 a { color: inherit; text-decoration: none; }
 
 /* ================================================================
+   TICKER STRIP — Market price bar above header
+   ================================================================ */
+.ticker-strip {
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ticker-strip::-webkit-scrollbar { display: none; }
+.ticker-strip-inner {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 4px 20px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-width: max-content;
+}
+.ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  transition: opacity 0.1s;
+}
+.ticker-item:hover { opacity: 0.7; }
+.ticker-item-name {
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-family: var(--mono);
+}
+.ticker-item-price {
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--mono);
+}
+.ticker-item-pct {
+  font-weight: 700;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+}
+.ticker-item-pct.up { color: var(--green); }
+.ticker-item-pct.down { color: var(--red); }
+.ticker-item-pct.muted { color: var(--text-muted); }
+
+/* ================================================================
    HEADER — Sticky dark bar
    ================================================================ */
 .header {
@@ -654,6 +701,42 @@ a { color: inherit; text-decoration: none; }
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
 }
+
+/* ================================================================
+   SEARCH BAR
+   ================================================================ */
+.search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.search-input {
+  flex: 1;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  background: var(--bg-card);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s;
+}
+.search-input:focus { border-color: var(--text-muted); }
+.search-input::placeholder { color: var(--text-faint); }
+.search-btn {
+  padding: 8px 18px;
+  background: var(--text);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.search-btn:hover { opacity: 0.85; }
 
 /* ================================================================
    SCREENER — Filters

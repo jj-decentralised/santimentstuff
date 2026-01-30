@@ -96,7 +96,16 @@ def _esc(s):
 # PAGE SHELL
 # ================================================================
 
-def page_shell(title: str, body: str, active_nav: str = "") -> str:
+# Module-level ticker data getter — set by api.py at startup
+_ticker_data_fn = None
+
+def set_ticker_data_fn(fn):
+    """Set the function that provides ticker data for the header strip."""
+    global _ticker_data_fn
+    _ticker_data_fn = fn
+
+
+def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = None) -> str:
     nav_items = [
         ("briefing", "/", "Briefing"),
         ("insights", "/insights", "Insights"),
@@ -111,17 +120,45 @@ def page_shell(title: str, body: str, active_nav: str = "") -> str:
         for key, href, label in nav_items
     )
 
+    # Market ticker strip — use passed data or fetch from global getter
+    if ticker_data is None and _ticker_data_fn:
+        try:
+            ticker_data = _ticker_data_fn()
+        except Exception:
+            ticker_data = None
+    ticker_html = ""
+    if ticker_data:
+        ticker_items = ""
+        for t in ticker_data:
+            pct = t.get("change")
+            cls = "up" if pct and pct > 0 else "down" if pct and pct < 0 else "muted"
+            pct_str = f"{pct:+.1f}%" if pct is not None else ""
+            ticker_items += (
+                f'<a href="/token/{t["slug"]}" class="ticker-item">'
+                f'<span class="ticker-item-name">{_esc(t.get("ticker", ""))}</span>'
+                f'<span class="ticker-item-price">{fmt_usd(t.get("price"))}</span>'
+                f'<span class="ticker-item-pct {cls}">{pct_str}</span>'
+                f'</a>'
+            )
+        ticker_html = f'<div class="ticker-strip"><div class="ticker-strip-inner">{ticker_items}</div></div>'
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{_esc(title)} — Onchain Pulse</title>
+    <meta name="description" content="Real-time on-chain crypto analytics powered by Santiment. MVRV, active addresses, exchange flows, dev activity across 3500+ tokens.">
+    <meta property="og:title" content="{_esc(title)} — Onchain Pulse">
+    <meta property="og:description" content="On-chain crypto analytics dashboard. MVRV zones, network health, smart money signals.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
+    {ticker_html}
     <header class="header">
         <div class="header-inner">
             <a href="/" class="logo">Onchain<span>Pulse</span></a>
@@ -739,22 +776,34 @@ def render_explore_page(
     category: str = "all",
     sectors: dict = None,
     categories: dict = None,
+    search: str = "",
 ) -> str:
     total_pages = max(1, (total + per_page - 1) // per_page)
     start = (page - 1) * per_page
 
     parts = []
     sector_label = (sectors or {}).get(sector, "All Sectors") if sector != "all" else ""
-    subtitle = f"{total} tokens" + (f" in {sector_label}" if sector_label else "") + " ranked by market cap"
+    search_note = f' matching "{_esc(search)}"' if search else ""
+    subtitle = f"{total} tokens" + (f" in {sector_label}" if sector_label else "") + search_note + " ranked by market cap"
     parts.append(f"""
     <h1 class="page-title">Explore</h1>
     <p class="page-subtitle">{subtitle}</p>""")
 
+    # Search bar
+    parts.append(f"""
+    <form class="search-bar" action="/explore" method="get">
+        <input type="text" name="q" value="{_esc(search)}" placeholder="Search by name, ticker, or slug..." class="search-input" autocomplete="off">
+        <button type="submit" class="search-btn">Search</button>
+        {f'<input type="hidden" name="sector" value="{_esc(sector)}">' if sector != "all" else ""}
+        <input type="hidden" name="per_page" value="{per_page}">
+    </form>""")
+
     # Sector filter bar
     if sectors:
-        sector_btns = f'<a href="/explore?per_page={per_page}" class="filter-btn{"  active" if sector == "all" else ""}">All</a>'
+        q_param = f"&q={_esc(search)}" if search else ""
+        sector_btns = f'<a href="/explore?per_page={per_page}{q_param}" class="filter-btn{"  active" if sector == "all" else ""}">All</a>'
         for key, label in sorted(sectors.items(), key=lambda x: x[1]):
-            sector_btns += f'<a href="/explore?sector={key}&per_page={per_page}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
+            sector_btns += f'<a href="/explore?sector={key}&per_page={per_page}{q_param}" class="filter-btn{" active" if key == sector else ""}">{_esc(label)}</a>'
         parts.append(f"""
     <div class="filter-bar">
         <div class="filter-group"><span class="filter-label">Sector:</span>{sector_btns}</div>
@@ -814,6 +863,8 @@ def render_explore_page(
             qs += f"&sector={sector}"
         if category != "all":
             qs += f"&category={category}"
+        if search:
+            qs += f"&q={_esc(search)}"
         pg = []
         pg.append(f'<a href="/explore?page={page-1}&{qs}" class="page-btn">&laquo;</a>' if page > 1 else '<span class="page-btn disabled">&laquo;</span>')
         for p in range(1, total_pages + 1):
@@ -1042,6 +1093,7 @@ def render_screener_page(
     sort_by: str = "marketcap_usd", order: str = "desc",
     sector: str = "all", category: str = "all",
     sectors: dict = None, categories: dict = None,
+    search: str = "",
 ) -> str:
     _sectors = sectors or {}
     _categories = categories or {}
@@ -1095,9 +1147,18 @@ def render_screener_page(
             <td class="col-tag hide-mobile">{zone_html}</td>
         </tr>""")
 
+    search_note = f' matching "{_esc(search)}"' if search else ""
     body = f"""
     <h1 class="page-title">Screener</h1>
-    <p class="page-subtitle">Filter and sort {len(tokens)} tokens</p>
+    <p class="page-subtitle">Filter and sort {len(tokens)} tokens{search_note}</p>
+    <form class="search-bar" action="/screener" method="get">
+        <input type="text" name="q" value="{_esc(search)}" placeholder="Search tokens..." class="search-input" autocomplete="off">
+        <button type="submit" class="search-btn">Search</button>
+        <input type="hidden" name="tier" value="{_esc(tier)}">
+        <input type="hidden" name="sort" value="{_esc(sort_by)}">
+        <input type="hidden" name="order" value="{_esc(order)}">
+        {f'<input type="hidden" name="sector" value="{_esc(sector)}">' if sector != "all" else ""}
+    </form>
     <div class="filter-bar">
         <div class="filter-group"><span class="filter-label">Tier:</span>{tier_btns}</div>
     </div>

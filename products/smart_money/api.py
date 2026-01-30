@@ -38,6 +38,7 @@ from core.ssr_renderer import (
     render_sync_page,
     render_compare_page,
     render_screener_page,
+    set_ticker_data_fn,
     fmt_usd,
     fmt_pct,
     pct_class,
@@ -646,6 +647,28 @@ def _get_summary_tokens() -> list[dict]:
     return _cached("summary_tokens", lambda: _build_bulk_token_data(SUMMARY_METRICS))
 
 
+# Ticker strip data — top tokens for the price bar across all pages
+_TICKER_SLUGS = ["bitcoin", "ethereum", "solana", "xrp", "binance-coin", "cardano", "dogecoin", "avalanche"]
+
+def _get_ticker_data() -> list[dict]:
+    """Return compact price data for the header ticker strip."""
+    def _build():
+        tokens = _get_all_tokens()
+        slug_map = {t["slug"]: t for t in tokens}
+        result = []
+        for slug in _TICKER_SLUGS:
+            t = slug_map.get(slug)
+            if t:
+                result.append({
+                    "slug": slug,
+                    "ticker": t.get("ticker", ""),
+                    "price": t.get("price_usd"),
+                    "change": t.get("price_usd_change"),
+                })
+        return result
+    return _cached("ticker_data", _build)
+
+
 # ── Economy-level aggregates ─────────────────────────────────
 
 def _build_economy_briefing() -> dict:
@@ -1051,8 +1074,11 @@ def _build_insights_data(view_id: str = "mvrv_nvt") -> dict:
 
 # ── Page-specific data builders ──────────────────────────────
 
-def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE, sector: str = "all", category: str = "all"):
+def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE, sector: str = "all", category: str = "all", search: str = ""):
     tokens = _get_all_tokens()
+    if search:
+        q = search.lower().strip()
+        tokens = [t for t in tokens if q in t.get("name", "").lower() or q in t.get("slug", "").lower() or q in t.get("ticker", "").lower()]
     if sector != "all":
         tokens = [t for t in tokens if t.get("sector") == sector]
     if category != "all":
@@ -1098,8 +1124,12 @@ def _build_screener_tokens(
     min_change=-999, max_change=999,
     sort_by="marketcap_usd", order="desc",
     sector="all", category="all",
+    search: str = "",
 ):
     tokens = _get_all_tokens()
+    if search:
+        sq = search.lower().strip()
+        tokens = [t for t in tokens if sq in t.get("name", "").lower() or sq in t.get("slug", "").lower() or sq in t.get("ticker", "").lower()]
     filtered = []
     for t in tokens:
         mcap = t.get("marketcap_usd") or 0
@@ -1162,6 +1192,9 @@ def create_app() -> FastAPI:
     if os.path.exists(static_path):
         app.mount("/static", StaticFiles(directory=static_path), name="static")
 
+    # Register ticker data function for header strip
+    set_ticker_data_fn(_get_ticker_data)
+
     # ============================================================
     # SERVER-RENDERED PAGES (no JS required)
     # ============================================================
@@ -1181,11 +1214,13 @@ def create_app() -> FastAPI:
         per_page: int = Query(default=DEFAULT_PAGE_SIZE, ge=10, le=MAX_PAGE_SIZE),
         sector: str = Query(default="all"),
         category: str = Query(default="all"),
+        q: str = Query(default=""),
     ):
-        """Full token explorer with pagination."""
-        tokens, total = _build_token_list(page, per_page, sector=sector, category=category)
+        """Full token explorer with pagination and search."""
+        tokens, total = _build_token_list(page, per_page, sector=sector, category=category, search=q)
         return render_explore_page(tokens, page=page, per_page=per_page, total=total,
-                                   sector=sector, category=category, sectors=SECTORS, categories=CATEGORIES)
+                                   sector=sector, category=category, sectors=SECTORS, categories=CATEGORIES,
+                                   search=q)
 
     @app.get("/insights", response_class=HTMLResponse)
     async def get_insights_page(
@@ -1234,8 +1269,9 @@ def create_app() -> FastAPI:
         order: str = Query(default="desc"),
         sector: str = Query(default="all"),
         category: str = Query(default="all"),
+        q: str = Query(default=""),
     ):
-        """Token screener with filters."""
+        """Token screener with filters and search."""
         tier_ranges = {
             "mega": (100e9, float("inf")),
             "large": (10e9, 100e9),
@@ -1245,11 +1281,11 @@ def create_app() -> FastAPI:
             "all": (0, float("inf")),
         }
         min_mcap, max_mcap = tier_ranges.get(tier, (0, float("inf")))
-        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order, sector, category)
+        tokens = _build_screener_tokens(min_mcap, max_mcap, min_change, max_change, sort, order, sector, category, search=q)
         return render_screener_page(
             tokens, tier=tier, min_change=min_change, max_change=max_change,
             sort_by=sort, order=order, sector=sector, category=category,
-            sectors=SECTORS, categories=CATEGORIES,
+            sectors=SECTORS, categories=CATEGORIES, search=q,
         )
 
     @app.get("/token/{slug}", response_class=HTMLResponse)
