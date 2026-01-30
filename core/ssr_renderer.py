@@ -92,6 +92,18 @@ def _esc(s):
     return html_mod.escape(str(s)) if s else ""
 
 
+def _breadcrumbs(*crumbs: tuple) -> str:
+    """Generate a breadcrumb trail.  Each crumb is (label, url) or just (label,) for the current page."""
+    items = ['<a href="/" class="bc-link">Home</a>']
+    for c in crumbs:
+        if len(c) == 2:
+            items.append(f'<a href="{c[1]}" class="bc-link">{_esc(c[0])}</a>')
+        else:
+            items.append(f'<span class="bc-current">{_esc(c[0])}</span>')
+    sep = ' <span class="bc-sep">›</span> '
+    return f'<nav class="breadcrumbs" aria-label="Breadcrumb">{sep.join(items)}</nav>'
+
+
 # ================================================================
 # PAGE SHELL
 # ================================================================
@@ -653,6 +665,7 @@ def render_insights_page(
     # Header
     sector_label = _sectors.get(sector, "") if sector != "all" else ""
     subtitle_extra = f" — {sector_label}" if sector_label else ""
+    parts.append(_breadcrumbs(("Insights",)))
     parts.append(f"""
     <h1 class="page-title">On-Chain Insights</h1>
     <p class="page-subtitle">Cross-metric scatter plots and thesis categorization{subtitle_extra} &middot; {len(insights.get("points", []))} tokens plotted</p>""")
@@ -830,6 +843,8 @@ def render_explore_page(
     sector_label = (sectors or {}).get(sector, "All Sectors") if sector != "all" else ""
     search_note = f' matching "{_esc(search)}"' if search else ""
     subtitle = f"{total} tokens" + (f" in {sector_label}" if sector_label else "") + search_note + " ranked by market cap"
+    bc_crumbs = [("Explore",)] if sector == "all" else [("Explore", "/explore"), (sector_label,)]
+    parts.append(_breadcrumbs(*bc_crumbs))
     parts.append(f"""
     <h1 class="page-title">Explore</h1>
     <p class="page-subtitle">{subtitle}</p>""")
@@ -1123,11 +1138,9 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         zone_label, zone_css, zone_desc = mvrv_zone(mvrv)
         mvrv_html = f'<div class="profile-mvrv"><span class="zone {zone_css}">{zone_label}</span> <span class="profile-mvrv-val">MVRV {mvrv:.2f}</span></div>'
 
+    _bc = _breadcrumbs(("Explore", "/explore"), (f"{name} ({ticker})",))
     body = f"""
-    <div class="profile-nav-row">
-        <a href="/" class="back-link">&larr; Briefing</a>
-        <a href="/explore" class="back-link">Explore</a>
-    </div>
+    {_bc}
 
     <div class="profile-hero">
         <div>
@@ -1265,6 +1278,7 @@ def render_compare_page(tokens: list) -> str:
     slug_list = ",".join(t.get("slug", "") for t in tokens)
 
     body = f"""
+    {_breadcrumbs(("Compare",))}
     <h1 class="page-title">Compare Tokens</h1>
     <p class="page-subtitle">Side-by-side on-chain comparison</p>
     <div class="compare-bar">
@@ -1358,6 +1372,7 @@ def render_screener_page(
 
     search_note = f' matching "{_esc(search)}"' if search else ""
     body = f"""
+    {_breadcrumbs(("Screener",))}
     <h1 class="page-title">Screener</h1>
     <p class="page-subtitle">Filter and sort {len(tokens)} tokens{search_note}</p>
     <form class="search-bar" action="/screener" method="get">
@@ -1445,6 +1460,7 @@ def render_valuation_page(tokens: list, sector: str = "all", sectors: dict = Non
 
     sector_note = f' in {(sectors or {}).get(sector, sector)}' if sector != "all" else ""
     body = f"""
+    {_breadcrumbs(("Valuation",))}
     <h1 class="page-title">Valuation Scanner</h1>
     <p class="page-subtitle">MVRV zones across {len(tokens)} tokens{sector_note}</p>
     {sector_filter}
@@ -1527,6 +1543,7 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
 def render_developers_page(tokens: list, sector: str = "all", sectors: dict = None) -> str:
     parts = []
     sector_note = f' in {(sectors or {}).get(sector, sector)}' if sector != "all" else ""
+    parts.append(_breadcrumbs(("Developers",)))
     parts.append(f"""
     <h1 class="page-title">Developer Activity</h1>
     <p class="page-subtitle">Top {len(tokens)} projects by dev activity{sector_note}</p>""")
@@ -1603,6 +1620,7 @@ def render_sectors_page(sector_details: dict, sector_labels: dict) -> str:
     sorted_sectors = sorted(sector_details.items(), key=lambda x: x[1]["mcap"], reverse=True)
 
     parts = []
+    parts.append(_breadcrumbs(("Sectors",)))
     parts.append("""
     <h1 class="page-title">Sector Overview</h1>
     <p class="page-subtitle">Performance breakdown by sector</p>""")
@@ -1669,6 +1687,7 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
     slugs_str = ",".join(slug_list)
 
     parts = []
+    parts.append(_breadcrumbs(("Watchlist",)))
     parts.append(f"""
     <h1 class="page-title">Watchlist</h1>
     <p class="page-subtitle">Track your favorite tokens &middot; Bookmark this URL to save your list</p>""")
