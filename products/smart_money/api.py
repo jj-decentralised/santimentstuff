@@ -1218,6 +1218,25 @@ def create_app() -> FastAPI:
     # Register ticker data function for header strip
     set_ticker_data_fn(_get_ticker_data)
 
+    # Custom 404 page
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    @app.exception_handler(404)
+    async def not_found_handler(request, exc):
+        body = """
+        <div class="empty-state" style="padding:60px 0">
+            <div class="empty-state-icon" style="font-size:3rem">&#9888;</div>
+            <h2>404 — Page Not Found</h2>
+            <p>The page you're looking for doesn't exist or has been moved.</p>
+            <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+                <a href="/" class="filter-btn active">Briefing</a>
+                <a href="/explore" class="filter-btn">Explore</a>
+                <a href="/screener" class="filter-btn">Screener</a>
+                <a href="/sectors" class="filter-btn">Sectors</a>
+            </div>
+        </div>"""
+        return HTMLResponse(page_shell("404 Not Found", body), status_code=404)
+
     # ============================================================
     # SERVER-RENDERED PAGES (no JS required)
     # ============================================================
