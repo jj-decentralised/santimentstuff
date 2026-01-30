@@ -334,10 +334,13 @@ def line_chart_svg(
     # If all values are positive, don't show negative Y
     all_positive = min(all_values) >= 0
     if all_positive:
-        clamped_lo = max(0, clamped_lo * 0.9)  # start near 0 or 90% of min
-        # If min is close to 0, just start at 0
-        if clamped_lo < clamped_hi * 0.15:
+        # Use 90% of clamped low as floor, but only go to 0 if the
+        # min is truly near zero relative to the range
+        range_span = clamped_hi - clamped_lo
+        if range_span > 0 and clamped_lo < range_span * 0.08:
             clamped_lo = 0
+        else:
+            clamped_lo = max(0, clamped_lo * 0.92)
 
     # Compute nice ticks
     ticks = _nice_ticks(clamped_lo, clamped_hi, y_label_count)
@@ -395,6 +398,21 @@ def line_chart_svg(
             continue
 
         color = s.get("color") or COLORS[si % len(COLORS)]
+
+        # Downsample very dense data to ~350 points using largest-triangle
+        # This keeps visual peaks/valleys while reducing SVG path complexity
+        max_points = 350
+        if len(data) > max_points:
+            step = len(data) / max_points
+            sampled = []
+            for j in range(max_points):
+                idx = int(j * step)
+                sampled.append(data[min(idx, len(data) - 1)])
+            # Always include last point
+            if sampled[-1] is not data[-1]:
+                sampled[-1] = data[-1]
+            data = sampled
+
         n = len(data)
 
         # Build points
@@ -422,12 +440,14 @@ def line_chart_svg(
         if not points:
             continue
 
-        # Gradient definition
+        # Gradient definition — lighter for dense data
         gid = f"grad_{si}_{abs(hash(color)) % 99999}"
-        defs.append(_gradient_def(gid, color, 0.15, 0.01))
+        grad_opacity = 0.08 if len(points) > 200 else 0.15
+        defs.append(_gradient_def(gid, color, grad_opacity, 0.01))
 
-        # Smooth path
-        line_d = _smooth_path(points, tension=0.25)
+        # Smooth path — use lower tension for dense data to avoid spikiness
+        tension = 0.15 if len(points) > 200 else 0.25
+        line_d = _smooth_path(points, tension=tension)
 
         # Area fill — clipped to chart bottom
         if show_area and len(series) <= 2:
@@ -446,8 +466,13 @@ def line_chart_svg(
                 f'<path d="{area_d}" fill="url(#{gid})" clip-path="url(#{clip_id})"/>'
             )
 
-        # Line
-        stroke_w = "2" if len(series) == 1 else "1.5"
+        # Line — thinner for dense datasets to avoid "hair" effect
+        if len(points) > 250:
+            stroke_w = "1.2"
+        elif len(series) == 1:
+            stroke_w = "1.8"
+        else:
+            stroke_w = "1.5"
         elements.append(
             f'<path d="{line_d}" fill="none" stroke="{color}" '
             f'stroke-width="{stroke_w}" stroke-linecap="round" stroke-linejoin="round"/>'
@@ -483,15 +508,15 @@ def line_chart_svg(
                     f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="4" '
                     f'fill="white" stroke="{color}" stroke-width="2"/>'
                 )
-                # Position label to avoid clipping
-                lbl_x = lx - 8
+                # Position label to avoid overlapping endpoint circle
+                lbl_x = lx - 14
                 anchor = "end"
                 if lx < pad_left + chart_w * 0.3:
-                    lbl_x = lx + 8
+                    lbl_x = lx + 14
                     anchor = "start"
-                lbl_y = ly - 8
-                if lbl_y < pad_top + 12:
-                    lbl_y = ly + 16
+                lbl_y = ly - 12
+                if lbl_y < pad_top + 14:
+                    lbl_y = ly + 20
                 elements.append(
                     f'<text x="{lbl_x:.1f}" y="{lbl_y:.1f}" text-anchor="{anchor}" '
                     f'font-size="10" font-weight="700" fill="{color}" '
