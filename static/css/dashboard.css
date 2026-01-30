@@ -1417,6 +1417,13 @@ a { color: inherit; text-decoration: none; }
 .corr-med { background: #FEF3C7; color: #92400E; }
 .corr-low { background: #F3F4F6; color: var(--text-secondary); }
 .corr-neg { background: #FEE2E2; color: #991B1B; }
+.radar-wrap {
+  display: flex;
+  justify-content: center;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 8px 0;
+}
 .section-subtitle { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 10px; }
 /* Glossary page */
 .glossary-grid {

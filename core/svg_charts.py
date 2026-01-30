@@ -1379,3 +1379,115 @@ def bar_chart_svg(
 
     elements.append('</svg>')
     return "\n".join(elements)
+
+
+# ============================================================
+# RADAR CHART — Spider/radar for multi-dimensional comparison
+# ============================================================
+
+def radar_chart_svg(
+    items: list[dict],
+    axes: list[tuple[str, str]],
+    width: int = 360,
+    height: int = 360,
+) -> str:
+    """Render a radar/spider chart SVG.
+
+    items: list of {"label": str, "values": {axis_key: float, ...}, "color": str}
+    axes: list of (key, display_label) tuples for each axis
+    """
+    if not items or len(axes) < 3:
+        return '<div class="chart-empty">Need at least 3 axes for radar</div>'
+
+    n_axes = len(axes)
+    cx, cy = width / 2, height / 2
+    r_max = min(width, height) / 2 - 40
+
+    elements = [
+        f'<svg width="100%" viewBox="0 0 {width} {height}" '
+        f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
+    ]
+
+    # Compute global max per axis for normalization
+    axis_max = {}
+    for key, _ in axes:
+        vals = [item["values"].get(key, 0) for item in items]
+        axis_max[key] = max(vals) if vals and max(vals) > 0 else 1
+
+    # Draw concentric rings (5 levels)
+    for level in range(1, 6):
+        r = r_max * level / 5
+        ring_pts = []
+        for i in range(n_axes):
+            angle = -math.pi / 2 + (2 * math.pi * i / n_axes)
+            ring_pts.append(f"{cx + r * math.cos(angle):.1f},{cy + r * math.sin(angle):.1f}")
+        elements.append(
+            f'<polygon points="{" ".join(ring_pts)}" '
+            f'fill="none" stroke="#E5E7EB" stroke-width="0.5"/>'
+        )
+
+    # Draw axis lines and labels
+    for i, (key, label) in enumerate(axes):
+        angle = -math.pi / 2 + (2 * math.pi * i / n_axes)
+        ex = cx + r_max * math.cos(angle)
+        ey = cy + r_max * math.sin(angle)
+        elements.append(
+            f'<line x1="{cx}" y1="{cy}" x2="{ex:.1f}" y2="{ey:.1f}" '
+            f'stroke="#D1D5DB" stroke-width="0.5"/>'
+        )
+        # Label position (slightly beyond max radius)
+        lx = cx + (r_max + 18) * math.cos(angle)
+        ly = cy + (r_max + 18) * math.sin(angle)
+        anchor = "middle"
+        if lx < cx - 10:
+            anchor = "end"
+        elif lx > cx + 10:
+            anchor = "start"
+        elements.append(
+            f'<text x="{lx:.1f}" y="{ly + 3:.1f}" text-anchor="{anchor}" '
+            f'font-size="9" font-weight="600" fill="#6B7280" '
+            f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
+        )
+
+    # Draw data polygons
+    for item in items:
+        color = item.get("color", "#3B82F6")
+        pts = []
+        for i, (key, _) in enumerate(axes):
+            val = item["values"].get(key, 0)
+            norm = (val / axis_max[key]) if axis_max[key] > 0 else 0
+            norm = min(1.0, max(0, norm))
+            r = r_max * norm
+            angle = -math.pi / 2 + (2 * math.pi * i / n_axes)
+            pts.append(f"{cx + r * math.cos(angle):.1f},{cy + r * math.sin(angle):.1f}")
+
+        elements.append(
+            f'<polygon points="{" ".join(pts)}" '
+            f'fill="{color}" fill-opacity="0.12" '
+            f'stroke="{color}" stroke-width="1.5" stroke-linejoin="round">'
+            f'<title>{html_mod.escape(item.get("label", ""))}</title></polygon>'
+        )
+        # Dots on vertices
+        for pt in pts:
+            px, py = pt.split(",")
+            elements.append(
+                f'<circle cx="{px}" cy="{py}" r="2.5" fill="{color}" stroke="white" stroke-width="1"/>'
+            )
+
+    # Legend
+    leg_y = height - 14
+    leg_x = 10
+    for item in items:
+        color = item.get("color", "#3B82F6")
+        label = item.get("label", "")[:15]
+        elements.append(
+            f'<circle cx="{leg_x + 5}" cy="{leg_y}" r="4" fill="{color}"/>'
+        )
+        elements.append(
+            f'<text x="{leg_x + 13}" y="{leg_y + 3.5}" font-size="9" font-weight="600" '
+            f'fill="#374151" font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
+        )
+        leg_x += len(label) * 5.5 + 24
+
+    elements.append('</svg>')
+    return "\n".join(elements)

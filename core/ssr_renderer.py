@@ -16,7 +16,7 @@ from .svg_charts import (
     sparkline_svg, line_chart_svg, chart_panel, comparison_table,
     market_heatmap_svg, dominance_bar_svg, donut_chart_svg,
     sentiment_gauge_svg, mini_trend_svg,
-    scatter_plot_svg, bar_chart_svg, THESIS_COLORS,
+    scatter_plot_svg, bar_chart_svg, radar_chart_svg, THESIS_COLORS,
 )
 
 
@@ -1799,6 +1799,7 @@ def render_compare_page(tokens: list) -> str:
         {comp_table}
     </div>
     {corr_html}
+    {_compare_radar(tokens)}
     <div class="section">
         <div class="section-title">Charts</div>
         <div class="chart-grid chart-grid-2">
@@ -1812,6 +1813,42 @@ def render_compare_page(tokens: list) -> str:
 # ================================================================
 # SCREENER PAGE
 # ================================================================
+
+def _compare_radar(tokens: list) -> str:
+    """Build a radar chart comparing key metrics across tokens."""
+    from .svg_charts import COLORS
+    radar_axes = [
+        ("marketcap_usd", "Market Cap"),
+        ("volume_usd", "Volume"),
+        ("daily_active_addresses", "Active Addr"),
+        ("dev_activity", "Dev Activity"),
+        ("mvrv_usd", "MVRV"),
+        ("exchange_balance", "Exch Balance"),
+    ]
+    items = []
+    for i, t in enumerate(tokens):
+        m = t.get("metrics", {})
+        values = {}
+        for key, _ in radar_axes:
+            v = m.get(key, {}).get("latest")
+            values[key] = abs(v) if v is not None else 0
+        if any(v > 0 for v in values.values()):
+            items.append({
+                "label": t.get("ticker") or t.get("name", "")[:8],
+                "values": values,
+                "color": COLORS[i % len(COLORS)],
+            })
+
+    if len(items) < 2:
+        return ""
+
+    return f"""
+    <div class="section">
+        <div class="section-title">Metric Radar</div>
+        <p class="section-subtitle">Normalized comparison across key on-chain metrics</p>
+        <div class="radar-wrap">{radar_chart_svg(items, radar_axes)}</div>
+    </div>"""
+
 
 def render_screener_page(
     tokens: list, tier: str = "all",
