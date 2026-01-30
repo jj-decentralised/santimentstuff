@@ -47,6 +47,7 @@ from core.ssr_renderer import (
     fmt_usd,
     fmt_pct,
     pct_class,
+    render_glossary_page,
 )
 
 logger = logging.getLogger(__name__)
@@ -1481,6 +1482,11 @@ def create_app() -> FastAPI:
                 break
 
         return render_token_profile(project, metrics, slug, timeframe=tf, token_info=token_info, related_tokens=related_tokens, prev_token=prev_token, next_token=next_token)
+
+    @app.get("/glossary", response_class=HTMLResponse)
+    async def get_glossary_page():
+        """Metric glossary — explanations of all on-chain metrics."""
+        return render_glossary_page()
 
     # ============================================================
     # JSON API ENDPOINTS (for programmatic access)

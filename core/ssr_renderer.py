@@ -236,6 +236,8 @@ def page_shell(title: str, body: str, active_nav: str = "", ticker_data: list = 
                 <a href="/compare?tokens=bitcoin,ethereum,solana">Compare</a>
                 <a href="/watchlist?tokens=bitcoin,ethereum,solana">Watchlist</a>
                 <a href="/sync">Sync Status</a>
+                <a href="/glossary">Glossary</a>
+                <a href="/api">API</a>
             </div>
             <div class="footer-meta">
                 On-chain data via <strong>Santiment</strong>. Refreshed daily. Not financial advice.
@@ -2001,3 +2003,82 @@ def render_watchlist_page(tokens: list, slug_list: list = None) -> str:
         parts.append(f'<div class="card-footer" style="margin-top:12px"><a href="/compare?tokens={_esc(slugs_str)}">Compare these tokens side-by-side &rarr;</a></div>')
 
     return page_shell("Watchlist", "\n".join(parts), active_nav="watchlist")
+
+
+# ================================================================
+# GLOSSARY PAGE
+# ================================================================
+
+def render_glossary_page() -> str:
+    metrics = [
+        ("MVRV (Market Value to Realized Value)", "mvrv_usd",
+         "Compares current market cap to realized cap (the value when each coin last moved on-chain). "
+         "Below 1.0 historically signals undervaluation; above 3.0 often precedes corrections.",
+         [("< 0.7", "Deep Value — strong buying zone historically"),
+          ("0.7 – 1.0", "Undervalued — accumulation territory"),
+          ("1.0 – 1.5", "Fair Value — balanced market"),
+          ("1.5 – 2.5", "Elevated — caution warranted"),
+          ("2.5 – 3.5", "Overvalued — distribution risk"),
+          ("> 3.5", "Euphoria — extreme caution")]),
+        ("NVT Ratio (Network Value to Transactions)", "nvt",
+         "Crypto equivalent of P/E ratio. Divides market cap by on-chain transaction volume. "
+         "High NVT means the network is overvalued relative to its usage; low NVT suggests undervaluation.",
+         [("< 20", "Strong utilization — potentially undervalued"),
+          ("20 – 80", "Normal range"),
+          ("> 150", "Overvalued relative to network throughput")]),
+        ("Daily Active Addresses (DAA)", "daily_active_addresses",
+         "Count of unique addresses that transacted on-chain in the past 24 hours. "
+         "Rising DAA indicates growing network adoption and user engagement.", []),
+        ("Exchange Balance", "exchange_balance",
+         "Total token supply held on known exchange wallets. "
+         "Decreasing balance suggests accumulation; increasing suggests distribution.",
+         [("Decreasing", "Accumulation — coins moving to cold storage"),
+          ("Increasing", "Distribution — coins moving to exchanges for potential sale")]),
+        ("Dev Activity", "dev_activity",
+         "Measures GitHub events (commits, PRs, issues) in the project's repositories. "
+         "Consistent dev activity signals an actively maintained project.", []),
+        ("Network Growth", "network_growth",
+         "Number of new addresses created on the network per day. "
+         "Higher growth indicates expanding network adoption.", []),
+        ("Transaction Volume", "transaction_volume",
+         "Total value of on-chain transactions per day. "
+         "Captures actual on-chain economic activity, distinct from exchange volume.", []),
+        ("Circulation", "circulation",
+         "Number of unique tokens transacted on-chain during the period. "
+         "High circulation suggests active usage rather than dormant holding.", []),
+        ("Velocity", "velocity",
+         "Transaction volume divided by circulating supply — how frequently tokens change hands.", []),
+        ("Mean Dollar Age", "mean_age",
+         "Average age of all tokens weighted by USD value. "
+         "Drops indicate older coins moving — often a distribution signal.", []),
+        ("Whale Transactions (>$100K)", "whale_transaction_count_100k_usd_to_inf",
+         "Count of transactions exceeding $100,000. "
+         "Spikes often precede significant price movements.", []),
+        ("Social Volume", "social_volume_total",
+         "Number of mentions across social platforms. "
+         "Spikes indicate growing interest or fear.", []),
+        ("Sentiment Balance", "sentiment_balance_total",
+         "Ratio of positive to negative social mentions. "
+         "Extreme positive can be contrarian bearish; extreme negative can be contrarian bullish.", []),
+    ]
+
+    cards = ""
+    for title, key, desc, thresholds in metrics:
+        threshold_html = ""
+        if thresholds:
+            items = "".join(f"<li><strong>{_esc(k)}</strong>: {_esc(v)}</li>" for k, v in thresholds)
+            threshold_html = f'<ul class="glossary-thresholds">{items}</ul>'
+        cards += f"""
+        <div class="card glossary-card">
+            <h3 class="glossary-metric-name">{_esc(title)}</h3>
+            <code class="glossary-key">{_esc(key)}</code>
+            <p class="glossary-desc">{_esc(desc)}</p>
+            {threshold_html}
+        </div>"""
+
+    body = f"""
+    {_breadcrumbs(("Glossary",))}
+    <h1 class="page-title">Metric Glossary</h1>
+    <p class="page-subtitle">Understanding the on-chain metrics used across the dashboard</p>
+    <div class="glossary-grid">{cards}</div>"""
+    return page_shell("Glossary", body)
