@@ -30,7 +30,8 @@ from core.santiment_data_puller import (
     ALL_PROFILE_METRICS,
 )
 from core.ssr_renderer import (
-    render_market_page,
+    render_briefing_page,
+    render_explore_page,
     render_valuation_page,
     render_token_profile,
     render_sync_page,
@@ -224,10 +225,18 @@ KEY_METRICS = [
     "transaction_volume",
 ]
 
-# Lighter set for summary/heatmap (fewer queries)
 SUMMARY_METRICS = [
     "price_usd", "marketcap_usd", "volume_usd",
     "daily_active_addresses", "mvrv_usd", "nvt",
+]
+
+# Bellwether tokens for economy-wide aggregate trends
+BELLWETHER_SLUGS = [
+    "bitcoin", "ethereum", "tether", "xrp", "binance-coin",
+    "solana", "cardano", "dogecoin", "tron", "avalanche",
+    "chainlink", "polkadot", "polygon", "litecoin", "uniswap",
+    "stellar", "near-protocol", "internet-computer", "cosmos",
+    "aave",
 ]
 
 DEFAULT_PAGE_SIZE = 100
@@ -250,14 +259,12 @@ def _cached(key: str, builder, ttl: int = _CACHE_TTL):
     return result
 
 
+# ── Bulk token data ──────────────────────────────────────────
+
 def _build_bulk_token_data(metrics_list: list[str]) -> list[dict]:
-    """
-    Build token list using bulk queries — one SQL query per metric
-    instead of one per token×metric. This is the core performance fix.
-    """
+    """One SQL query per metric instead of per token×metric."""
     if not _san_cache:
         return []
-
     all_projects = _san_cache.get_all_projects()
     slug_map = {}
     for project in all_projects:
@@ -268,9 +275,8 @@ def _build_bulk_token_data(metrics_list: list[str]) -> list[dict]:
             "slug": slug,
             "name": project.get("name", slug),
             "ticker": project.get("ticker", ""),
+            "infrastructure": project.get("infrastructure", ""),
         }
-
-    # Bulk fetch: one query per metric (not per token!)
     for metric in metrics_list:
         bulk = _san_cache.get_latest_values(metric)
         for slug, vals in bulk.items():
@@ -283,32 +289,220 @@ def _build_bulk_token_data(metrics_list: list[str]) -> list[dict]:
                 slug_map[slug][f"{metric}_change"] = round((latest - prev) / prev * 100, 2)
             else:
                 slug_map[slug][f"{metric}_change"] = 0 if latest is not None else None
-
     tokens = [t for t in slug_map.values() if t.get("price_usd") is not None]
     tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
     return tokens
 
 
 def _get_all_tokens() -> list[dict]:
-    """Cached full token list with all KEY_METRICS."""
     return _cached("all_tokens", lambda: _build_bulk_token_data(KEY_METRICS))
 
 
 def _get_summary_tokens() -> list[dict]:
-    """Cached summary token list with SUMMARY_METRICS only."""
     return _cached("summary_tokens", lambda: _build_bulk_token_data(SUMMARY_METRICS))
 
 
+# ── Economy-level aggregates ─────────────────────────────────
+
+def _build_economy_briefing() -> dict:
+    """
+    Core economy briefing — answers:
+      1. What regime are we in? (MVRV distribution, breadth)
+      2. Where is capital flowing? (exchange balance, volume concentration)
+      3. How healthy are networks? (aggregate DAA, dev activity, growth)
+      4. What moved meaningfully? (on-chain signals, not just price noise)
+      5. What's the valuation landscape? (zone distribution)
+    """
+    def _compute():
+        tokens = _get_all_tokens()
+        if not tokens:
+            return {}
+
+        # ── 1. Market regime ──
+        total_mcap = sum(t.get("marketcap_usd") or 0 for t in tokens)
+        total_vol = sum(t.get("volume_usd") or 0 for t in tokens)
+        mvrv_vals = [t["mvrv_usd"] for t in tokens if t.get("mvrv_usd") is not None]
+        avg_mvrv = sum(mvrv_vals) / len(mvrv_vals) if mvrv_vals else None
+        pos = sum(1 for t in tokens if (t.get("price_usd_change") or 0) > 0)
+        neg = sum(1 for t in tokens if (t.get("price_usd_change") or 0) < 0)
+        flat = len(tokens) - pos - neg
+
+        # ── 2. MVRV zone distribution ──
+        zones = {"deep_value": 0, "undervalued": 0, "fair": 0, "elevated": 0, "overvalued": 0, "euphoria": 0}
+        for v in mvrv_vals:
+            if v < 0.7:
+                zones["deep_value"] += 1
+            elif v < 1.0:
+                zones["undervalued"] += 1
+            elif v < 1.5:
+                zones["fair"] += 1
+            elif v < 2.5:
+                zones["elevated"] += 1
+            elif v < 3.5:
+                zones["overvalued"] += 1
+            else:
+                zones["euphoria"] += 1
+
+        # ── 3. Capital flows — volume concentration + exchange balance ──
+        top10_vol = sum(t.get("volume_usd") or 0 for t in tokens[:10])
+        vol_concentration = (top10_vol / total_vol * 100) if total_vol > 0 else 0
+
+        # Exchange balance changes (accumulation vs distribution signal)
+        exch_tokens = [t for t in tokens if t.get("exchange_balance") is not None and t.get("exchange_balance_change") is not None]
+        accum_count = sum(1 for t in exch_tokens if (t.get("exchange_balance_change") or 0) < -1)
+        distrib_count = sum(1 for t in exch_tokens if (t.get("exchange_balance_change") or 0) > 1)
+
+        # ── 4. Network health aggregates ──
+        total_daa = sum(t.get("daily_active_addresses") or 0 for t in tokens)
+        daa_with_change = [t for t in tokens if t.get("daily_active_addresses_change") is not None]
+        avg_daa_change = (sum(t["daily_active_addresses_change"] for t in daa_with_change) / len(daa_with_change)) if daa_with_change else None
+
+        dev_tokens = [t for t in tokens if t.get("dev_activity") is not None]
+        total_dev = sum(t.get("dev_activity") or 0 for t in dev_tokens)
+        dev_with_change = [t for t in dev_tokens if t.get("dev_activity_change") is not None]
+        avg_dev_change = (sum(t["dev_activity_change"] for t in dev_with_change) / len(dev_with_change)) if dev_with_change else None
+
+        growth_tokens = [t for t in tokens if t.get("network_growth") is not None]
+        total_growth = sum(t.get("network_growth") or 0 for t in growth_tokens)
+
+        # ── 5. Notable on-chain moves (signals, not just price) ──
+        signals = []
+
+        # Biggest DAA changes (network activity spikes)
+        daa_movers = sorted(
+            [t for t in tokens if t.get("daily_active_addresses_change") is not None and abs(t.get("daily_active_addresses_change") or 0) > 10],
+            key=lambda t: abs(t.get("daily_active_addresses_change") or 0), reverse=True,
+        )[:5]
+        for t in daa_movers:
+            ch = t["daily_active_addresses_change"]
+            signals.append({
+                "slug": t["slug"], "name": t["name"], "ticker": t["ticker"],
+                "signal": "daa_spike" if ch > 0 else "daa_drop",
+                "metric": "Active Addresses",
+                "change": ch,
+            })
+
+        # Exchange balance shifts (accumulation/distribution)
+        exch_movers = sorted(
+            [t for t in exch_tokens if abs(t.get("exchange_balance_change") or 0) > 3],
+            key=lambda t: abs(t.get("exchange_balance_change") or 0), reverse=True,
+        )[:5]
+        for t in exch_movers:
+            ch = t["exchange_balance_change"]
+            signals.append({
+                "slug": t["slug"], "name": t["name"], "ticker": t["ticker"],
+                "signal": "distribution" if ch > 0 else "accumulation",
+                "metric": "Exchange Balance",
+                "change": ch,
+            })
+
+        # Dev activity changes
+        dev_movers = sorted(
+            [t for t in dev_tokens if t.get("dev_activity_change") is not None and abs(t.get("dev_activity_change") or 0) > 15],
+            key=lambda t: abs(t.get("dev_activity_change") or 0), reverse=True,
+        )[:5]
+        for t in dev_movers:
+            ch = t["dev_activity_change"]
+            signals.append({
+                "slug": t["slug"], "name": t["name"], "ticker": t["ticker"],
+                "signal": "dev_surge" if ch > 0 else "dev_decline",
+                "metric": "Dev Activity",
+                "change": ch,
+            })
+
+        # ── 6. Aggregate trend lines (for charts) ──
+        trends = {}
+        if _san_cache:
+            for metric_key, label in [
+                ("daily_active_addresses", "daa"),
+                ("dev_activity", "dev"),
+                ("network_growth", "growth"),
+                ("volume_usd", "volume"),
+            ]:
+                data = _san_cache.get_aggregate_timeseries(metric_key, BELLWETHER_SLUGS, days=90)
+                if data and len(data) > 5:
+                    trends[label] = data
+
+            # BTC price as market proxy
+            btc_data = _san_cache.get_timeseries("price_usd", "bitcoin")
+            if btc_data and len(btc_data) > 90:
+                trends["btc_price"] = btc_data[-90:]
+            elif btc_data:
+                trends["btc_price"] = btc_data
+
+            # BTC mcap trend
+            btc_mcap = _san_cache.get_timeseries("marketcap_usd", "bitcoin")
+            if btc_mcap and len(btc_mcap) > 90:
+                trends["btc_mcap"] = btc_mcap[-90:]
+            elif btc_mcap:
+                trends["btc_mcap"] = btc_mcap
+
+        # ── 7. Gainers / Losers ──
+        valid = [t for t in tokens if t.get("price_usd_change") is not None and abs(t.get("price_usd_change", 0)) < 500]
+        valid.sort(key=lambda x: x.get("price_usd_change", 0), reverse=True)
+        gainers = valid[:10]
+        losers = list(reversed(valid[-10:]))
+
+        # ── 8. Top by various metrics ──
+        top_volume = tokens[:10]
+        top_daa = sorted([t for t in tokens if t.get("daily_active_addresses")],
+                         key=lambda t: t.get("daily_active_addresses") or 0, reverse=True)[:10]
+        top_dev = sorted([t for t in tokens if t.get("dev_activity")],
+                         key=lambda t: t.get("dev_activity") or 0, reverse=True)[:10]
+
+        return {
+            # Regime
+            "total_tokens": len(tokens),
+            "total_mcap": total_mcap,
+            "total_vol": total_vol,
+            "avg_mvrv": avg_mvrv,
+            "breadth": {"up": pos, "down": neg, "flat": flat},
+            "mvrv_zones": zones,
+            "mvrv_total": len(mvrv_vals),
+
+            # Capital flows
+            "vol_concentration_top10": vol_concentration,
+            "accumulating": accum_count,
+            "distributing": distrib_count,
+
+            # Network health
+            "total_daa": total_daa,
+            "avg_daa_change": avg_daa_change,
+            "total_dev": total_dev,
+            "avg_dev_change": avg_dev_change,
+            "total_growth": total_growth,
+
+            # Signals
+            "signals": signals[:15],
+
+            # Trends (for charts)
+            "trends": trends,
+
+            # Movers
+            "gainers": gainers,
+            "losers": losers,
+
+            # Top lists
+            "top_volume": top_volume,
+            "top_daa": top_daa,
+            "top_dev": top_dev,
+
+            # Full token list for heatmap/dominance
+            "all_tokens": tokens,
+        }
+
+    return _cached("economy_briefing", _compute)
+
+
+# ── Page-specific data builders ──────────────────────────────
+
 def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
-    """Build the market token list from cache with pagination."""
     tokens = _get_all_tokens()
     total = len(tokens)
-
     start = (page - 1) * per_page
     end = start + per_page
     page_tokens = tokens[start:end]
-
-    # Add 7-day sparkline data only for the visible page (still per-token query, but only ~100)
+    # Sparklines only for visible page
     for t in page_tokens:
         price_data = _san_cache.get_timeseries("price_usd", t["slug"])
         if price_data and len(price_data) >= 7:
@@ -317,25 +511,15 @@ def _build_token_list(page: int = 1, per_page: int = DEFAULT_PAGE_SIZE):
             t["sparkline_7d"] = price_data[-len(price_data):]
         else:
             t["sparkline_7d"] = []
-
     return page_tokens, total
 
 
 def _build_all_tokens_for_valuation():
-    """Build token list with valuation data (uses cached all-tokens)."""
     tokens = _get_all_tokens()
-    result = []
-    for t in tokens:
-        if t.get("mvrv_usd") is None and t.get("nvt") is None:
-            continue
-        if t.get("price_usd") is None:
-            continue
-        result.append(t)
-    return result
+    return [t for t in tokens if t.get("mvrv_usd") is not None and t.get("price_usd") is not None]
 
 
 def _build_profile_metrics(slug: str):
-    """Build full metrics dict for a token profile."""
     metrics_data = {}
     for metric in ALL_PROFILE_METRICS:
         data = _san_cache.get_timeseries(metric, slug)
@@ -353,47 +537,11 @@ def _build_profile_metrics(slug: str):
     return metrics_data
 
 
-def _build_all_tokens_summary():
-    """Lightweight summary of ALL tokens for dashboard charts."""
-    return _get_summary_tokens()
-
-
-def _build_mcap_trend():
-    """Build total market cap trend data from BTC market cap."""
-    def _compute():
-        if not _san_cache:
-            return []
-        data = _san_cache.get_timeseries("marketcap_usd", "bitcoin")
-        if data and len(data) > 30:
-            return data[-30:]
-        return data or []
-    return _cached("mcap_trend", _compute)
-
-
-def _build_gainers_losers(count: int = 10):
-    """Get top gainers and losers by 24h price change (uses cached data)."""
-    tokens = _get_summary_tokens()
-    valid = [
-        t for t in tokens
-        if t.get("price_usd") is not None
-        and t.get("price_usd_change") is not None
-        and abs(t.get("price_usd_change", 0)) < 500
-    ]
-    valid.sort(key=lambda x: x.get("price_usd_change", 0), reverse=True)
-    gainers = valid[:count]
-    losers = list(reversed(valid[-count:]))
-    return gainers, losers
-
-
 def _build_screener_tokens(
-    min_mcap: float = 0,
-    max_mcap: float = float("inf"),
-    min_change: float = -999,
-    max_change: float = 999,
-    sort_by: str = "marketcap_usd",
-    order: str = "desc",
+    min_mcap=0, max_mcap=float("inf"),
+    min_change=-999, max_change=999,
+    sort_by="marketcap_usd", order="desc",
 ):
-    """Build token list with filters for the screener (uses cached data)."""
     tokens = _get_all_tokens()
     filtered = []
     for t in tokens:
@@ -404,23 +552,18 @@ def _build_screener_tokens(
         if pct < min_change or pct > max_change:
             continue
         filtered.append(t)
-
-    reverse = order == "desc"
-    filtered.sort(key=lambda x: x.get(sort_by) or 0, reverse=reverse)
+    filtered.sort(key=lambda x: x.get(sort_by) or 0, reverse=(order == "desc"))
     return filtered
 
 
 def _build_comparison_data(slugs: list[str]):
-    """Build comparison data for multiple tokens."""
     if not _san_cache:
         return []
-
     results = []
     for slug in slugs:
         project = _san_cache.get_project(slug)
         if not project:
             project = {"name": slug.replace("-", " ").title(), "ticker": slug.upper()[:5]}
-
         metrics = _build_profile_metrics(slug)
         results.append({
             "slug": slug,
@@ -463,27 +606,22 @@ def create_app() -> FastAPI:
     # ============================================================
 
     @app.get("/", response_class=HTMLResponse)
-    async def get_market_page(
+    async def get_briefing_page():
+        """Economy briefing — the daily dashboard."""
+        briefing = _build_economy_briefing()
+        status = _san_pull_status.get("status", "unknown")
+        cache_stats = _san_cache.get_pull_stats() if _san_cache else {}
+        universe_size = _san_pull_status.get("universe_size", 0)
+        return render_briefing_page(briefing, status, cache_stats, universe_size)
+
+    @app.get("/explore", response_class=HTMLResponse)
+    async def get_explore_page(
         page: int = Query(default=1, ge=1),
         per_page: int = Query(default=DEFAULT_PAGE_SIZE, ge=10, le=MAX_PAGE_SIZE),
     ):
-        """Market overview — fully server-rendered with pagination and rich dashboard."""
+        """Full token explorer with pagination."""
         tokens, total = _build_token_list(page, per_page)
-        gainers, losers = _build_gainers_losers(10)
-        all_tokens_summary = _build_all_tokens_summary()
-        mcap_trend = _build_mcap_trend()
-        status = _san_pull_status.get("status", "unknown")
-        last_pull = _san_pull_status.get("last_pull")
-        universe_size = _san_pull_status.get("universe_size", 0)
-        cache_stats = _san_cache.get_pull_stats() if _san_cache else {}
-        return render_market_page(
-            tokens, status, last_pull,
-            page=page, per_page=per_page, total=total,
-            universe_size=universe_size, cache_stats=cache_stats,
-            gainers=gainers, losers=losers,
-            all_tokens_for_charts=all_tokens_summary,
-            mcap_trend_data=mcap_trend,
-        )
+        return render_explore_page(tokens, page=page, per_page=per_page, total=total)
 
     @app.get("/valuation", response_class=HTMLResponse)
     async def get_valuation_page():

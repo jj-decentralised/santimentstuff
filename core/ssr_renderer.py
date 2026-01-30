@@ -3,6 +3,9 @@ Server-side HTML renderer — pure HTML, zero JavaScript.
 
 Every page is a complete HTML document rendered on the server.
 Navigation is via <a> links. Charts are inline SVG.
+
+Design philosophy: Daily economy briefing, not a trading terminal.
+Open it once, understand the entire crypto economy in 30 seconds.
 """
 
 import html as html_mod
@@ -59,32 +62,33 @@ def fmt_pct(v) -> str:
 
 
 def css_class(v) -> str:
-    """Return 'up', 'down', or 'muted' for a numeric value."""
     if v is None:
         return "muted"
     return "up" if v > 0 else "down" if v < 0 else "muted"
 
 
 def mvrv_zone(v):
-    """Return (label, css_class, description) for an MVRV value."""
     if v is None:
-        return ("N/A", "zone-neutral", "No MVRV data available")
+        return ("N/A", "zone-neutral", "No data")
     if v < 0.7:
-        return ("Deep Value", "zone-extreme-low", "Market is trading well below realized value — historically a strong buying zone")
+        return ("Deep Value", "zone-extreme-low", "Well below realized value — historically strong buying zone")
     if v < 1.0:
-        return ("Undervalued", "zone-undervalued", "Market is below realized value — potential accumulation zone")
+        return ("Undervalued", "zone-undervalued", "Below realized value — accumulation territory")
     if v < 1.5:
-        return ("Fair", "zone-fair", "Market is near realized value — balanced positioning")
+        return ("Fair Value", "zone-fair", "Near realized value — balanced market")
     if v < 2.5:
-        return ("Elevated", "zone-fair-high", "Market is above realized value — caution warranted")
+        return ("Elevated", "zone-fair-high", "Above realized value — caution warranted")
     if v < 3.5:
-        return ("Overvalued", "zone-overvalued", "Market is well above realized value — distribution risk increasing")
-    return ("Euphoria", "zone-extreme-high", "Market is far above realized value — historically a distribution zone")
+        return ("Overvalued", "zone-overvalued", "Well above realized value — distribution risk")
+    return ("Euphoria", "zone-extreme-high", "Far above realized value — extreme caution")
 
 
-# Keep old names exported for compatibility
 def pct_class(v):
     return css_class(v)
+
+
+def _esc(s):
+    return html_mod.escape(str(s)) if s else ""
 
 
 # ================================================================
@@ -92,12 +96,12 @@ def pct_class(v):
 # ================================================================
 
 def page_shell(title: str, body: str, active_nav: str = "") -> str:
-    """Wrap body content in the full HTML page shell."""
     nav_items = [
-        ("market", "/", "Market"),
+        ("briefing", "/", "Briefing"),
+        ("explore", "/explore", "Explore"),
         ("screener", "/screener", "Screener"),
-        ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
         ("valuation", "/valuation", "Valuation"),
+        ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
         ("sync", "/sync", "Sync"),
     ]
     nav_html = "".join(
@@ -110,9 +114,9 @@ def page_shell(title: str, body: str, active_nav: str = "") -> str:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{html_mod.escape(title)} — Onchain Pulse</title>
+    <title>{_esc(title)} — Onchain Pulse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
@@ -120,228 +124,412 @@ def page_shell(title: str, body: str, active_nav: str = "") -> str:
         <div class="header-inner">
             <a href="/" class="logo">Onchain<span>Pulse</span></a>
             <nav class="header-nav">{nav_html}</nav>
-            <div class="header-right">
-                <span class="status-dot syncing"></span>
-                <span>Powered by Santiment</span>
-            </div>
         </div>
     </header>
     <main class="main">{body}</main>
-    <footer class="footer">On-chain data provided by Santiment. Updated continuously.</footer>
+    <footer class="footer">
+        On-chain data via <strong>Santiment</strong>. Refreshed daily. Not financial advice.
+    </footer>
 </body>
 </html>"""
 
 
 # ================================================================
-# MARKET PAGE (Landing / Dashboard)
+# BRIEFING PAGE (Landing — Daily Economy Dashboard)
 # ================================================================
 
-def render_market_page(
-    tokens: list,
-    pull_status: str,
-    last_pull: str = None,
-    page: int = 1,
-    per_page: int = 100,
-    total: int = 0,
-    universe_size: int = 0,
-    cache_stats: dict = None,
-    gainers: list = None,
-    losers: list = None,
-    all_tokens_for_charts: list = None,
-    mcap_trend_data: list = None,
-    **kwargs,
-) -> str:
-    all_t = all_tokens_for_charts or tokens
-    gainers = gainers or []
-    losers = losers or []
+def _signal_icon(signal_type: str) -> str:
+    icons = {
+        "daa_spike": "&#9650;",      # up triangle
+        "daa_drop": "&#9660;",       # down triangle
+        "accumulation": "&#9679;",   # circle
+        "distribution": "&#9675;",   # empty circle
+        "dev_surge": "&#9733;",      # star
+        "dev_decline": "&#9734;",    # empty star
+    }
+    return icons.get(signal_type, "&#8226;")
 
-    # Aggregates
-    total_mcap = sum(t.get("marketcap_usd") or 0 for t in all_t)
-    total_vol = sum(t.get("volume_usd") or 0 for t in all_t)
-    mvrv_vals = [t["mvrv_usd"] for t in all_t if t.get("mvrv_usd") is not None]
-    avg_mvrv = sum(mvrv_vals) / len(mvrv_vals) if mvrv_vals else None
-    daa_vals = [t["daily_active_addresses"] for t in all_t if t.get("daily_active_addresses")]
-    total_daa = sum(daa_vals) if daa_vals else None
-    pos = sum(1 for t in all_t if (t.get("price_usd_change") or 0) > 0)
-    neg = sum(1 for t in all_t if (t.get("price_usd_change") or 0) < 0)
 
-    total_pages = max(1, (total + per_page - 1) // per_page)
-    start = (page - 1) * per_page
+def _signal_label(signal_type: str) -> str:
+    labels = {
+        "daa_spike": "Activity Surge",
+        "daa_drop": "Activity Drop",
+        "accumulation": "Accumulation",
+        "distribution": "Distribution",
+        "dev_surge": "Dev Surge",
+        "dev_decline": "Dev Decline",
+    }
+    return labels.get(signal_type, signal_type)
 
+
+def _signal_css(signal_type: str) -> str:
+    if signal_type in ("daa_spike", "accumulation", "dev_surge"):
+        return "up"
+    return "down"
+
+
+def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, universe_size: int) -> str:
+    if not briefing:
+        return page_shell("Briefing", '<div class="empty-state"><h2>Loading data...</h2><p>Data is being pulled from Santiment. Check the <a href="/sync">Sync</a> page for progress.</p></div>', active_nav="briefing")
+
+    b = briefing
     parts = []
 
-    # --- Sync banner ---
+    # ── Sync banner (compact) ──
     is_syncing = pull_status not in ("ready", "idle", "skipped")
     if is_syncing:
         cs = cache_stats or {}
-        pct = min(99, int(total / universe_size * 100)) if universe_size and total else 0
         parts.append(f"""
         <div class="sync-banner">
             <span class="sync-dot"></span>
-            <span class="sync-banner-text"><strong>Syncing</strong> — {total}/{universe_size} tokens ({pct}%) · {fmt_num(cs.get("timeseries_rows", 0))} points · {cs.get("db_size_mb", 0):.0f} MB</span>
-            <div class="sync-bar"><div class="sync-bar-fill" style="width:{pct}%"></div></div>
-            <a href="/sync" class="sync-link">Details</a>
+            <span>Syncing {b.get("total_tokens", 0)} tokens · {fmt_num(cs.get("timeseries_rows", 0))} data points</span>
+            <a href="/sync">Details &rarr;</a>
         </div>""")
 
-    # --- Page header ---
+    # ── Header ──
+    now_str = datetime.utcnow().strftime("%B %d, %Y")
     parts.append(f"""
-    <h1 class="page-title">Market Overview</h1>
-    <p class="page-subtitle">{total} tokens tracked{f" of {universe_size} discovered" if universe_size else ""}</p>""")
+    <div class="briefing-header">
+        <div>
+            <h1 class="briefing-title">Daily Economy Briefing</h1>
+            <p class="briefing-date">{now_str} &middot; {b.get("total_tokens", 0)} tokens tracked</p>
+        </div>
+    </div>""")
 
-    # --- Stats row ---
-    mcap_trend = mcap_trend_data or kwargs.get("mcap_trend", None)
-    trend_svg = mini_trend_svg(mcap_trend, width=110, height=28) if mcap_trend and len(mcap_trend) > 3 else ""
+    # ── Section 1: Market Regime ──
+    avg_mvrv = b.get("avg_mvrv")
+    breadth = b.get("breadth", {})
+    zone_label, zone_css, zone_desc = mvrv_zone(avg_mvrv)
+
+    # Regime verdict
+    up = breadth.get("up", 0)
+    down = breadth.get("down", 0)
+    total_bd = up + down
+    breadth_pct = (up / total_bd * 100) if total_bd else 50
+
+    if avg_mvrv is not None and avg_mvrv < 1.0 and breadth_pct < 40:
+        regime = ("Bearish", "regime-bear")
+    elif avg_mvrv is not None and avg_mvrv > 2.0 and breadth_pct > 65:
+        regime = ("Bullish", "regime-bull")
+    elif breadth_pct > 55:
+        regime = ("Cautiously Bullish", "regime-neutral-bull")
+    elif breadth_pct < 45:
+        regime = ("Cautiously Bearish", "regime-neutral-bear")
+    else:
+        regime = ("Neutral", "regime-neutral")
+
+    gauge_svg = sentiment_gauge_svg(avg_mvrv, min_val=0, max_val=4, label="MVRV") if avg_mvrv is not None else ""
+
+    # BTC price trend
+    btc_trend = b.get("trends", {}).get("btc_price", [])
+    btc_chart = mini_trend_svg(btc_trend, width=200, height=50) if btc_trend and len(btc_trend) > 5 else ""
+
     parts.append(f"""
-    <div class="stats-row">
-        <div class="stat-card">
-            <div class="stat-label">Total Market Cap</div>
-            <div class="stat-value">{fmt_usd(total_mcap)}</div>
-            {f'<div class="stat-trend">{trend_svg}</div>' if trend_svg else ''}
+    <section class="card regime-card">
+        <div class="card-header">
+            <h2 class="card-title">Market Regime</h2>
+            <span class="regime-badge {regime[1]}">{regime[0]}</span>
         </div>
-        <div class="stat-card">
-            <div class="stat-label">24h Volume</div>
-            <div class="stat-value">{fmt_usd(total_vol)}</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Avg MVRV</div>
-            <div class="stat-value">{f"{avg_mvrv:.2f}" if avg_mvrv else "&mdash;"}</div>
-            <div class="stat-sub">{mvrv_zone(avg_mvrv)[0] if avg_mvrv else ""}</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Active Addresses</div>
-            <div class="stat-value">{fmt_num(total_daa)}</div>
-        </div>
-        <div class="stat-card hide-mobile">
-            <div class="stat-label">Market Breadth</div>
-            <div class="stat-value"><span class="up">{pos}</span> / <span class="down">{neg}</span></div>
-            <div class="stat-sub">up / down</div>
-        </div>
-    </div>""")
-
-    # --- Sentiment gauge ---
-    if avg_mvrv is not None:
-        zone_label, zone_css, zone_desc = mvrv_zone(avg_mvrv)
-        parts.append(f"""
-    <div class="sentiment-panel">
-        <div class="sentiment-gauge">{sentiment_gauge_svg(avg_mvrv, min_val=0, max_val=4, label="Avg MVRV")}</div>
-        <div class="sentiment-info">
-            <div class="sentiment-label">Market Sentiment</div>
-            <div class="sentiment-reading">
-                <span class="sentiment-value">{avg_mvrv:.2f}</span>
-                <span class="zone {zone_css}">{zone_label}</span>
+        <div class="regime-body">
+            <div class="regime-gauge">
+                {gauge_svg}
+                <div class="regime-mvrv">
+                    <span class="regime-mvrv-val">{f"{avg_mvrv:.2f}" if avg_mvrv else "—"}</span>
+                    <span class="zone {zone_css}">{zone_label}</span>
+                </div>
             </div>
-            <p class="sentiment-desc">{zone_desc}</p>
-            <div class="breadth-row">
-                <span><strong class="up">{pos}</strong> tokens up</span>
-                <span><strong class="down">{neg}</strong> tokens down</span>
+            <div class="regime-stats">
+                <div class="regime-stat">
+                    <div class="regime-stat-label">Total Market Cap</div>
+                    <div class="regime-stat-value">{fmt_usd(b.get("total_mcap"))}</div>
+                    {f'<div class="regime-stat-trend">{btc_chart}</div>' if btc_chart else ''}
+                </div>
+                <div class="regime-stat">
+                    <div class="regime-stat-label">24h Volume</div>
+                    <div class="regime-stat-value">{fmt_usd(b.get("total_vol"))}</div>
+                </div>
+                <div class="regime-stat">
+                    <div class="regime-stat-label">Market Breadth</div>
+                    <div class="regime-stat-value">
+                        <span class="up">{up}</span>
+                        <span class="muted">/</span>
+                        <span class="down">{down}</span>
+                    </div>
+                    <div class="breadth-bar">
+                        <div class="breadth-bar-fill" style="width:{breadth_pct:.0f}%"></div>
+                    </div>
+                </div>
+                <div class="regime-stat">
+                    <div class="regime-stat-label">Vol. Concentration</div>
+                    <div class="regime-stat-value">{b.get("vol_concentration_top10", 0):.0f}% in top 10</div>
+                </div>
             </div>
         </div>
-    </div>""")
+        <p class="regime-desc">{zone_desc}</p>
+    </section>""")
 
-    # --- Dominance bar ---
-    if len(all_t) > 3:
-        dom = sorted(all_t, key=lambda t: t.get("marketcap_usd") or 0, reverse=True)
+    # ── Section 2: Valuation Landscape ──
+    zones = b.get("mvrv_zones", {})
+    zone_total = b.get("mvrv_total", 0) or 1
+    zone_defs = [
+        ("Deep Value", "deep_value", "zone-extreme-low"),
+        ("Undervalued", "undervalued", "zone-undervalued"),
+        ("Fair Value", "fair", "zone-fair"),
+        ("Elevated", "elevated", "zone-fair-high"),
+        ("Overvalued", "overvalued", "zone-overvalued"),
+        ("Euphoria", "euphoria", "zone-extreme-high"),
+    ]
+    zone_bars = ""
+    for label, key, css in zone_defs:
+        cnt = zones.get(key, 0)
+        pct = cnt / zone_total * 100 if zone_total else 0
+        zone_bars += f"""
+        <div class="zone-row">
+            <span class="zone-row-label"><span class="zone {css}">{label}</span></span>
+            <div class="zone-row-bar"><div class="zone-row-fill {css}" style="width:{pct:.0f}%"></div></div>
+            <span class="zone-row-count">{cnt}</span>
+        </div>"""
+
+    parts.append(f"""
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title">Valuation Landscape</h2>
+            <span class="card-badge">{zone_total} tokens with MVRV data</span>
+        </div>
+        <div class="zone-distribution">{zone_bars}</div>
+        <div class="card-footer">
+            <a href="/valuation">View full valuation scanner &rarr;</a>
+        </div>
+    </section>""")
+
+    # ── Section 3: Network Health ──
+    trends = b.get("trends", {})
+
+    health_metrics = []
+    daa = b.get("total_daa")
+    daa_ch = b.get("avg_daa_change")
+    daa_trend = trends.get("daa", [])
+    if daa:
+        health_metrics.append(("Active Addresses", fmt_num(daa), daa_ch, daa_trend))
+
+    dev = b.get("total_dev")
+    dev_ch = b.get("avg_dev_change")
+    dev_trend = trends.get("dev", [])
+    if dev:
+        health_metrics.append(("Developer Activity", fmt_num(dev), dev_ch, dev_trend))
+
+    growth = b.get("total_growth")
+    growth_trend = trends.get("growth", [])
+    if growth:
+        health_metrics.append(("Network Growth", fmt_num(growth), None, growth_trend))
+
+    vol_trend = trends.get("volume", [])
+    if vol_trend:
+        health_metrics.append(("Aggregate Volume", fmt_usd(b.get("total_vol")), None, vol_trend))
+
+    health_cards = ""
+    for label, value, change, trend_data in health_metrics:
+        trend_chart = mini_trend_svg(trend_data, width=140, height=36) if trend_data and len(trend_data) > 5 else ""
+        change_html = f'<span class="{css_class(change)}">{fmt_pct(change)}</span>' if change is not None else ""
+        health_cards += f"""
+        <div class="health-card">
+            <div class="health-card-header">
+                <span class="health-card-label">{label}</span>
+                {change_html}
+            </div>
+            <div class="health-card-value">{value}</div>
+            <div class="health-card-trend">{trend_chart}</div>
+        </div>"""
+
+    if health_cards:
+        # Capital flow signals
+        accum = b.get("accumulating", 0)
+        distrib = b.get("distributing", 0)
+        flow_html = ""
+        if accum or distrib:
+            flow_html = f"""
+            <div class="flow-summary">
+                <span class="flow-item up">&#9679; {accum} accumulating</span>
+                <span class="flow-item down">&#9675; {distrib} distributing</span>
+                <span class="flow-item muted">(exchange balance shift &gt; 1%)</span>
+            </div>"""
+
         parts.append(f"""
-    <div class="section">
-        <div class="section-title">Market Dominance</div>
-        <div class="dominance-wrap">{dominance_bar_svg(dom)}</div>
-    </div>""")
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title">Network Health</h2>
+            <span class="card-badge">Top 20 bellwether tokens · 90 day trends</span>
+        </div>
+        <div class="health-grid">{health_cards}</div>
+        {flow_html}
+    </section>""")
 
-    # --- Heatmap ---
-    if len(all_t) > 5:
+    # ── Section 4: On-Chain Signals ──
+    signals = b.get("signals", [])
+    if signals:
+        signal_rows = ""
+        for s in signals[:12]:
+            slug = s.get("slug", "")
+            sig_type = s.get("signal", "")
+            signal_rows += f"""
+            <a href="/token/{slug}" class="signal-row">
+                <span class="signal-icon {_signal_css(sig_type)}">{_signal_icon(sig_type)}</span>
+                <span class="signal-name">{_esc(s.get("name", slug)[:20])} <span class="ticker">{_esc(s.get("ticker", ""))}</span></span>
+                <span class="signal-type">{_signal_label(sig_type)}</span>
+                <span class="signal-metric">{_esc(s.get("metric", ""))}</span>
+                <span class="signal-change {css_class(s.get("change"))}">{fmt_pct(s.get("change"))}</span>
+            </a>"""
+
         parts.append(f"""
-    <div class="section">
-        <div class="section-title">Performance Heatmap <span class="badge">24h change</span></div>
-        <div class="heatmap-wrap">{market_heatmap_svg(all_t, max_tokens=50)}</div>
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title">On-Chain Signals</h2>
+            <span class="card-badge">Meaningful moves beyond price</span>
+        </div>
+        <div class="signal-list">{signal_rows}</div>
+    </section>""")
+
+    # ── Section 5: Dominance + Heatmap (side by side) ──
+    all_tokens = b.get("all_tokens", [])
+    if len(all_tokens) > 5:
+        dom = sorted(all_tokens, key=lambda t: t.get("marketcap_usd") or 0, reverse=True)
+        parts.append(f"""
+    <div class="two-col">
+        <section class="card">
+            <div class="card-header"><h2 class="card-title">Market Dominance</h2></div>
+            <div class="dominance-wrap">{dominance_bar_svg(dom)}</div>
+        </section>
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">24h Heatmap</h2>
+            </div>
+            <div class="heatmap-wrap">{market_heatmap_svg(all_tokens, max_tokens=40)}</div>
+        </section>
     </div>""")
 
-    # --- Gainers / Losers ---
+    # ── Section 6: Movers ──
+    gainers = b.get("gainers", [])
+    losers = b.get("losers", [])
     if gainers or losers:
         def _mover_rows(items):
-            rows = []
-            for i, t in enumerate(items[:10]):
+            rows = ""
+            for i, t in enumerate(items[:8]):
                 slug = t.get("slug", "")
                 pct = t.get("price_usd_change")
-                rows.append(
+                rows += (
                     f'<a href="/token/{slug}" class="mover-row">'
                     f'<span class="mover-rank">{i+1}</span>'
-                    f'<span class="mover-name">{html_mod.escape(t.get("name", slug)[:20])} '
-                    f'<span class="ticker">{html_mod.escape(t.get("ticker", ""))}</span></span>'
+                    f'<span class="mover-name">{_esc(t.get("name", slug)[:18])} '
+                    f'<span class="ticker">{_esc(t.get("ticker", ""))}</span></span>'
                     f'<span class="mover-price">{fmt_usd(t.get("price_usd"))}</span>'
                     f'<span class="mover-pct {css_class(pct)}">{fmt_pct(pct)}</span>'
                     f'</a>'
                 )
-            return "".join(rows)
+            return rows
 
         parts.append(f"""
-    <div class="movers-grid">
-        <div class="movers-col">
-            <div class="movers-header up">Top Gainers</div>
+    <div class="two-col">
+        <section class="card">
+            <div class="card-header"><h2 class="card-title up-header">Top Gainers</h2></div>
             {_mover_rows(gainers)}
-        </div>
-        <div class="movers-col">
-            <div class="movers-header down">Top Losers</div>
+        </section>
+        <section class="card">
+            <div class="card-header"><h2 class="card-title down-header">Top Losers</h2></div>
             {_mover_rows(losers)}
-        </div>
+        </section>
     </div>""")
 
-    # --- Top by Volume / Active Addresses ---
-    vol_sorted = sorted(all_t, key=lambda t: t.get("volume_usd") or 0, reverse=True)[:8]
-    daa_sorted = sorted([t for t in all_t if t.get("daily_active_addresses")],
-                        key=lambda t: t.get("daily_active_addresses") or 0, reverse=True)[:8]
+    # ── Section 7: Top by metrics ──
+    top_vol = b.get("top_volume", [])[:8]
+    top_daa = b.get("top_daa", [])[:8]
+    top_dev = b.get("top_dev", [])[:8]
 
-    if vol_sorted or daa_sorted:
-        def _top_rows(items, metric_key, fmt_fn):
-            rows = []
-            for i, t in enumerate(items):
-                slug = t.get("slug", "")
-                pct = t.get("price_usd_change")
-                rows.append(
-                    f'<a href="/token/{slug}" class="top-row">'
-                    f'<span class="top-rank">{i+1}</span>'
-                    f'<span class="top-name">{html_mod.escape(t.get("name", slug)[:18])} '
-                    f'<span class="ticker">{html_mod.escape(t.get("ticker", ""))}</span></span>'
-                    f'<span class="top-val">{fmt_fn(t.get(metric_key))}</span>'
-                    f'<span class="top-pct {css_class(pct)}">{fmt_pct(pct)}</span>'
-                    f'</a>'
-                )
-            return "".join(rows)
+    def _top_list(items, val_key, fmt_fn):
+        rows = ""
+        for i, t in enumerate(items):
+            slug = t.get("slug", "")
+            rows += (
+                f'<a href="/token/{slug}" class="top-row">'
+                f'<span class="top-rank">{i+1}</span>'
+                f'<span class="top-name">{_esc(t.get("name", slug)[:18])} '
+                f'<span class="ticker">{_esc(t.get("ticker", ""))}</span></span>'
+                f'<span class="top-val">{fmt_fn(t.get(val_key))}</span>'
+                f'</a>'
+            )
+        return rows
 
-        parts.append(f"""
-    <div class="top-grid">
-        <div class="top-col">
-            <div class="top-header">Top by Volume</div>
-            {_top_rows(vol_sorted, "volume_usd", fmt_usd)}
-        </div>
-        <div class="top-col">
-            <div class="top-header">Top by Active Addresses</div>
-            {_top_rows(daa_sorted, "daily_active_addresses", fmt_num)}
-        </div>
+    if top_vol or top_daa or top_dev:
+        cols = []
+        if top_vol:
+            cols.append(f'<section class="card"><div class="card-header"><h2 class="card-title">By Volume</h2></div>{_top_list(top_vol, "volume_usd", fmt_usd)}</section>')
+        if top_daa:
+            cols.append(f'<section class="card"><div class="card-header"><h2 class="card-title">By Active Addresses</h2></div>{_top_list(top_daa, "daily_active_addresses", fmt_num)}</section>')
+        if top_dev:
+            cols.append(f'<section class="card"><div class="card-header"><h2 class="card-title">By Dev Activity</h2></div>{_top_list(top_dev, "dev_activity", fmt_num)}</section>')
+        parts.append(f'<div class="three-col">{"".join(cols)}</div>')
+
+    # ── Footer nav ──
+    parts.append("""
+    <div class="briefing-footer-nav">
+        <a href="/explore" class="footer-nav-card">
+            <strong>Explore</strong>
+            <span>Browse all tokens with full metrics table</span>
+        </a>
+        <a href="/screener" class="footer-nav-card">
+            <strong>Screener</strong>
+            <span>Filter by tier, sort by any metric</span>
+        </a>
+        <a href="/valuation" class="footer-nav-card">
+            <strong>Valuation</strong>
+            <span>MVRV zone scanner across all tokens</span>
+        </a>
+        <a href="/compare?tokens=bitcoin,ethereum,solana" class="footer-nav-card">
+            <strong>Compare</strong>
+            <span>Side-by-side on-chain comparison</span>
+        </a>
     </div>""")
 
-    # --- Main table ---
-    showing = f"Showing {start+1}&ndash;{min(start+per_page, total)}" if total else "No data yet"
+    return page_shell("Daily Briefing", "\n".join(parts), active_nav="briefing")
+
+
+# ================================================================
+# EXPLORE PAGE (Full token table with pagination)
+# ================================================================
+
+def render_explore_page(
+    tokens: list,
+    page: int = 1,
+    per_page: int = 100,
+    total: int = 0,
+) -> str:
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    start = (page - 1) * per_page
+
+    parts = []
     parts.append(f"""
-    <div class="section">
-        <div class="section-title">All Tokens <span class="badge">{showing} of {total}</span></div>
-        <div class="table-wrap">
-            <table class="data-table">
-                <thead><tr>
-                    <th class="col-rank">#</th>
-                    <th>Name</th>
-                    <th class="col-num">Price</th>
-                    <th class="col-num">24h</th>
-                    <th class="col-spark hide-mobile">7d</th>
-                    <th class="col-num">Market Cap</th>
-                    <th class="col-num">Volume</th>
-                    <th class="col-num hide-mobile">MVRV</th>
-                    <th class="col-tag hide-mobile">Zone</th>
-                    <th class="col-num hide-mobile">Active Addr</th>
-                </tr></thead>
-                <tbody>""")
+    <h1 class="page-title">Explore</h1>
+    <p class="page-subtitle">All {total} tokens ranked by market cap</p>""")
+
+    # Table
+    parts.append(f"""
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr>
+                <th class="col-rank">#</th>
+                <th>Name</th>
+                <th class="col-num">Price</th>
+                <th class="col-num">24h</th>
+                <th class="col-spark hide-mobile">7d</th>
+                <th class="col-num">Market Cap</th>
+                <th class="col-num">Volume</th>
+                <th class="col-num hide-mobile">MVRV</th>
+                <th class="col-tag hide-mobile">Zone</th>
+                <th class="col-num hide-mobile">Active Addr</th>
+            </tr></thead>
+            <tbody>""")
 
     if not tokens:
-        parts.append('<tr><td colspan="10" class="empty-cell">Data is being pulled. Refresh in a moment...</td></tr>')
+        parts.append('<tr><td colspan="10" class="empty-cell">Data is being pulled. Refresh shortly.</td></tr>')
     else:
         for i, t in enumerate(tokens):
             rank = start + i + 1
@@ -351,10 +539,9 @@ def render_market_page(
             zone_html = f'<span class="zone {mvrv_zone(mvrv)[1]}">{mvrv_zone(mvrv)[0]}</span>' if mvrv is not None else "&mdash;"
             spark = t.get("sparkline_7d", [])
             spark_html = sparkline_svg(spark, width=80, height=24) if spark else "&mdash;"
-
             parts.append(f"""<tr>
                 <td class="col-rank">{rank}</td>
-                <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{html_mod.escape(t.get("name", slug))}</strong> <span class="ticker">{html_mod.escape(t.get("ticker", ""))}</span></a></td>
+                <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
                 <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
                 <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
                 <td class="col-spark hide-mobile">{spark_html}</td>
@@ -370,20 +557,18 @@ def render_market_page(
     # Pagination
     if total_pages > 1:
         pg = []
-        pg.append(f'<a href="/?page={page-1}&per_page={per_page}" class="page-btn">&laquo;</a>' if page > 1 else '<span class="page-btn disabled">&laquo;</span>')
+        pg.append(f'<a href="/explore?page={page-1}&per_page={per_page}" class="page-btn">&laquo;</a>' if page > 1 else '<span class="page-btn disabled">&laquo;</span>')
         for p in range(1, total_pages + 1):
             if p == page:
                 pg.append(f'<span class="page-btn active">{p}</span>')
             elif p <= 2 or p > total_pages - 1 or abs(p - page) <= 2:
-                pg.append(f'<a href="/?page={p}&per_page={per_page}" class="page-btn">{p}</a>')
+                pg.append(f'<a href="/explore?page={p}&per_page={per_page}" class="page-btn">{p}</a>')
             elif (p == 3 and page > 5) or (p == total_pages - 1 and page < total_pages - 4):
                 pg.append('<span class="page-btn ellipsis">&hellip;</span>')
-        pg.append(f'<a href="/?page={page+1}&per_page={per_page}" class="page-btn">&raquo;</a>' if page < total_pages else '<span class="page-btn disabled">&raquo;</span>')
+        pg.append(f'<a href="/explore?page={page+1}&per_page={per_page}" class="page-btn">&raquo;</a>' if page < total_pages else '<span class="page-btn disabled">&raquo;</span>')
         parts.append(f'<div class="pagination">{"".join(pg)}</div>')
 
-    parts.append("</div>")  # close section
-
-    return page_shell("Market", "\n".join(parts), active_nav="market")
+    return page_shell("Explore", "\n".join(parts), active_nav="explore")
 
 
 # ================================================================
@@ -392,53 +577,42 @@ def render_market_page(
 
 def render_token_profile(token: dict, metrics: dict, slug: str = "") -> str:
     slug = slug or token.get("slug", "")
-    name = html_mod.escape(token.get("name", slug))
-    ticker = html_mod.escape(token.get("ticker", ""))
-    infra = html_mod.escape(token.get("infrastructure", ""))
+    name = _esc(token.get("name", slug))
+    ticker = _esc(token.get("ticker", ""))
+    infra = _esc(token.get("infrastructure", ""))
 
-    # metrics is a dict of {metric_name: {data: [...], latest: val, count: N, ...}}
     def _m(key):
-        """Get metric info dict."""
         return metrics.get(key) or {}
 
     def _latest(key):
-        """Get latest value for a metric."""
         m = _m(key)
-        if isinstance(m, dict):
-            return m.get("latest")
-        return None
+        return m.get("latest") if isinstance(m, dict) else None
 
     def _data(key):
-        """Get timeseries data list for a metric."""
         m = _m(key)
-        if isinstance(m, dict):
-            return m.get("data") or []
-        return []
+        return m.get("data") or [] if isinstance(m, dict) else []
 
     price = _latest("price_usd")
     mvrv = _latest("mvrv_usd")
 
-    # Compute change badges from timeseries data
+    # Change badges
     changes = []
     price_ts = _data("price_usd")
     if price_ts and len(price_ts) >= 2:
         curr = price_ts[-1].get("value")
         for label, days in [("24h", 1), ("7d", 7), ("30d", 30)]:
-            idx = -1 - days
             if len(price_ts) > days and curr:
-                prev = price_ts[idx].get("value")
+                prev = price_ts[-1 - days].get("value")
                 if prev and prev != 0:
                     v = (curr - prev) / prev * 100
                     cls = "up" if v > 0 else "down" if v < 0 else "flat"
                     changes.append(f'<span class="change-pill {cls}">{label} {fmt_pct(v)}</span>')
 
-    # Metrics cards
+    # Metric cards
     metric_cards = []
     metric_defs = [
-        ("marketcap_usd", "Market Cap"),
-        ("volume_usd", "Volume 24h"),
-        ("mvrv_usd", "MVRV"),
-        ("nvt", "NVT Ratio"),
+        ("marketcap_usd", "Market Cap"), ("volume_usd", "Volume 24h"),
+        ("mvrv_usd", "MVRV"), ("nvt", "NVT Ratio"),
         ("daily_active_addresses", "Active Addresses"),
         ("transaction_volume", "Tx Volume"),
         ("exchange_balance", "Exchange Balance"),
@@ -459,7 +633,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "") -> str:
         val_str = fmt_usd(latest) if is_usd else f"{latest:,.2f}" if latest < 1000 else fmt_num(latest)
         metric_cards.append(f"""
         <div class="metric-card">
-            <div class="metric-label">{html_mod.escape(label)}</div>
+            <div class="metric-label">{_esc(label)}</div>
             <div class="metric-value">{val_str}</div>
         </div>""")
 
@@ -478,33 +652,32 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "") -> str:
         ("mvrv_usd", "MVRV Ratio", "#8B5CF6"),
         ("daily_active_addresses", "Active Addresses", "#10B981"),
         ("exchange_balance", "Exchange Balance", "#EF4444"),
-        ("dev_activity", "Development Activity", "#F59E0B"),
+        ("dev_activity", "Dev Activity", "#F59E0B"),
         ("network_growth", "Network Growth", "#06B6D4"),
-        ("transaction_volume", "Transaction Volume", "#EC4899"),
+        ("transaction_volume", "Tx Volume", "#EC4899"),
         ("circulation", "Circulation", "#14B8A6"),
-        ("whale_transaction_count_100k_usd_to_inf", "Whale Transactions", "#F97316"),
+        ("whale_transaction_count_100k_usd_to_inf", "Whale Txs", "#F97316"),
         ("social_volume_total", "Social Volume", "#8B5CF6"),
-        ("sentiment_balance_total", "Sentiment Balance", "#3B82F6"),
+        ("sentiment_balance_total", "Sentiment", "#3B82F6"),
     ]
     for key, title, color in chart_defs:
         data = _data(key)
         if not data or len(data) < 3:
             continue
-        chart = line_chart_svg(
+        secondary_charts.append(line_chart_svg(
             [{"label": title, "data": data, "color": color}],
             width=340, height=200, title=title, metric_key=key,
             show_min_max=False, show_area=True,
-        )
-        secondary_charts.append(chart)
+        ))
 
     charts_html = ""
     if price_chart:
-        charts_html += f'<div class="chart-wrap" style="margin-bottom:14px">{price_chart}</div>'
+        charts_html += f'<div class="chart-wrap">{price_chart}</div>'
     if secondary_charts:
         charts_html += chart_panel(secondary_charts, columns=2)
 
     body = f"""
-    <a href="/" class="back-link">&larr; Market</a>
+    <a href="/" class="back-link">&larr; Briefing</a>
 
     <div class="profile-hero">
         <div>
@@ -525,7 +698,6 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "") -> str:
         {charts_html if charts_html else '<p class="chart-empty">Chart data is still loading...</p>'}
     </div>
     """
-
     return page_shell(f"{name} ({ticker})", body)
 
 
@@ -537,7 +709,7 @@ def render_compare_page(tokens: list) -> str:
     if not tokens:
         body = """
         <h1 class="page-title">Compare Tokens</h1>
-        <p class="page-subtitle">Select tokens to compare side by side.</p>
+        <p class="page-subtitle">Side-by-side on-chain comparison</p>
         <p class="chart-empty">Usage: /compare?tokens=bitcoin,ethereum,solana</p>
         """
         return page_shell("Compare", body, active_nav="compare")
@@ -552,26 +724,21 @@ def render_compare_page(tokens: list) -> str:
     chips = "".join(f'<a href="/compare?tokens={slugs}" class="compare-chip">{label}</a>' for label, slugs in presets)
 
     metric_keys = [
-        ("price_usd", "Price"),
-        ("marketcap_usd", "Market Cap"),
-        ("volume_usd", "Volume 24h"),
-        ("mvrv_usd", "MVRV"),
-        ("nvt", "NVT"),
-        ("daily_active_addresses", "Active Addresses"),
-        ("dev_activity", "Dev Activity"),
-        ("exchange_balance", "Exchange Balance"),
+        ("price_usd", "Price"), ("marketcap_usd", "Market Cap"),
+        ("volume_usd", "Volume 24h"), ("mvrv_usd", "MVRV"),
+        ("nvt", "NVT"), ("daily_active_addresses", "Active Addresses"),
+        ("dev_activity", "Dev Activity"), ("exchange_balance", "Exchange Balance"),
     ]
     comp_table = comparison_table(tokens, metric_keys)
 
     from .svg_charts import COLORS
-    overlay_configs = [
+    overlay_charts = []
+    for metric_key, title, show_area in [
         ("price_usd", "Price Comparison", True),
         ("mvrv_usd", "MVRV Comparison", False),
         ("daily_active_addresses", "Active Addresses", False),
         ("volume_usd", "Volume Comparison", False),
-    ]
-    overlay_charts = []
-    for metric_key, title, show_area in overlay_configs:
+    ]:
         series = []
         for i, t in enumerate(tokens):
             data = t.get("metrics", {}).get(metric_key, {}).get("data", [])
@@ -582,30 +749,26 @@ def render_compare_page(tokens: list) -> str:
                     "color": COLORS[i % len(COLORS)],
                 })
         if series:
-            chart = line_chart_svg(
+            overlay_charts.append(line_chart_svg(
                 series, width=720, height=280, title=title,
                 metric_key=metric_key, show_area=show_area and len(series) == 1,
                 show_min_max=False,
-            )
-            overlay_charts.append(chart)
+            ))
 
     body = f"""
     <h1 class="page-title">Compare Tokens</h1>
-    <p class="page-subtitle">Side-by-side on-chain metric comparison</p>
-
+    <p class="page-subtitle">Side-by-side on-chain comparison</p>
     <div class="compare-bar">
-        <span class="compare-bar-label">Quick Compare:</span>
+        <span class="compare-bar-label">Quick:</span>
         {chips}
     </div>
-
     <div class="section">
         <div class="section-title">Metrics</div>
         {comp_table}
     </div>
-
     <div class="section">
-        <div class="section-title">Overlay Charts</div>
-        {"".join(f'<div class="chart-wrap" style="margin-bottom:14px">{c}</div>' for c in overlay_charts) if overlay_charts else '<p class="chart-empty">Not enough data for overlay charts yet.</p>'}
+        <div class="section-title">Charts</div>
+        {"".join(f'<div class="chart-wrap">{c}</div>' for c in overlay_charts) if overlay_charts else '<p class="chart-empty">Not enough data yet.</p>'}
     </div>
     """
     return page_shell("Compare", body, active_nav="compare")
@@ -616,20 +779,13 @@ def render_compare_page(tokens: list) -> str:
 # ================================================================
 
 def render_screener_page(
-    tokens: list,
-    tier: str = "all",
-    min_change: float = None,
-    max_change: float = None,
-    sort_by: str = "marketcap_usd",
-    order: str = "desc",
+    tokens: list, tier: str = "all",
+    min_change: float = None, max_change: float = None,
+    sort_by: str = "marketcap_usd", order: str = "desc",
 ) -> str:
     tiers = [
-        ("all", "All"),
-        ("mega", "Mega >$100B"),
-        ("large", "Large $10B-$100B"),
-        ("mid", "Mid $1B-$10B"),
-        ("small", "Small $100M-$1B"),
-        ("micro", "Micro <$100M"),
+        ("all", "All"), ("mega", "Mega >$100B"), ("large", "Large $10B+"),
+        ("mid", "Mid $1B+"), ("small", "Small $100M+"), ("micro", "Micro <$100M"),
     ]
     tier_btns = "".join(
         f'<a href="/screener?tier={key}&sort={sort_by}&order={order}" '
@@ -643,14 +799,14 @@ def render_screener_page(
         return f'<a href="/screener?tier={tier}&sort={col}&order={new_order}" class="sort-link">{label}{arrow}</a>'
 
     rows = []
-    for i, t in enumerate(tokens):
+    for i, t in enumerate(tokens[:200]):
         slug = t.get("slug", "")
         pct = t.get("price_usd_change")
         mvrv = t.get("mvrv_usd")
         zone_html = f'<span class="zone {mvrv_zone(mvrv)[1]}">{mvrv_zone(mvrv)[0]}</span>' if mvrv else "&mdash;"
         rows.append(f"""<tr>
             <td class="col-rank">{i+1}</td>
-            <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{html_mod.escape(t.get("name", slug))}</strong> <span class="ticker">{html_mod.escape(t.get("ticker", ""))}</span></a></td>
+            <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
             <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
             <td class="col-num {css_class(pct)}">{fmt_pct(pct)}</td>
             <td class="col-num">{fmt_usd(t.get("marketcap_usd"))}</td>
@@ -662,31 +818,23 @@ def render_screener_page(
 
     body = f"""
     <h1 class="page-title">Screener</h1>
-    <p class="page-subtitle">Filter and sort {len(tokens)} tokens by on-chain metrics</p>
-
+    <p class="page-subtitle">Filter and sort {len(tokens)} tokens</p>
     <div class="filter-bar">
-        <div class="filter-group">
-            <span class="filter-label">Tier:</span>
-            {tier_btns}
-        </div>
+        <div class="filter-group"><span class="filter-label">Tier:</span>{tier_btns}</div>
     </div>
-
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
-                <th class="col-rank">#</th>
-                <th>Name</th>
+                <th class="col-rank">#</th><th>Name</th>
                 <th class="col-num">{sort_link("price_usd", "Price")}</th>
                 <th class="col-num">{sort_link("price_usd_change", "24h")}</th>
-                <th class="col-num">{sort_link("marketcap_usd", "Market Cap")}</th>
+                <th class="col-num">{sort_link("marketcap_usd", "Mkt Cap")}</th>
                 <th class="col-num">{sort_link("volume_usd", "Volume")}</th>
                 <th class="col-num hide-mobile">{sort_link("mvrv_usd", "MVRV")}</th>
                 <th class="col-tag hide-mobile">Zone</th>
                 <th class="col-num hide-mobile">{sort_link("daily_active_addresses", "Active Addr")}</th>
             </tr></thead>
-            <tbody>
-                {"".join(rows) if rows else '<tr><td colspan="9" class="empty-cell">No tokens match the filter criteria.</td></tr>'}
-            </tbody>
+            <tbody>{"".join(rows) if rows else '<tr><td colspan="9" class="empty-cell">No tokens match.</td></tr>'}</tbody>
         </table>
     </div>
     """
@@ -705,30 +853,26 @@ def render_valuation_page(tokens: list) -> str:
             z = mvrv_zone(mvrv)
             zone_counts[z[0]] = zone_counts.get(z[0], 0) + 1
 
-    legend_items = [
-        ("Deep Value", "zone-extreme-low"),
-        ("Undervalued", "zone-undervalued"),
-        ("Fair", "zone-fair"),
-        ("Elevated", "zone-fair-high"),
-        ("Overvalued", "zone-overvalued"),
-        ("Euphoria", "zone-extreme-high"),
-    ]
     legend = "".join(
         f'<span class="legend-item"><span class="zone {cls}">{label}</span> {zone_counts.get(label, 0)}</span>'
-        for label, cls in legend_items
+        for label, cls in [
+            ("Deep Value", "zone-extreme-low"), ("Undervalued", "zone-undervalued"),
+            ("Fair Value", "zone-fair"), ("Elevated", "zone-fair-high"),
+            ("Overvalued", "zone-overvalued"), ("Euphoria", "zone-extreme-high"),
+        ]
     )
 
     rows = []
     for i, t in enumerate(tokens):
-        slug = t.get("slug", "")
         mvrv = t.get("mvrv_usd")
         if mvrv is None:
             continue
+        slug = t.get("slug", "")
         zone_label, zone_css, _ = mvrv_zone(mvrv)
         bar_pct = min(100, max(0, mvrv / 4 * 100))
         rows.append(f"""<tr>
             <td class="col-rank">{i+1}</td>
-            <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{html_mod.escape(t.get("name", slug))}</strong> <span class="ticker">{html_mod.escape(t.get("ticker", ""))}</span></a></td>
+            <td class="col-name"><a href="/token/{slug}" class="token-link"><strong>{_esc(t.get("name", slug))}</strong> <span class="ticker">{_esc(t.get("ticker", ""))}</span></a></td>
             <td class="col-num bold">{fmt_usd(t.get("price_usd"))}</td>
             <td class="col-num bold">{mvrv:.2f}</td>
             <td class="col-tag"><span class="zone {zone_css}">{zone_label}</span></td>
@@ -737,23 +881,16 @@ def render_valuation_page(tokens: list) -> str:
 
     body = f"""
     <h1 class="page-title">Valuation Scanner</h1>
-    <p class="page-subtitle">MVRV-based valuation zones across {len(tokens)} tokens</p>
-
+    <p class="page-subtitle">MVRV zones across {len(tokens)} tokens</p>
     <div class="val-legend">{legend}</div>
-
     <div class="table-wrap">
         <table class="data-table">
             <thead><tr>
-                <th class="col-rank">#</th>
-                <th>Name</th>
-                <th class="col-num">Price</th>
-                <th class="col-num">MVRV</th>
-                <th class="col-tag">Zone</th>
-                <th class="hide-mobile">MVRV Bar</th>
+                <th class="col-rank">#</th><th>Name</th>
+                <th class="col-num">Price</th><th class="col-num">MVRV</th>
+                <th class="col-tag">Zone</th><th class="hide-mobile">Bar</th>
             </tr></thead>
-            <tbody>
-                {"".join(rows) if rows else '<tr><td colspan="6" class="empty-cell">MVRV data not yet available. Check back after sync completes.</td></tr>'}
-            </tbody>
+            <tbody>{"".join(rows) if rows else '<tr><td colspan="6" class="empty-cell">MVRV data not yet available.</td></tr>'}</tbody>
         </table>
     </div>
     """
@@ -780,28 +917,22 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
     for i, (_, key) in enumerate(phases):
         if key in status:
             current_idx = i
-            break
     if status == "ready":
         current_idx = len(phases) - 1
 
     pipeline_html = ""
     for i, (label, _) in enumerate(phases):
-        if status == "ready" or i < current_idx:
-            cls = "done"
-        elif i == current_idx:
-            cls = "active"
-        else:
-            cls = ""
+        cls = "done" if (status == "ready" or i < current_idx) else ("active" if i == current_idx else "")
         pipeline_html += f'<span class="sync-step {cls}"><span class="sync-step-dot"></span>{label}</span>'
 
     stats_grid = f"""
     <div class="sync-stats-grid">
         <div class="sync-stat"><div class="sync-stat-label">Projects</div><div class="sync-stat-value">{fmt_num(cs.get("projects_cached", 0))}</div></div>
         <div class="sync-stat"><div class="sync-stat-label">Data Points</div><div class="sync-stat-value">{fmt_num(cs.get("total_data_points_pulled", 0))}</div></div>
-        <div class="sync-stat"><div class="sync-stat-label">Timeseries Rows</div><div class="sync-stat-value">{fmt_num(cs.get("timeseries_rows", 0))}</div></div>
+        <div class="sync-stat"><div class="sync-stat-label">Timeseries</div><div class="sync-stat-value">{fmt_num(cs.get("timeseries_rows", 0))}</div></div>
         <div class="sync-stat"><div class="sync-stat-label">DB Size</div><div class="sync-stat-value">{cs.get("db_size_mb", 0):.0f} MB</div></div>
         <div class="sync-stat"><div class="sync-stat-label">API Requests</div><div class="sync-stat-value">{fmt_num(cl.get("total_requests", 0))}</div></div>
-        <div class="sync-stat"><div class="sync-stat-label">Successful Pulls</div><div class="sync-stat-value">{fmt_num(cs.get("successful_pulls", 0))}</div></div>
+        <div class="sync-stat"><div class="sync-stat-label">Successful</div><div class="sync-stat-value">{fmt_num(cs.get("successful_pulls", 0))}</div></div>
         <div class="sync-stat"><div class="sync-stat-label">Errors</div><div class="sync-stat-value">{cl.get("errors", 0)}</div></div>
         <div class="sync-stat"><div class="sync-stat-label">Cache Hits</div><div class="sync-stat-value">{fmt_num(cl.get("cache_hits", 0))}</div></div>
     </div>"""
@@ -809,17 +940,14 @@ def render_sync_page(pull_status: dict, cache_stats: dict, client_stats: dict) -
     error_html = ""
     last_err = cl.get("last_error")
     if last_err:
-        error_html = f'<div class="sync-error"><strong>Last Error:</strong> {html_mod.escape(str(last_err)[:300])}</div>'
+        error_html = f'<div class="sync-error"><strong>Last Error:</strong> {_esc(str(last_err)[:300])}</div>'
 
     body = f"""
     <h1 class="page-title">Data Sync</h1>
-    <p class="page-subtitle">Pipeline status and cache statistics</p>
-
+    <p class="page-subtitle">Pipeline status and statistics</p>
     <div class="sync-pipeline">{pipeline_html}</div>
-
     {stats_grid}
     {error_html}
-
-    <p class="sync-hint">This page is a snapshot. Refresh to see latest progress.</p>
+    <p class="sync-hint">Snapshot — refresh for latest.</p>
     """
     return page_shell("Sync", body, active_nav="sync")

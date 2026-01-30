@@ -222,6 +222,26 @@ class SantimentCache:
             # skip rows beyond 2 per slug
         return result
 
+    def get_aggregate_timeseries(
+        self,
+        metric: str,
+        slugs: list[str],
+        days: int = 90,
+        interval: str = "1d",
+    ) -> list[dict]:
+        """
+        Sum a metric across multiple slugs, returning a single aggregate timeseries.
+        Used for economy-level trends (e.g., total active addresses across top 20).
+        """
+        placeholders = ",".join("?" for _ in slugs)
+        rows = self._conn.execute(
+            f"""SELECT dt, SUM(value) as total FROM timeseries
+                WHERE metric = ? AND interval = ? AND slug IN ({placeholders})
+                GROUP BY dt ORDER BY dt DESC LIMIT ?""",
+            [metric, interval] + slugs + [days],
+        ).fetchall()
+        return [{"datetime": r["dt"], "value": r["total"]} for r in reversed(rows)]
+
     def get_timeseries_date_range(self, metric: str, slug: str, interval: str = "1d") -> Optional[dict]:
         """Get the earliest and latest date we have for a metric/slug."""
         row = self._conn.execute(
