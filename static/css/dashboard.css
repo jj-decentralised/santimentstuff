@@ -2885,6 +2885,28 @@ html.dark .health-pulse circle[stroke="#E5E7EB"] { stroke: #30363D; }
   color: var(--text-primary);
   background: var(--border-light);
 }
+/* Sector detail movers */
+.movers-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;
+}
+.movers-col { }
+.movers-label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+.mover-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.mover-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; font-size: 0.68rem; font-weight: 600;
+  background: var(--bg-alt); border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm); text-decoration: none;
+  transition: all 0.1s;
+}
+.mover-chip:hover { border-color: var(--accent); }
+.mover-ticker { color: var(--text-primary); }
+.mover-pct { font-family: var(--mono); }
+html.dark .mover-chip { background: #161B22; border-color: #30363D; }
+@media (max-width: 640px) {
+  .movers-row { grid-template-columns: 1fr; }
+}
+
 .sector-detail-actions {
   display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
 }

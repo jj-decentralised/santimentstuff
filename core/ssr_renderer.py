@@ -3094,6 +3094,23 @@ def render_sector_detail_page(tokens: list, sector_key: str, sector_label: str, 
             <td class="col-tag hide-mobile">{zone_html}</td>
         </tr>"""
 
+    # Top movers
+    with_pct = [t for t in tokens if t.get("price_usd_change") is not None]
+    gainers = sorted(with_pct, key=lambda t: t.get("price_usd_change", 0), reverse=True)[:5]
+    losers = sorted(with_pct, key=lambda t: t.get("price_usd_change", 0))[:5]
+    def _mover_chips(tlist, label):
+        chips = "".join(
+            f'<a href="/token/{t["slug"]}" class="mover-chip">'
+            f'<span class="mover-ticker">{_esc(t.get("ticker",""))}</span>'
+            f'<span class="mover-pct {css_class(t.get("price_usd_change"))}">{fmt_pct(t.get("price_usd_change"))}</span>'
+            f'</a>'
+            for t in tlist
+        )
+        return f'<div class="movers-col"><div class="movers-label">{label}</div><div class="mover-list">{chips}</div></div>'
+    movers_html = ""
+    if gainers or losers:
+        movers_html = f'<div class="movers-row">{_mover_chips(gainers, "Top Gainers")}{_mover_chips(losers, "Top Losers")}</div>'
+
     ch_cls = "up" if avg_change > 0 else "down" if avg_change < 0 else "muted"
     body = f"""
     {_breadcrumbs(("Sectors", "/sectors"), (sector_label,))}
@@ -3111,6 +3128,8 @@ def render_sector_detail_page(tokens: list, sector_key: str, sector_label: str, 
         <div class="zone-bar">{zone_bar_segs}</div>
         <div class="zone-legend">{zone_legend}</div>
     </div>
+
+    {movers_html}
 
     <div class="sector-detail-actions">
         <a href="/compare?tokens={','.join(t['slug'] for t in tokens[:5])}" class="filter-btn">Compare Top 5</a>
