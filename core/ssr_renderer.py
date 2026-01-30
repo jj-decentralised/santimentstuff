@@ -2344,6 +2344,10 @@ def render_compare_page(tokens: list) -> str:
         <a href="/watchlist?tokens={_esc(slug_list)}" class="filter-btn">Save as Watchlist</a>
         <a href="/compare/export.csv?tokens={_esc(slug_list)}" class="export-btn">&#8681; Export CSV</a>
     </div>
+    <div class="share-hint">
+        <span class="share-label">Share this comparison:</span>
+        <code class="share-url">/compare?tokens={_esc(slug_list)}</code>
+    </div>
     <div class="section">
         <div class="section-title">Metrics</div>
         {comp_table}

@@ -1699,6 +1699,17 @@ html.dark .supply-info { background: #161B22; border-color: #30363D; }
 .compare-actions {
   margin-bottom: 14px;
 }
+.share-hint {
+  font-size: 0.68rem; color: var(--text-muted); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.share-label { font-weight: 600; }
+.share-url {
+  font-size: 0.64rem; padding: 3px 8px;
+  background: var(--bg-alt); border: 1px solid var(--border-light);
+  border-radius: 3px; user-select: all; cursor: text;
+  word-break: break-all;
+}
 /* Correlation matrix */
 .corr-table { width: auto; border-collapse: collapse; }
 .corr-table th, .corr-table td { text-align: center; padding: 6px 12px; font-size: 0.75rem; }
