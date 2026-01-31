@@ -888,9 +888,10 @@ a { color: inherit; text-decoration: none; }
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 16px 14px;
   overflow: hidden;
 }
+.chart-cell .chart-svg { margin: 0 -4px; }
 .chart-svg { display: block; width: 100%; height: auto; }
 
 /* ================================================================
@@ -3497,18 +3498,24 @@ html.dark {
   --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) .chart-svg text { fill: #E6EDF3; }
-  :root:not(.light) .chart-svg text[fill="#111"],
-  :root:not(.light) .chart-svg text[fill="#111111"],
-  :root:not(.light) .chart-svg text[fill="#0F1419"],
-  :root:not(.light) .chart-svg text[fill="#374151"] { fill: #C9D1D9; }
-  :root:not(.light) .chart-svg text[fill="#6B7280"],
-  :root:not(.light) .chart-svg text[fill="#9CA3AF"] { fill: #8B949E; }
-  :root:not(.light) .chart-svg line[stroke="#E5E7EB"],
-  :root:not(.light) .chart-svg line[stroke="#F3F4F6"] { stroke: #30363D; }
+  :root:not(.light) .chart-svg text { fill: #D0D7DE; }
+  :root:not(.light) .chart-svg text[fill="#222"],
+  :root:not(.light) .chart-svg text[fill="#222222"],
+  :root:not(.light) .chart-svg text[fill="#333"],
+  :root:not(.light) .chart-svg text[fill="#333333"],
+  :root:not(.light) .chart-svg text[fill="#444"],
+  :root:not(.light) .chart-svg text[fill="#555"] { fill: #C9D1D9; }
+  :root:not(.light) .chart-svg text[fill="#666666"],
+  :root:not(.light) .chart-svg text[fill="#777"],
+  :root:not(.light) .chart-svg text[fill="#888"],
+  :root:not(.light) .chart-svg text[fill="#999"],
+  :root:not(.light) .chart-svg text[fill="#AAAAAA"],
+  :root:not(.light) .chart-svg text[fill="#AAA"] { fill: #8B949E; }
+  :root:not(.light) .chart-svg line[stroke="#E8E8E8"],
+  :root:not(.light) .chart-svg line[stroke="#333333"] { stroke: #30363D; }
   :root:not(.light) .chart-svg rect[fill="white"],
   :root:not(.light) .chart-svg circle[fill="white"] { fill: #0D1117; }
-  :root:not(.light) .chart-svg line[stroke="#D1D5DB"] { stroke: #21262D; }
+  :root:not(.light) .chart-svg polygon[stroke="#E8E8E8"] { stroke: #30363D; }
   :root:not(.light) .onchain-narrative { background: #161B22; border-left-color: #58A6FF; }
   :root:not(.light) .composite-score { background: #161B22; }
   :root:not(.light) .onchain-health { background: #161B22; }
@@ -3528,19 +3535,25 @@ html.dark .sector-meme { background: #7F1D1D; color: #FCA5A5; border-color: #991
 html.dark .sector-ai { background: #164E63; color: #67E8F9; border-color: #155E75; }
 html.dark .sector-exchange { background: #78350F; color: #FCD34D; border-color: #92400E; }
 html.dark .data-table tbody tr:hover { background: #1C2128; }
-html.dark .chart-svg text { fill: #E6EDF3; }
-html.dark .chart-svg text[fill="#111"],
-html.dark .chart-svg text[fill="#111111"],
-html.dark .chart-svg text[fill="#0F1419"],
-html.dark .chart-svg text[fill="#374151"] { fill: #C9D1D9; }
-html.dark .chart-svg text[fill="#6B7280"],
-html.dark .chart-svg text[fill="#9CA3AF"] { fill: #8B949E; }
-html.dark .chart-svg line[stroke="#E5E7EB"],
-html.dark .chart-svg line[stroke="#F3F4F6"] { stroke: #30363D; }
-html.dark .chart-svg polygon[fill="none"][stroke="#E5E7EB"] { stroke: #30363D; }
+html.dark .chart-svg text { fill: #D0D7DE; }
+html.dark .chart-svg text[fill="#222"],
+html.dark .chart-svg text[fill="#222222"],
+html.dark .chart-svg text[fill="#333"],
+html.dark .chart-svg text[fill="#333333"],
+html.dark .chart-svg text[fill="#444"],
+html.dark .chart-svg text[fill="#555"] { fill: #C9D1D9; }
+html.dark .chart-svg text[fill="#666666"],
+html.dark .chart-svg text[fill="#777"],
+html.dark .chart-svg text[fill="#888"],
+html.dark .chart-svg text[fill="#999"],
+html.dark .chart-svg text[fill="#AAAAAA"],
+html.dark .chart-svg text[fill="#AAA"] { fill: #8B949E; }
+html.dark .chart-svg line[stroke="#E8E8E8"],
+html.dark .chart-svg line[stroke="#333333"] { stroke: #30363D; }
+html.dark .chart-svg polygon[fill="none"][stroke="#E8E8E8"],
+html.dark .chart-svg polygon[stroke="#E8E8E8"] { stroke: #30363D; }
 html.dark .chart-svg rect[fill="white"],
 html.dark .chart-svg circle[fill="white"] { fill: #0D1117; }
-html.dark .chart-svg line[stroke="#D1D5DB"] { stroke: #21262D; }
 html.dark .onchain-narrative { background: #161B22; border-left-color: #58A6FF; }
 html.dark .composite-score { background: #161B22; }
 html.dark .onchain-health { background: #161B22; }

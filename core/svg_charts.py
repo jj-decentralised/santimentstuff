@@ -1,13 +1,15 @@
 """
 Pure SVG chart generation — no JavaScript required.
 
-Premium chart engine with:
-- Smooth bezier curves (cubic spline interpolation)
-- Gradient area fills with defs
-- Min/max/current value markers
-- Refined typography and spacing
-- Heatmap grids, dominance bars, sentiment gauges
-- Outlier clamping, smart y-axis, clean labels
+WSJ-inspired chart engine with:
+- Clean, minimal design with generous whitespace
+- Thin, precise lines (1–1.5px)
+- Light dotted horizontal gridlines
+- Professional serif/sans-serif typography
+- Muted, authoritative color palette (navy, slate, warm gray)
+- Right-aligned Y-axis labels
+- High data-to-ink ratio
+- No gratuitous gradients or decorative effects
 """
 
 import html as html_mod
@@ -16,36 +18,42 @@ from typing import Optional
 
 
 # ============================================================
-# COLORS — Refined palette
+# WSJ-INSPIRED COLOR PALETTE
 # ============================================================
 
+# Primary series colors — muted, professional, WSJ-like
 COLORS = [
-    "#111111",   # near-black (primary)
-    "#3B82F6",   # blue
-    "#EF4444",   # red
-    "#10B981",   # emerald
-    "#F59E0B",   # amber
-    "#8B5CF6",   # violet
-    "#06B6D4",   # cyan
-    "#EC4899",   # pink
-    "#F97316",   # orange
-    "#14B8A6",   # teal
+    "#0A2463",   # deep navy (primary)
+    "#C84630",   # WSJ red/brick
+    "#2D7D9A",   # teal-blue
+    "#7D5A3C",   # warm brown
+    "#5B7065",   # sage green
+    "#8E6C88",   # muted plum
+    "#B8860B",   # dark goldenrod
+    "#4A6FA5",   # steel blue
+    "#C17817",   # amber/ochre
+    "#3D5A80",   # slate blue
 ]
 
-GRID_COLOR = "#F3F4F6"
-LABEL_COLOR = "#9CA3AF"
-AXIS_COLOR = "#E5E7EB"
-BG_COLOR = "#FAFBFC"
+GRID_COLOR = "#E8E8E8"
+LABEL_COLOR = "#666666"
+AXIS_COLOR = "#333333"
+BG_COLOR = "none"  # transparent — let the container handle background
 
-# Heatmap color scale (red -> gray -> green)
+# WSJ typography stack — serif for data labels, clean and authoritative
+FONT_LABEL = '"Georgia","Cambria","Times New Roman",serif'
+FONT_DATA = '"Helvetica Neue","Arial",sans-serif'
+FONT_TITLE = '"Helvetica Neue","Arial",sans-serif'
+
+# Heatmap color scale — more muted, WSJ editorial style
 HEATMAP_COLORS = {
-    "extreme_neg": "#DC2626",
-    "neg": "#F87171",
-    "slight_neg": "#FCA5A5",
-    "neutral": "#E5E7EB",
-    "slight_pos": "#86EFAC",
-    "pos": "#34D399",
-    "extreme_pos": "#059669",
+    "extreme_neg": "#B91C1C",
+    "neg": "#DC6B50",
+    "slight_neg": "#E8A998",
+    "neutral": "#E8E8E8",
+    "slight_pos": "#93C5A4",
+    "pos": "#3D8B5F",
+    "extreme_pos": "#1B5E3B",
 }
 
 
@@ -56,7 +64,7 @@ HEATMAP_COLORS = {
 def _fmt_compact(v: float) -> str:
     """Compact number for tooltips."""
     if v is None:
-        return "–"
+        return "\u2013"
     a = abs(v)
     sign = "-" if v < 0 else ""
     if a >= 1e12:
@@ -117,9 +125,7 @@ def _nice_ticks(lo: float, hi: float, n_ticks: int = 5) -> list[float]:
     if hi <= lo:
         return [lo]
     raw_step = (hi - lo) / max(n_ticks - 1, 1)
-    # Find order of magnitude
     mag = 10 ** math.floor(math.log10(raw_step)) if raw_step > 0 else 1
-    # Snap to nice step: 1, 2, 2.5, 5, 10 multiples
     nice_steps = [1, 2, 2.5, 5, 10]
     norm = raw_step / mag
     step = mag
@@ -128,7 +134,6 @@ def _nice_ticks(lo: float, hi: float, n_ticks: int = 5) -> list[float]:
             step = ns * mag
             break
 
-    # Generate ticks
     start = math.floor(lo / step) * step
     ticks = []
     v = start
@@ -140,23 +145,24 @@ def _nice_ticks(lo: float, hi: float, n_ticks: int = 5) -> list[float]:
 
 
 def _fmt_date(dt_str: str) -> str:
-    """Format ISO date for chart labels."""
+    """Format ISO date for chart labels — WSJ style: 'Jan 5'."""
     try:
         parts = dt_str[:10].split("-")
-        months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return f"{months[int(parts[1])]} {parts[2].lstrip('0')}"
+        months = ["", "Jan.", "Feb.", "Mar.", "Apr.", "May", "June",
+                  "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."]
+        day = str(int(parts[2]))
+        return f"{months[int(parts[1])]} {day}"
     except Exception:
         return dt_str[:10]
 
 
 def _fmt_date_year(dt_str: str) -> str:
-    """Format date with year for longer charts."""
+    """Format date with year for longer charts — WSJ style: 'Jan. 2024'."""
     try:
         parts = dt_str[:10].split("-")
-        months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return f"{months[int(parts[1])]} '{parts[0][2:]}"
+        months = ["", "Jan.", "Feb.", "Mar.", "Apr.", "May", "June",
+                  "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."]
+        return f"{months[int(parts[1])]} {parts[0]}"
     except Exception:
         return dt_str[:7]
 
@@ -171,7 +177,6 @@ def _clamp_outliers(values: list[float], pct: float = 2.0) -> tuple:
     hi_idx = min(n - 1, int(n * (100 - pct) / 100))
     lo = sv[lo_idx]
     hi = sv[hi_idx]
-    # Ensure some range
     if hi <= lo:
         lo = sv[0]
         hi = sv[-1]
@@ -184,7 +189,6 @@ def _clamp_outliers(values: list[float], pct: float = 2.0) -> tuple:
 def _smooth_path(points: list[tuple[float, float]], tension: float = 0.3) -> str:
     """
     Generate a smooth SVG path using cubic bezier curves (Catmull-Rom to Bezier).
-    Returns SVG path d attribute string.
     """
     if len(points) < 2:
         return ""
@@ -199,7 +203,6 @@ def _smooth_path(points: list[tuple[float, float]], tension: float = 0.3) -> str
         p2 = points[i]
         p3 = points[min(len(points) - 1, i + 1)]
 
-        # Control points
         cp1x = p1[0] + (p2[0] - p0[0]) * tension
         cp1y = p1[1] + (p2[1] - p0[1]) * tension
         cp2x = p2[0] - (p3[0] - p1[0]) * tension
@@ -228,10 +231,10 @@ def sparkline_svg(
     data: list[dict],
     width: int = 80,
     height: int = 24,
-    color: str = "#000000",
+    color: str = "#0A2463",
     show_change_color: bool = True,
 ) -> str:
-    """Tiny inline sparkline SVG with gradient fill."""
+    """Tiny inline sparkline SVG — clean single line, no fill."""
     values = [d.get("value") for d in data if d.get("value") is not None]
     if len(values) < 2:
         return ""
@@ -242,9 +245,7 @@ def sparkline_svg(
     n = len(values)
 
     if show_change_color:
-        color = "#10B981" if values[-1] >= values[0] else "#EF4444"
-
-    gid = f"sg{abs(hash(str(values[:3]))) % 99999}"
+        color = "#1B5E3B" if values[-1] >= values[0] else "#B91C1C"
 
     points = []
     for i, v in enumerate(values):
@@ -252,33 +253,30 @@ def sparkline_svg(
         y = height - ((v - min_v) / v_range) * (height - 4) - 2
         points.append((x, y))
 
-    line_d = _smooth_path(points, tension=0.25)
-    area_d = line_d + f" L{points[-1][0]:.1f},{height} L{points[0][0]:.1f},{height} Z"
+    line_d = _smooth_path(points, tension=0.2)
 
-    # Tooltip: show latest value, change, and range
+    # Tooltip
     first_v, last_v = values[0], values[-1]
     if first_v and first_v != 0:
         chg = (last_v - first_v) / first_v * 100
         chg_str = f" ({chg:+.1f}%)"
     else:
         chg_str = ""
-    tooltip = f"{_fmt_compact(last_v)}{chg_str} | Range: {_fmt_compact(min_v)}–{_fmt_compact(max_v)}"
+    tooltip = f"{_fmt_compact(last_v)}{chg_str}"
 
     return (
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'style="vertical-align:middle">'
         f'<title>{tooltip}</title>'
-        f'<defs>{_gradient_def(gid, color, 0.3, 0.0)}</defs>'
-        f'<path d="{area_d}" fill="url(#{gid})"/>'
         f'<path d="{line_d}" fill="none" stroke="{color}" '
-        f'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        f'stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>'
         f'<circle cx="{points[-1][0]:.1f}" cy="{points[-1][1]:.1f}" r="1.5" fill="{color}"/>'
         f'</svg>'
     )
 
 
 # ============================================================
-# LINE CHART — Full-size with smooth curves, gradients, markers
+# LINE CHART — WSJ-style: clean, precise, authoritative
 # ============================================================
 
 def line_chart_svg(
@@ -296,54 +294,42 @@ def line_chart_svg(
     ref_lines: list[tuple] = None,
 ) -> str:
     """
-    Generate a premium line chart SVG with smooth curves and gradient fills.
-
-    Key improvements:
-    - Outlier clamping (2nd/98th percentile) for stable Y-axis
-    - Smart zero baseline: if all values are positive, Y starts at 0 or near-min
-    - Nice round tick numbers on Y-axis
-    - Fewer, cleaner date labels on X-axis
-    - Gradient fill clipped at chart bottom (not below zero)
+    WSJ-style line chart: thin precise lines, dotted gridlines,
+    right-side Y labels, serif typography, high data-ink ratio.
     """
     if not series or not any(s.get("data") for s in series):
         return '<div class="chart-empty">No chart data available</div>'
 
-    # Chart dimensions
-    pad_left = 70
-    pad_right = 30
-    pad_top = 35 if title else 16
-    pad_bottom = 40
+    # Chart dimensions — generous left padding for labels
+    pad_left = 12
+    pad_right = 62
+    pad_top = 40 if title else 20
+    pad_bottom = 36
     chart_w = width - pad_left - pad_right
     chart_h = height - pad_top - pad_bottom
 
     # Collect all values
     all_values = []
-    all_dates = []
     for s in series:
         for d in (s.get("data") or []):
             v = d.get("value")
             if v is not None:
                 all_values.append(v)
-                all_dates.append(d.get("datetime", ""))
 
     if not all_values:
         return '<div class="chart-empty">No chart data available</div>'
 
-    # ── Smart Y-axis range with outlier clamping ──
+    # Smart Y-axis range with outlier clamping
     clamped_lo, clamped_hi = _clamp_outliers(all_values, pct=2.0)
 
-    # If all values are positive, don't show negative Y
     all_positive = min(all_values) >= 0
     if all_positive:
-        # Use 90% of clamped low as floor, but only go to 0 if the
-        # min is truly near zero relative to the range
         range_span = clamped_hi - clamped_lo
         if range_span > 0 and clamped_lo < range_span * 0.08:
             clamped_lo = 0
         else:
             clamped_lo = max(0, clamped_lo * 0.92)
 
-    # Compute nice ticks
     ticks = _nice_ticks(clamped_lo, clamped_hi, y_label_count)
     min_v = ticks[0]
     max_v = ticks[-1]
@@ -365,49 +351,45 @@ def line_chart_svg(
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
     )
 
-    # Chart area background
-    elements.append(
-        f'<rect x="{pad_left}" y="{pad_top}" width="{chart_w}" height="{chart_h}" '
-        f'fill="{BG_COLOR}" rx="4"/>'
-    )
-
-    # Title
+    # Title — WSJ uses bold sans-serif above chart
     if title:
         elements.append(
-            f'<text x="{pad_left}" y="20" font-size="13" font-weight="700" '
-            f'fill="#111827" font-family="Inter,system-ui,sans-serif">{html_mod.escape(title)}</text>'
+            f'<text x="{pad_left}" y="18" font-size="14" font-weight="700" '
+            f'fill="#222222" font-family={FONT_TITLE} letter-spacing="-0.3">{html_mod.escape(title)}</text>'
         )
 
-    # ── Y-axis: nice round tick lines ──
+    # Y-axis: thin dotted gridlines + right-side labels (WSJ style)
     if show_grid:
         for tick in ticks:
             y = scale_y(tick)
             label = _fmt_val(tick, metric_key)
+            # Dotted gridline
             elements.append(
                 f'<line x1="{pad_left}" y1="{y:.1f}" x2="{pad_left + chart_w}" y2="{y:.1f}" '
-                f'stroke="{GRID_COLOR}" stroke-width="1"/>'
+                f'stroke="{GRID_COLOR}" stroke-width="0.7" stroke-dasharray="2,3"/>'
             )
+            # Right-side label (WSJ convention)
             elements.append(
-                f'<text x="{pad_left - 8}" y="{y + 4:.1f}" text-anchor="end" '
-                f'font-size="10" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
+                f'<text x="{pad_left + chart_w + 8}" y="{y + 3.5:.1f}" text-anchor="start" '
+                f'font-size="10" fill="{LABEL_COLOR}" font-family={FONT_LABEL}>{label}</text>'
             )
 
-    # ── Reference lines (horizontal annotations) ──
+    # Reference lines (horizontal annotations)
     if ref_lines:
         for ref_val, ref_label, ref_color in ref_lines:
             if clamped_lo <= ref_val <= clamped_hi:
                 ry = scale_y(ref_val)
                 elements.append(
                     f'<line x1="{pad_left}" y1="{ry:.1f}" x2="{pad_left + chart_w}" y2="{ry:.1f}" '
-                    f'stroke="{ref_color}" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>'
+                    f'stroke="{ref_color}" stroke-width="0.8" stroke-dasharray="5,3" opacity="0.7"/>'
                 )
                 elements.append(
-                    f'<text x="{pad_left + chart_w + 4}" y="{ry + 3:.1f}" text-anchor="start" '
-                    f'font-size="8" font-weight="600" fill="{ref_color}" '
-                    f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(ref_label)}</text>'
+                    f'<text x="{pad_left + chart_w + 8}" y="{ry + 3:.1f}" text-anchor="start" '
+                    f'font-size="9" font-weight="600" fill="{ref_color}" '
+                    f'font-family={FONT_LABEL}>{html_mod.escape(ref_label)}</text>'
                 )
 
-    # ── Draw each series ──
+    # Draw each series
     for si, s in enumerate(series):
         data = s.get("data") or []
         if not data:
@@ -415,8 +397,7 @@ def line_chart_svg(
 
         color = s.get("color") or COLORS[si % len(COLORS)]
 
-        # Downsample very dense data to ~350 points using largest-triangle
-        # This keeps visual peaks/valleys while reducing SVG path complexity
+        # Downsample dense data
         max_points = 350
         if len(data) > max_points:
             step = len(data) / max_points
@@ -424,14 +405,11 @@ def line_chart_svg(
             for j in range(max_points):
                 idx = int(j * step)
                 sampled.append(data[min(idx, len(data) - 1)])
-            # Always include last point
             if sampled[-1] is not data[-1]:
                 sampled[-1] = data[-1]
             data = sampled
 
         n = len(data)
-
-        # Build points
         points = []
         min_pt = None
         max_pt = None
@@ -456,17 +434,11 @@ def line_chart_svg(
         if not points:
             continue
 
-        # Gradient definition — lighter for dense data
+        # Very subtle area fill — WSJ occasionally uses light fills
         gid = f"grad_{si}_{abs(hash(color)) % 99999}"
-        grad_opacity = 0.08 if len(points) > 200 else 0.15
-        defs.append(_gradient_def(gid, color, grad_opacity, 0.01))
-
-        # Smooth path — use lower tension for dense data to avoid spikiness
-        tension = 0.15 if len(points) > 200 else 0.25
-        line_d = _smooth_path(points, tension=tension)
-
-        # Area fill — clipped to chart bottom
-        if show_area and len(series) <= 2:
+        if show_area and len(series) == 1:
+            grad_opacity = 0.06
+            defs.append(_gradient_def(gid, color, grad_opacity, 0.0))
             clip_id = f"clip_{si}"
             defs.append(
                 f'<clipPath id="{clip_id}">'
@@ -474,7 +446,7 @@ def line_chart_svg(
                 f'</clipPath>'
             )
             area_d = (
-                line_d +
+                _smooth_path(points, tension=0.15 if len(points) > 200 else 0.2) +
                 f" L{points[-1][0]:.1f},{pad_top + chart_h:.1f}"
                 f" L{points[0][0]:.1f},{pad_top + chart_h:.1f} Z"
             )
@@ -482,35 +454,18 @@ def line_chart_svg(
                 f'<path d="{area_d}" fill="url(#{gid})" clip-path="url(#{clip_id})"/>'
             )
 
-        # Line — thinner for dense datasets to avoid "hair" effect
-        if len(points) > 250:
+        # Main line — precise, thin
+        tension = 0.12 if len(points) > 200 else 0.2
+        line_d = _smooth_path(points, tension=tension)
+        stroke_w = "1.2" if len(points) > 250 else "1.5"
+        if len(series) > 2:
             stroke_w = "1.2"
-        elif len(series) == 1:
-            stroke_w = "1.8"
-        else:
-            stroke_w = "1.5"
         elements.append(
             f'<path d="{line_d}" fill="none" stroke="{color}" '
-            f'stroke-width="{stroke_w}" stroke-linecap="round" stroke-linejoin="round"/>'
+            f'stroke-width="{stroke_w}" stroke-linejoin="round"/>'
         )
 
-        # Min/Max markers (single series, enough data)
-        if show_min_max and len(series) == 1 and len(points) > 20 and min_pt and max_pt:
-            mx, my, mv = max_pt
-            if pad_left + 40 < mx < pad_left + chart_w - 40:
-                elements.append(
-                    f'<circle cx="{mx:.1f}" cy="{my:.1f}" r="3" '
-                    f'fill="white" stroke="{color}" stroke-width="1.5"/>'
-                )
-
-            nx, ny, nv = min_pt
-            if pad_left + 40 < nx < pad_left + chart_w - 40:
-                elements.append(
-                    f'<circle cx="{nx:.1f}" cy="{ny:.1f}" r="3" '
-                    f'fill="white" stroke="#EF4444" stroke-width="1.5"/>'
-                )
-
-        # Latest value endpoint
+        # Latest value — small dot with label (WSJ highlights current)
         if points:
             lx, ly = points[-1]
             lv = None
@@ -518,37 +473,27 @@ def line_chart_svg(
                 if d.get("value") is not None:
                     lv = d["value"]
                     break
-            if lv is not None:
+            if lv is not None and len(series) <= 2:
                 label_text = _fmt_val(lv, metric_key)
                 elements.append(
-                    f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="4" '
-                    f'fill="white" stroke="{color}" stroke-width="2"/>'
+                    f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="3" '
+                    f'fill="{color}" stroke="white" stroke-width="1.5"/>'
                 )
-                # Position label to avoid overlapping endpoint circle
-                lbl_x = lx - 14
-                anchor = "end"
-                if lx < pad_left + chart_w * 0.3:
-                    lbl_x = lx + 14
-                    anchor = "start"
-                lbl_y = ly - 12
-                if lbl_y < pad_top + 14:
-                    lbl_y = ly + 20
+                # Label always on right side near the dot
                 elements.append(
-                    f'<text x="{lbl_x:.1f}" y="{lbl_y:.1f}" text-anchor="{anchor}" '
-                    f'font-size="10" font-weight="700" fill="{color}" '
-                    f'font-family="Inter,system-ui,sans-serif">{label_text}</text>'
+                    f'<text x="{pad_left + chart_w + 8}" y="{ly + 4:.1f}" text-anchor="start" '
+                    f'font-size="11" font-weight="700" fill="{color}" '
+                    f'font-family={FONT_DATA}>{label_text}</text>'
                 )
 
-    # ── X-axis date labels — smart spacing ──
+    # X-axis date labels
     primary_data = series[0].get("data") or []
     if primary_data:
         n = len(primary_data)
         use_year = n > 180
-        # Aim for ~5 labels max, evenly spaced
         n_labels = min(x_label_count, max(2, n // 60))
         step = max(1, (n - 1) // n_labels)
         indices = list(range(0, n, step))
-        # Always include last point
         if indices[-1] != n - 1:
             indices.append(n - 1)
 
@@ -557,38 +502,39 @@ def line_chart_svg(
             x = pad_left + (idx / max(n - 1, 1)) * chart_w
             label = _fmt_date_year(dt) if use_year else _fmt_date(dt)
             elements.append(
-                f'<text x="{x:.1f}" y="{pad_top + chart_h + 16}" text-anchor="middle" '
-                f'font-size="9" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
+                f'<text x="{x:.1f}" y="{pad_top + chart_h + 18}" text-anchor="middle" '
+                f'font-size="9" fill="{LABEL_COLOR}" font-family={FONT_LABEL}>{label}</text>'
             )
 
-    # X-axis line
+    # Bottom axis line — the only solid line (WSJ style)
     elements.append(
         f'<line x1="{pad_left}" y1="{pad_top + chart_h}" '
         f'x2="{pad_left + chart_w}" y2="{pad_top + chart_h}" '
-        f'stroke="{AXIS_COLOR}" stroke-width="1"/>'
+        f'stroke="{AXIS_COLOR}" stroke-width="0.8"/>'
     )
 
-    # Legend (multi-series)
+    # Legend (multi-series) — clean, left-aligned
     if len(series) > 1:
-        leg_y = height - 6
+        leg_y = height - 4
         leg_x = pad_left
         for si, s in enumerate(series):
             color = s.get("color") or COLORS[si % len(COLORS)]
             label = s.get("label", f"Series {si+1}")
             elements.append(
-                f'<circle cx="{leg_x + 5}" cy="{leg_y - 3}" r="4" fill="{color}"/>'
+                f'<line x1="{leg_x}" y1="{leg_y - 3}" x2="{leg_x + 14}" y2="{leg_y - 3}" '
+                f'stroke="{color}" stroke-width="2"/>'
             )
             elements.append(
-                f'<text x="{leg_x + 14}" y="{leg_y}" font-size="10" font-weight="600" fill="#6B7280" '
-                f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
+                f'<text x="{leg_x + 18}" y="{leg_y}" font-size="9" font-weight="500" fill="#555" '
+                f'font-family={FONT_DATA}>{html_mod.escape(label)}</text>'
             )
-            leg_x += len(label) * 6.5 + 30
+            leg_x += len(label) * 5.8 + 32
 
-    # Watermark
+    # Source line — small, bottom-left (WSJ convention)
     elements.append(
-        f'<text x="{pad_left + chart_w - 4}" y="{pad_top + chart_h - 6}" text-anchor="end" '
-        f'font-size="8" font-weight="600" fill="#D1D5DB" '
-        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
+        f'<text x="{pad_left}" y="{height - 2}" text-anchor="start" '
+        f'font-size="8" fill="#AAAAAA" font-family={FONT_LABEL} '
+        f'font-style="italic">Source: Santiment</text>'
     )
 
     # Insert defs
@@ -634,12 +580,10 @@ def comparison_table(
             f'<strong>{name}</strong> <span class="ticker">{ticker}</span></a></th>'
         )
 
-    # Metrics where lower = better (inverted ranking)
     lower_is_better = {"nvt"}
 
     rows = []
     for key, label in metric_keys:
-        # Find the best value for highlighting
         vals = []
         for t in tokens:
             m = t.get("metrics", {}).get(key, {})
@@ -694,14 +638,14 @@ def _heatmap_color(pct_change: float) -> str:
 
 def _heatmap_text_color(pct_change: float) -> str:
     if pct_change is None:
-        return "#6B7280"
+        return "#555555"
     if abs(pct_change) >= 5:
         return "#FFFFFF"
-    return "#374151"
+    return "#333333"
 
 
 def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
-    """Treemap-style heatmap of token performance."""
+    """Treemap-style heatmap — WSJ editorial style with clean typography."""
     if not tokens:
         return ""
 
@@ -713,7 +657,7 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
 
     width = 700
     height = 320
-    padding = 2
+    padding = 1.5
 
     elements = [
         f'<svg width="100%" viewBox="0 0 {width} {height}" '
@@ -749,7 +693,7 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
                 f'<a href="/token/{slug}">'
                 f'<rect x="{x + padding:.1f}" y="{y + padding:.1f}" '
                 f'width="{w - padding * 2:.1f}" height="{row_h - padding * 2:.1f}" '
-                f'rx="4" fill="{bg}"/>'
+                f'rx="1" fill="{bg}"/>'
             )
 
             if w > 45:
@@ -757,25 +701,18 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
                 cy = y + row_h / 2
                 elements.append(
                     f'<text x="{cx:.1f}" y="{cy - 5:.1f}" text-anchor="middle" '
-                    f'font-size="{min(12, max(8, w/8)):.0f}" font-weight="700" fill="{fg}" '
-                    f'font-family="Inter,system-ui,sans-serif">{ticker}</text>'
+                    f'font-size="{min(11, max(8, w/8)):.0f}" font-weight="700" fill="{fg}" '
+                    f'font-family={FONT_DATA}>{ticker}</text>'
                 )
                 elements.append(
                     f'<text x="{cx:.1f}" y="{cy + 9:.1f}" text-anchor="middle" '
-                    f'font-size="{min(10, max(7, w/10)):.0f}" font-weight="600" fill="{fg}" '
-                    f'opacity="0.85" font-family="Inter,system-ui,sans-serif">{pct_str}</text>'
+                    f'font-size="{min(10, max(7, w/10)):.0f}" font-weight="500" fill="{fg}" '
+                    f'opacity="0.9" font-family={FONT_LABEL}>{pct_str}</text>'
                 )
             elements.append('</a>')
             x += w
 
         idx = row_end
-
-    # Watermark
-    elements.append(
-        f'<text x="{width - 8}" y="{height - 6}" text-anchor="end" '
-        f'font-size="8" font-weight="600" fill="#D1D5DB" '
-        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
-    )
 
     elements.append('</svg>')
     return "\n".join(elements)
@@ -786,13 +723,13 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
 # ============================================================
 
 def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) -> str:
-    """Horizontal stacked bar showing market dominance."""
+    """Horizontal stacked bar — WSJ style with clean segments."""
     if not tokens:
         return ""
 
     total = sum(t.get("marketcap_usd") or 0 for t in tokens) or 1
     bar_y = 0
-    bar_h = 32
+    bar_h = 28
     label_y = bar_h + 18
 
     elements = [
@@ -819,35 +756,35 @@ def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) ->
             "label": "Others",
             "value": others_mcap,
             "pct": (others_mcap / total) * 100,
-            "color": "#D1D5DB",
+            "color": "#CCCCCC",
         })
 
     for seg in segments:
         w = max(2, (seg["value"] / total) * width)
         elements.append(
             f'<rect x="{x:.1f}" y="{bar_y}" width="{w:.1f}" height="{bar_h}" '
-            f'rx="{"4" if x == 0 else "0"}" fill="{seg["color"]}"/>'
+            f'fill="{seg["color"]}"/>'
         )
-        if w > 40:
+        if w > 45:
             elements.append(
                 f'<text x="{x + w/2:.1f}" y="{bar_y + bar_h/2 + 4:.1f}" text-anchor="middle" '
-                f'font-size="10" font-weight="700" fill="white" '
-                f'font-family="Inter,system-ui,sans-serif">{seg["label"]} {seg["pct"]:.1f}%</text>'
+                f'font-size="9" font-weight="700" fill="white" '
+                f'font-family={FONT_DATA}>{seg["label"]} {seg["pct"]:.1f}%</text>'
             )
         x += w
 
-    # Legend
+    # Legend — clean line items
     leg_x = 0
     for seg in segments:
         if seg["pct"] < 1:
             continue
         elements.append(
-            f'<circle cx="{leg_x + 5}" cy="{label_y}" r="4" fill="{seg["color"]}"/>'
+            f'<rect x="{leg_x}" y="{label_y - 6}" width="10" height="10" rx="1" fill="{seg["color"]}"/>'
         )
         label = f'{seg["label"]} {seg["pct"]:.1f}%'
         elements.append(
-            f'<text x="{leg_x + 13}" y="{label_y + 3.5}" font-size="9" font-weight="600" '
-            f'fill="#6B7280" font-family="Inter,system-ui,sans-serif">{label}</text>'
+            f'<text x="{leg_x + 14}" y="{label_y + 3}" font-size="9" font-weight="500" '
+            f'fill="#555" font-family={FONT_DATA}>{label}</text>'
         )
         leg_x += len(label) * 5.5 + 22
 
@@ -863,10 +800,10 @@ def donut_chart_svg(
     tokens: list[dict],
     width: int = 260,
     height: int = 260,
-    inner_ratio: float = 0.6,
+    inner_ratio: float = 0.62,
     max_slices: int = 8,
 ) -> str:
-    """Donut chart showing market cap dominance as colored arcs."""
+    """Donut chart — WSJ style with muted palette and clean labels."""
     if not tokens:
         return ""
 
@@ -889,11 +826,11 @@ def donut_chart_svg(
             "label": "Others",
             "value": others,
             "pct": (others / total) * 100,
-            "color": "#D1D5DB",
+            "color": "#CCCCCC",
         })
 
     cx, cy = width / 2, height / 2 - 10
-    r_outer = min(width, height) / 2 - 20
+    r_outer = min(width, height) / 2 - 22
     r_inner = r_outer * inner_ratio
 
     elements = [
@@ -901,24 +838,15 @@ def donut_chart_svg(
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
     ]
 
-    # Watermark
-    elements.append(
-        f'<text x="{width - 6}" y="12" text-anchor="end" font-size="8" '
-        f'font-weight="500" fill="#D1D5DB" font-family="Inter,system-ui,sans-serif" '
-        f'opacity="0.5">santiment</text>'
-    )
-
-    angle = -math.pi / 2  # start at top
+    angle = -math.pi / 2
     for s in slices:
         if s["pct"] < 0.3:
             continue
         sweep = (s["value"] / total) * 2 * math.pi
-        # Outer arc
         x1_o = cx + r_outer * math.cos(angle)
         y1_o = cy + r_outer * math.sin(angle)
         x2_o = cx + r_outer * math.cos(angle + sweep)
         y2_o = cy + r_outer * math.sin(angle + sweep)
-        # Inner arc
         x1_i = cx + r_inner * math.cos(angle + sweep)
         y1_i = cy + r_inner * math.sin(angle + sweep)
         x2_i = cx + r_inner * math.cos(angle)
@@ -934,13 +862,13 @@ def donut_chart_svg(
         )
 
         elements.append(
-            f'<path d="{d}" fill="{s["color"]}" stroke="white" stroke-width="1.5">'
+            f'<path d="{d}" fill="{s["color"]}" stroke="white" stroke-width="2">'
             f'<title>{html_mod.escape(s["label"])}: {s["pct"]:.1f}%</title></path>'
         )
 
-        # Label on the slice midpoint (outside)
+        # External label
         mid_angle = angle + sweep / 2
-        label_r = r_outer + 14
+        label_r = r_outer + 16
         lx = cx + label_r * math.cos(mid_angle)
         ly = cy + label_r * math.sin(mid_angle)
         anchor = "start" if lx > cx else "end"
@@ -950,23 +878,23 @@ def donut_chart_svg(
         if s["pct"] >= 4:
             elements.append(
                 f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchor}" '
-                f'font-size="9" font-weight="600" fill="#374151" '
-                f'font-family="Inter,system-ui,sans-serif">'
-                f'{html_mod.escape(s["label"])} {s["pct"]:.1f}%</text>'
+                f'font-size="9" font-weight="600" fill="#444" '
+                f'font-family={FONT_DATA}>'
+                f'{html_mod.escape(s["label"])} {s["pct"]:.0f}%</text>'
             )
 
         angle += sweep
 
     # Center text
     elements.append(
-        f'<text x="{cx}" y="{cy - 4}" text-anchor="middle" '
-        f'font-size="11" font-weight="700" fill="#111" '
-        f'font-family="Inter,system-ui,sans-serif">Market</text>'
+        f'<text x="{cx}" y="{cy - 2}" text-anchor="middle" '
+        f'font-size="11" font-weight="700" fill="#222" '
+        f'font-family={FONT_DATA}>Market</text>'
     )
     elements.append(
-        f'<text x="{cx}" y="{cy + 10}" text-anchor="middle" '
-        f'font-size="9" font-weight="500" fill="#6B7280" '
-        f'font-family="Inter,system-ui,sans-serif">Dominance</text>'
+        f'<text x="{cx}" y="{cy + 12}" text-anchor="middle" '
+        f'font-size="9" font-weight="400" fill="#777" '
+        f'font-family={FONT_LABEL}>Dominance</text>'
     )
 
     elements.append('</svg>')
@@ -985,7 +913,7 @@ def sentiment_gauge_svg(
     width: int = 240,
     height: int = 140,
 ) -> str:
-    """Semicircle gauge SVG for aggregate metrics."""
+    """Semicircle gauge — WSJ-clean with muted color bands."""
     norm = max(0, min(1, (value - min_val) / (max_val - min_val))) if (max_val - min_val) > 0 else 0.5
 
     cx = width / 2
@@ -1000,14 +928,14 @@ def sentiment_gauge_svg(
     # Background arc
     elements.append(
         f'<path d="M{cx - r:.1f},{cy:.1f} A{r:.1f},{r:.1f} 0 0 1 {cx + r:.1f},{cy:.1f}" '
-        f'fill="none" stroke="#E5E7EB" stroke-width="12" stroke-linecap="round"/>'
+        f'fill="none" stroke="#E8E8E8" stroke-width="10" stroke-linecap="round"/>'
     )
 
-    # Color segments
+    # Color segments — muted tones
     segments = [
-        (0, 0.33, "#10B981"),
-        (0.33, 0.66, "#F59E0B"),
-        (0.66, 1.0, "#EF4444"),
+        (0, 0.33, "#3D8B5F"),
+        (0.33, 0.66, "#B8860B"),
+        (0.66, 1.0, "#B91C1C"),
     ]
     for start_frac, end_frac, color in segments:
         a1 = math.pi * (1 - start_frac)
@@ -1018,47 +946,40 @@ def sentiment_gauge_svg(
         y2 = cy - r * math.sin(a2)
         elements.append(
             f'<path d="M{x1:.1f},{y1:.1f} A{r:.1f},{r:.1f} 0 0 1 {x2:.1f},{y2:.1f}" '
-            f'fill="none" stroke="{color}" stroke-width="12" stroke-linecap="butt" opacity="0.2"/>'
+            f'fill="none" stroke="{color}" stroke-width="10" stroke-linecap="butt" opacity="0.25"/>'
         )
 
-    # Needle
+    # Needle — thin, elegant
     needle_angle = math.pi * (1 - norm)
-    nx = cx + (r - 10) * math.cos(needle_angle)
-    ny = cy - (r - 10) * math.sin(needle_angle)
+    nx = cx + (r - 8) * math.cos(needle_angle)
+    ny = cy - (r - 8) * math.sin(needle_angle)
     elements.append(
         f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{nx:.1f}" y2="{ny:.1f}" '
-        f'stroke="#111827" stroke-width="3" stroke-linecap="round"/>'
+        f'stroke="#222222" stroke-width="2" stroke-linecap="round"/>'
     )
-    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="6" fill="#111827"/>')
-    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="3" fill="white"/>')
+    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="#222222"/>')
+    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="2.5" fill="white"/>')
 
     # Value
     elements.append(
         f'<text x="{cx:.1f}" y="{cy - r/2 - 2:.1f}" text-anchor="middle" '
-        f'font-size="22" font-weight="900" fill="#111827" '
-        f'font-family="Inter,system-ui,sans-serif">{value:.2f}</text>'
+        f'font-size="22" font-weight="800" fill="#222222" '
+        f'font-family={FONT_DATA}>{value:.2f}</text>'
     )
     elements.append(
         f'<text x="{cx:.1f}" y="{cy + 16:.1f}" text-anchor="middle" '
-        f'font-size="10" font-weight="600" fill="#9CA3AF" '
-        f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
+        f'font-size="9" font-weight="500" fill="#888" '
+        f'font-family={FONT_LABEL}>{html_mod.escape(label)}</text>'
     )
 
     # Min/Max labels
     elements.append(
-        f'<text x="{cx - r - 5:.1f}" y="{cy + 4:.1f}" text-anchor="end" '
-        f'font-size="9" fill="#9CA3AF" font-family="Inter,system-ui,sans-serif">Undervalued</text>'
+        f'<text x="{cx - r - 4:.1f}" y="{cy + 4:.1f}" text-anchor="end" '
+        f'font-size="8" fill="#999" font-family={FONT_LABEL}>Undervalued</text>'
     )
     elements.append(
-        f'<text x="{cx + r + 5:.1f}" y="{cy + 4:.1f}" text-anchor="start" '
-        f'font-size="9" fill="#9CA3AF" font-family="Inter,system-ui,sans-serif">Overvalued</text>'
-    )
-
-    # Watermark
-    elements.append(
-        f'<text x="{width - 6}" y="{height - 4}" text-anchor="end" '
-        f'font-size="7" font-weight="600" fill="#D1D5DB" '
-        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
+        f'<text x="{cx + r + 4:.1f}" y="{cy + 4:.1f}" text-anchor="start" '
+        f'font-size="8" fill="#999" font-family={FONT_LABEL}>Overvalued</text>'
     )
 
     elements.append('</svg>')
@@ -1073,9 +994,9 @@ def mini_trend_svg(
     data: list[dict],
     width: int = 140,
     height: int = 40,
-    color: str = "#111111",
+    color: str = "#0A2463",
 ) -> str:
-    """Small area chart for embedding in stat cards / hero sections."""
+    """Small line chart for stat cards — minimal, WSJ style."""
     values = [d.get("value") for d in data if d.get("value") is not None]
     if len(values) < 3:
         return ""
@@ -1085,41 +1006,36 @@ def mini_trend_svg(
     v_range = max_v - min_v if max_v != min_v else 1
     n = len(values)
 
-    gid = f"mt{abs(hash(str(values[:3]))) % 99999}"
-
     points = []
     for i, v in enumerate(values):
         x = (i / (n - 1)) * width
         y = height - ((v - min_v) / v_range) * (height - 4) - 2
         points.append((x, y))
 
-    line_d = _smooth_path(points, tension=0.25)
-    area_d = line_d + f" L{points[-1][0]:.1f},{height} L{points[0][0]:.1f},{height} Z"
+    line_d = _smooth_path(points, tension=0.2)
 
     return (
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
         f'style="vertical-align:middle">'
-        f'<defs>{_gradient_def(gid, color, 0.18, 0.0)}</defs>'
-        f'<path d="{area_d}" fill="url(#{gid})"/>'
         f'<path d="{line_d}" fill="none" stroke="{color}" '
-        f'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        f'stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>'
         f'</svg>'
     )
 
 
 # ============================================================
-# SCATTER PLOT — Cross-metric analysis (e.g., MVRV vs NVT)
+# SCATTER PLOT — Cross-metric analysis
 # ============================================================
 
 THESIS_COLORS = {
-    "smart_money": "#10B981",
-    "builder_momentum": "#3B82F6",
-    "deep_value": "#059669",
-    "distribution_warning": "#EF4444",
-    "hodler": "#8B5CF6",
-    "high_utility": "#06B6D4",
-    "speculative": "#F97316",
-    "uncategorized": "#9CA3AF",
+    "smart_money": "#1B5E3B",
+    "builder_momentum": "#2D7D9A",
+    "deep_value": "#3D8B5F",
+    "distribution_warning": "#B91C1C",
+    "hodler": "#8E6C88",
+    "high_utility": "#4A6FA5",
+    "speculative": "#C17817",
+    "uncategorized": "#999999",
 }
 
 
@@ -1137,7 +1053,7 @@ def scatter_plot_svg(
     log_x: bool = False,
     log_y: bool = False,
 ) -> str:
-    """Render a scatter plot SVG with log scales, color coding, and size scaling."""
+    """Scatter plot — WSJ style: clean axes, dotted grid, muted dots."""
     if not points:
         return '<div class="chart-empty">No data for scatter plot</div>'
 
@@ -1162,25 +1078,23 @@ def scatter_plot_svg(
     if len(x_vals) < 3:
         return '<div class="chart-empty">Insufficient valid data</div>'
 
-    # Chart dimensions
-    pad_left = 70
-    pad_right = 20
-    pad_top = 35 if title else 16
-    pad_bottom = 55
+    pad_left = 12
+    pad_right = 62
+    pad_top = 40 if title else 20
+    pad_bottom = 52
     chart_w = width - pad_left - pad_right
     chart_h = height - pad_top - pad_bottom
 
-    # Ranges with 5% padding
     x_min, x_max = min(x_vals), max(x_vals)
     y_min, y_max = min(y_vals), max(y_vals)
     x_range = x_max - x_min if x_max != x_min else 1
     y_range = y_max - y_min if y_max != y_min else 1
-    x_pad = x_range * 0.05
-    y_pad = y_range * 0.05
-    x_min -= x_pad
-    x_max += x_pad
-    y_min -= y_pad
-    y_max += y_pad
+    x_pad_v = x_range * 0.05
+    y_pad_v = y_range * 0.05
+    x_min -= x_pad_v
+    x_max += x_pad_v
+    y_min -= y_pad_v
+    y_max += y_pad_v
     x_range = x_max - x_min
     y_range = y_max - y_min
 
@@ -1190,7 +1104,6 @@ def scatter_plot_svg(
     def scale_y(v):
         return pad_top + chart_h - ((v - y_min) / y_range) * chart_h
 
-    # Size scaling
     size_vals = []
     max_size = 1
     if size_key:
@@ -1203,18 +1116,13 @@ def scatter_plot_svg(
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg scatter-chart">'
     ]
 
-    elements.append(
-        f'<rect x="{pad_left}" y="{pad_top}" width="{chart_w}" height="{chart_h}" '
-        f'fill="{BG_COLOR}" rx="4"/>'
-    )
-
     if title:
         elements.append(
-            f'<text x="{pad_left}" y="20" font-size="13" font-weight="700" '
-            f'fill="#111827" font-family="Inter,system-ui,sans-serif">{html_mod.escape(title)}</text>'
+            f'<text x="{pad_left}" y="18" font-size="14" font-weight="700" '
+            f'fill="#222" font-family={FONT_TITLE}>{html_mod.escape(title)}</text>'
         )
 
-    # Grid lines
+    # Dotted gridlines
     for i in range(5):
         frac = i / 4
         y = pad_top + chart_h - frac * chart_h
@@ -1222,53 +1130,44 @@ def scatter_plot_svg(
         label = _fmt_val(10 ** y_val if log_y else y_val, y_key)
         elements.append(
             f'<line x1="{pad_left}" y1="{y:.1f}" x2="{pad_left + chart_w}" y2="{y:.1f}" '
-            f'stroke="{GRID_COLOR}" stroke-width="1"/>'
+            f'stroke="{GRID_COLOR}" stroke-width="0.7" stroke-dasharray="2,3"/>'
         )
         elements.append(
-            f'<text x="{pad_left - 8}" y="{y + 4:.1f}" text-anchor="end" '
-            f'font-size="9" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{label}</text>'
+            f'<text x="{pad_left + chart_w + 8}" y="{y + 3.5:.1f}" text-anchor="start" '
+            f'font-size="9" fill="{LABEL_COLOR}" font-family={FONT_LABEL}>{label}</text>'
         )
         x = pad_left + frac * chart_w
         x_val = x_min + frac * x_range
         xlabel = _fmt_val(10 ** x_val if log_x else x_val, x_key)
         elements.append(
-            f'<line x1="{x:.1f}" y1="{pad_top}" x2="{x:.1f}" y2="{pad_top + chart_h}" '
-            f'stroke="{GRID_COLOR}" stroke-width="1"/>'
-        )
-        elements.append(
             f'<text x="{x:.1f}" y="{pad_top + chart_h + 16}" text-anchor="middle" '
-            f'font-size="9" fill="{LABEL_COLOR}" font-family="Inter,system-ui,sans-serif">{xlabel}</text>'
+            f'font-size="9" fill="{LABEL_COLOR}" font-family={FONT_LABEL}>{xlabel}</text>'
         )
 
     # Axis labels
     if x_label:
         elements.append(
-            f'<text x="{pad_left + chart_w / 2}" y="{height - 6}" text-anchor="middle" '
-            f'font-size="10" font-weight="600" fill="{LABEL_COLOR}" '
-            f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(x_label)}</text>'
+            f'<text x="{pad_left + chart_w / 2}" y="{height - 4}" text-anchor="middle" '
+            f'font-size="10" font-weight="600" fill="#555" '
+            f'font-family={FONT_DATA}>{html_mod.escape(x_label)}</text>'
         )
     if y_label:
         elements.append(
-            f'<text x="14" y="{pad_top + chart_h / 2}" text-anchor="middle" '
-            f'font-size="10" font-weight="600" fill="{LABEL_COLOR}" '
-            f'font-family="Inter,system-ui,sans-serif" '
-            f'transform="rotate(-90, 14, {pad_top + chart_h / 2})">{html_mod.escape(y_label)}</text>'
+            f'<text x="10" y="{pad_top + chart_h / 2}" text-anchor="middle" '
+            f'font-size="10" font-weight="600" fill="#555" '
+            f'font-family={FONT_DATA} '
+            f'transform="rotate(-90, 10, {pad_top + chart_h / 2})">{html_mod.escape(y_label)}</text>'
         )
 
     # Axis lines
     elements.append(
         f'<line x1="{pad_left}" y1="{pad_top + chart_h}" '
         f'x2="{pad_left + chart_w}" y2="{pad_top + chart_h}" '
-        f'stroke="{AXIS_COLOR}" stroke-width="1"/>'
-    )
-    elements.append(
-        f'<line x1="{pad_left}" y1="{pad_top}" '
-        f'x2="{pad_left}" y2="{pad_top + chart_h}" '
-        f'stroke="{AXIS_COLOR}" stroke-width="1"/>'
+        f'stroke="{AXIS_COLOR}" stroke-width="0.8"/>'
     )
 
-    # Plot points
-    for idx, p in enumerate(valid):
+    # Plot points — slightly larger, less opacity for overlap
+    for idx_p, p in enumerate(valid):
         xv = _safe_log(p[x_key]) if log_x else p[x_key]
         yv = _safe_log(p[y_key]) if log_y else p[y_key]
         if xv is None or yv is None:
@@ -1278,15 +1177,15 @@ def scatter_plot_svg(
         dot_cy = scale_y(yv)
 
         if color_key and p.get(color_key):
-            color = THESIS_COLORS.get(p[color_key], "#9CA3AF")
+            color = THESIS_COLORS.get(p[color_key], "#999999")
         else:
-            color = "#111111"
+            color = "#0A2463"
 
         if size_key and max_size > 0 and size_vals:
-            sv = size_vals[idx] if idx < len(size_vals) else 0
+            sv = size_vals[idx_p] if idx_p < len(size_vals) else 0
             r = min_r + (sv / max_size) * (max_r - min_r) if max_size else min_r
         else:
-            r = 4
+            r = 4.5
 
         slug = p.get("slug", "")
         ticker = html_mod.escape(p.get("ticker", "")[:6])
@@ -1295,7 +1194,7 @@ def scatter_plot_svg(
         elements.append(
             f'<a href="/token/{slug}">'
             f'<circle cx="{dot_cx:.1f}" cy="{dot_cy:.1f}" r="{r:.1f}" '
-            f'fill="{color}" opacity="0.65" class="scatter-dot">'
+            f'fill="{color}" opacity="0.55" stroke="{color}" stroke-width="0.5" stroke-opacity="0.3" class="scatter-dot">'
             f'<title>{name} ({ticker})</title>'
             f'</circle>'
             f'</a>'
@@ -1304,15 +1203,15 @@ def scatter_plot_svg(
         if r > 8 and ticker:
             elements.append(
                 f'<text x="{dot_cx:.1f}" y="{dot_cy - r - 3:.1f}" text-anchor="middle" '
-                f'font-size="8" font-weight="600" fill="{color}" '
-                f'font-family="Inter,system-ui,sans-serif">{ticker}</text>'
+                f'font-size="8" font-weight="600" fill="#444" '
+                f'font-family={FONT_DATA}>{ticker}</text>'
             )
 
-    # Watermark
+    # Source line
     elements.append(
-        f'<text x="{pad_left + chart_w - 4}" y="{pad_top + chart_h - 6}" text-anchor="end" '
-        f'font-size="8" font-weight="600" fill="#D1D5DB" '
-        f'font-family="Inter,system-ui,sans-serif" opacity="0.5">Onchain Pulse</text>'
+        f'<text x="{pad_left}" y="{height - 2}" text-anchor="start" '
+        f'font-size="8" fill="#AAA" font-family={FONT_LABEL} '
+        f'font-style="italic">Source: Santiment</text>'
     )
 
     elements.append('</svg>')
@@ -1328,10 +1227,10 @@ def bar_chart_svg(
     width: int = 340,
     height: int = 180,
     title: str = "",
-    color: str = "#3B82F6",
+    color: str = "#0A2463",
     metric_key: str = "",
 ) -> str:
-    """Render a vertical bar chart SVG from time-series data."""
+    """Vertical bar chart — WSJ style: uniform color, clean gridlines."""
     if not data or len(data) < 2:
         return '<div class="chart-empty">No bar data</div>'
 
@@ -1339,10 +1238,10 @@ def bar_chart_svg(
     if not values:
         return '<div class="chart-empty">No bar data</div>'
 
-    pad_left = 60
-    pad_right = 16
+    pad_left = 10
+    pad_right = 52
     pad_top = 30 if title else 12
-    pad_bottom = 30
+    pad_bottom = 28
     chart_w = width - pad_left - pad_right
     chart_h = height - pad_top - pad_bottom
 
@@ -1362,21 +1261,24 @@ def bar_chart_svg(
     if title:
         elements.append(
             f'<text x="{pad_left}" y="18" font-size="12" font-weight="700" '
-            f'fill="#111" font-family="Inter,system-ui,sans-serif">{html_mod.escape(title)}</text>'
+            f'fill="#222" font-family={FONT_TITLE}>{html_mod.escape(title)}</text>'
         )
 
-    # Grid lines
+    # Dotted gridlines with right-side labels
     for i in range(5):
         gy = pad_top + (chart_h / 4) * i
         gv = max_val * (1 - i / 4)
-        elements.append(f'<line x1="{pad_left}" y1="{gy:.1f}" x2="{pad_left + chart_w}" y2="{gy:.1f}" stroke="#E5E7EB" stroke-width="0.5"/>')
         elements.append(
-            f'<text x="{pad_left - 6}" y="{gy + 3:.1f}" text-anchor="end" '
-            f'font-size="8" fill="#9CA3AF" font-family="Inter,system-ui,sans-serif">'
+            f'<line x1="{pad_left}" y1="{gy:.1f}" x2="{pad_left + chart_w}" y2="{gy:.1f}" '
+            f'stroke="{GRID_COLOR}" stroke-width="0.7" stroke-dasharray="2,3"/>'
+        )
+        elements.append(
+            f'<text x="{pad_left + chart_w + 6}" y="{gy + 3:.1f}" text-anchor="start" '
+            f'font-size="8" fill="{LABEL_COLOR}" font-family={FONT_LABEL}>'
             f'{_fmt_val(gv, metric_key)}</text>'
         )
 
-    # Bars
+    # Bars — uniform color, no opacity gradient
     for i, d in enumerate(data):
         v = d.get("value")
         if v is None:
@@ -1384,29 +1286,29 @@ def bar_chart_svg(
         bx = pad_left + i * (bar_w + gap)
         bh = max(1, (v / max_val) * chart_h)
         by = pad_top + chart_h - bh
-        opacity = 0.4 + 0.6 * (i / max(1, n - 1))
         elements.append(
             f'<rect x="{bx:.1f}" y="{by:.1f}" width="{bar_w:.1f}" height="{bh:.1f}" '
-            f'rx="1" fill="{color}" opacity="{opacity:.2f}">'
+            f'fill="{color}" opacity="0.75">'
             f'<title>{_fmt_val(v, metric_key)}</title></rect>'
         )
 
-    # X-axis date labels
-    for idx in [0, n // 2, n - 1]:
-        if idx < len(data):
-            dt = data[idx].get("datetime") or data[idx].get("date", "")
-            label = dt[5:10] if len(dt) >= 10 else dt[:10]
-            lx = pad_left + idx * (bar_w + gap) + bar_w / 2
-            elements.append(
-                f'<text x="{lx:.1f}" y="{pad_top + chart_h + 16}" text-anchor="middle" '
-                f'font-size="8" fill="#9CA3AF" font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
-            )
-
-    # Watermark
+    # Bottom axis line
     elements.append(
-        f'<text x="{width - 6}" y="{height - 4}" text-anchor="end" font-size="7" '
-        f'fill="#D1D5DB" font-family="Inter,system-ui,sans-serif" opacity="0.5">santiment</text>'
+        f'<line x1="{pad_left}" y1="{pad_top + chart_h}" '
+        f'x2="{pad_left + chart_w}" y2="{pad_top + chart_h}" '
+        f'stroke="{AXIS_COLOR}" stroke-width="0.8"/>'
     )
+
+    # X-axis date labels
+    for idx_d in [0, n // 2, n - 1]:
+        if idx_d < len(data):
+            dt = data[idx_d].get("datetime") or data[idx_d].get("date", "")
+            label = _fmt_date(dt) if len(dt) >= 10 else dt[:10]
+            lx = pad_left + idx_d * (bar_w + gap) + bar_w / 2
+            elements.append(
+                f'<text x="{lx:.1f}" y="{pad_top + chart_h + 14}" text-anchor="middle" '
+                f'font-size="8" fill="{LABEL_COLOR}" font-family={FONT_LABEL}>{html_mod.escape(label)}</text>'
+            )
 
     elements.append('</svg>')
     return "\n".join(elements)
@@ -1422,11 +1324,7 @@ def radar_chart_svg(
     width: int = 360,
     height: int = 360,
 ) -> str:
-    """Render a radar/spider chart SVG.
-
-    items: list of {"label": str, "values": {axis_key: float, ...}, "color": str}
-    axes: list of (key, display_label) tuples for each axis
-    """
+    """Radar chart — WSJ editorial style: thin lines, muted fills."""
     if not items or len(axes) < 3:
         return '<div class="chart-empty">Need at least 3 axes for radar</div>'
 
@@ -1439,13 +1337,12 @@ def radar_chart_svg(
         f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
     ]
 
-    # Compute global max per axis for normalization
     axis_max = {}
     for key, _ in axes:
         vals = [item["values"].get(key, 0) for item in items]
         axis_max[key] = max(vals) if vals and max(vals) > 0 else 1
 
-    # Draw concentric rings (5 levels)
+    # Concentric rings — dotted
     for level in range(1, 6):
         r = r_max * level / 5
         ring_pts = []
@@ -1454,21 +1351,20 @@ def radar_chart_svg(
             ring_pts.append(f"{cx + r * math.cos(angle):.1f},{cy + r * math.sin(angle):.1f}")
         elements.append(
             f'<polygon points="{" ".join(ring_pts)}" '
-            f'fill="none" stroke="#E5E7EB" stroke-width="0.5"/>'
+            f'fill="none" stroke="{GRID_COLOR}" stroke-width="0.5" stroke-dasharray="2,2"/>'
         )
 
-    # Draw axis lines and labels
+    # Axis lines and labels
     for i, (key, label) in enumerate(axes):
         angle = -math.pi / 2 + (2 * math.pi * i / n_axes)
         ex = cx + r_max * math.cos(angle)
         ey = cy + r_max * math.sin(angle)
         elements.append(
             f'<line x1="{cx}" y1="{cy}" x2="{ex:.1f}" y2="{ey:.1f}" '
-            f'stroke="#D1D5DB" stroke-width="0.5"/>'
+            f'stroke="{GRID_COLOR}" stroke-width="0.5"/>'
         )
-        # Label position (slightly beyond max radius)
-        lx = cx + (r_max + 18) * math.cos(angle)
-        ly = cy + (r_max + 18) * math.sin(angle)
+        lx = cx + (r_max + 16) * math.cos(angle)
+        ly = cy + (r_max + 16) * math.sin(angle)
         anchor = "middle"
         if lx < cx - 10:
             anchor = "end"
@@ -1476,29 +1372,28 @@ def radar_chart_svg(
             anchor = "start"
         elements.append(
             f'<text x="{lx:.1f}" y="{ly + 3:.1f}" text-anchor="{anchor}" '
-            f'font-size="9" font-weight="600" fill="#6B7280" '
-            f'font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
+            f'font-size="9" font-weight="500" fill="#555" '
+            f'font-family={FONT_DATA}>{html_mod.escape(label)}</text>'
         )
 
-    # Draw data polygons
+    # Data polygons
     for item in items:
-        color = item.get("color", "#3B82F6")
+        color = item.get("color", "#0A2463")
         pts = []
         for i, (key, _) in enumerate(axes):
             val = item["values"].get(key, 0)
-            norm = (val / axis_max[key]) if axis_max[key] > 0 else 0
-            norm = min(1.0, max(0, norm))
-            r = r_max * norm
+            norm_v = (val / axis_max[key]) if axis_max[key] > 0 else 0
+            norm_v = min(1.0, max(0, norm_v))
+            r = r_max * norm_v
             angle = -math.pi / 2 + (2 * math.pi * i / n_axes)
             pts.append(f"{cx + r * math.cos(angle):.1f},{cy + r * math.sin(angle):.1f}")
 
         elements.append(
             f'<polygon points="{" ".join(pts)}" '
-            f'fill="{color}" fill-opacity="0.12" '
-            f'stroke="{color}" stroke-width="1.5" stroke-linejoin="round">'
+            f'fill="{color}" fill-opacity="0.1" '
+            f'stroke="{color}" stroke-width="1.2" stroke-linejoin="round">'
             f'<title>{html_mod.escape(item.get("label", ""))}</title></polygon>'
         )
-        # Dots on vertices
         for pt in pts:
             px, py = pt.split(",")
             elements.append(
@@ -1509,16 +1404,17 @@ def radar_chart_svg(
     leg_y = height - 14
     leg_x = 10
     for item in items:
-        color = item.get("color", "#3B82F6")
+        color = item.get("color", "#0A2463")
         label = item.get("label", "")[:15]
         elements.append(
-            f'<circle cx="{leg_x + 5}" cy="{leg_y}" r="4" fill="{color}"/>'
+            f'<line x1="{leg_x}" y1="{leg_y}" x2="{leg_x + 12}" y2="{leg_y}" '
+            f'stroke="{color}" stroke-width="2"/>'
         )
         elements.append(
-            f'<text x="{leg_x + 13}" y="{leg_y + 3.5}" font-size="9" font-weight="600" '
-            f'fill="#374151" font-family="Inter,system-ui,sans-serif">{html_mod.escape(label)}</text>'
+            f'<text x="{leg_x + 16}" y="{leg_y + 3.5}" font-size="9" font-weight="500" '
+            f'fill="#444" font-family={FONT_DATA}>{html_mod.escape(label)}</text>'
         )
-        leg_x += len(label) * 5.5 + 24
+        leg_x += len(label) * 5.5 + 28
 
     elements.append('</svg>')
     return "\n".join(elements)

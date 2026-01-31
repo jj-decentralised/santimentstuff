@@ -2147,7 +2147,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     # Charts
     price_data = _data("price_usd")
     price_chart = line_chart_svg(
-        [{"label": "Price USD", "data": price_data, "color": "#0F1419"}],
+        [{"label": "Price USD", "data": price_data, "color": "#0A2463"}],
         width=720, height=300, title="Price History", metric_key="price_usd",
         show_min_max=True,
     ) if price_data else ""
@@ -2157,13 +2157,13 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     mvrv_data = _data("mvrv_usd")
     if mvrv_data and len(mvrv_data) >= 3:
         mvrv_refs = [
-            (0.7, "Deep Value", "#059669"),
-            (1.0, "Fair", "#6B7280"),
-            (2.0, "Overvalued", "#F59E0B"),
-            (3.5, "Euphoria", "#DC2626"),
+            (0.7, "Deep Value", "#3D8B5F"),
+            (1.0, "Fair", "#666666"),
+            (2.0, "Overvalued", "#B8860B"),
+            (3.5, "Euphoria", "#B91C1C"),
         ]
         secondary_charts.append(line_chart_svg(
-            [{"label": "MVRV Ratio", "data": mvrv_data, "color": "#8B5CF6"}],
+            [{"label": "MVRV Ratio", "data": mvrv_data, "color": "#8E6C88"}],
             width=340, height=200, title="MVRV Ratio", metric_key="mvrv_usd",
             show_min_max=False, show_area=True, ref_lines=mvrv_refs,
         ))
@@ -2172,29 +2172,29 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     nvt_data = _data("nvt")
     if nvt_data and len(nvt_data) >= 3:
         nvt_refs = [
-            (20, "Undervalued", "#059669"),
-            (50, "Fair", "#6B7280"),
-            (100, "Expensive", "#F59E0B"),
-            (150, "Overvalued", "#DC2626"),
+            (20, "Undervalued", "#3D8B5F"),
+            (50, "Fair", "#666666"),
+            (100, "Expensive", "#B8860B"),
+            (150, "Overvalued", "#B91C1C"),
         ]
         secondary_charts.append(line_chart_svg(
-            [{"label": "NVT Ratio", "data": nvt_data, "color": "#6366F1"}],
+            [{"label": "NVT Ratio", "data": nvt_data, "color": "#4A6FA5"}],
             width=340, height=200, title="NVT Ratio", metric_key="nvt",
             show_min_max=False, show_area=True, ref_lines=nvt_refs,
         ))
 
     chart_defs = [
-        ("volume_usd", "Daily Volume", "#3B82F6"),
-        ("marketcap_usd", "Market Cap", "#0F1419"),
-        ("daily_active_addresses", "Active Addresses", "#10B981"),
-        ("exchange_balance", "Exchange Balance", "#EF4444"),
-        ("dev_activity", "Dev Activity", "#F59E0B"),
-        ("network_growth", "Network Growth", "#06B6D4"),
-        ("transaction_volume", "Tx Volume", "#EC4899"),
-        ("circulation", "Circulation", "#14B8A6"),
-        ("whale_transaction_count_100k_usd_to_inf", "Whale Txs", "#F97316"),
-        ("social_volume_total", "Social Volume", "#8B5CF6"),
-        ("sentiment_balance_total", "Sentiment", "#3B82F6"),
+        ("volume_usd", "Daily Volume", "#2D7D9A"),
+        ("marketcap_usd", "Market Cap", "#0A2463"),
+        ("daily_active_addresses", "Active Addresses", "#5B7065"),
+        ("exchange_balance", "Exchange Balance", "#C84630"),
+        ("dev_activity", "Dev Activity", "#B8860B"),
+        ("network_growth", "Network Growth", "#4A6FA5"),
+        ("transaction_volume", "Tx Volume", "#7D5A3C"),
+        ("circulation", "Circulation", "#3D5A80"),
+        ("whale_transaction_count_100k_usd_to_inf", "Whale Txs", "#C17817"),
+        ("social_volume_total", "Social Volume", "#8E6C88"),
+        ("sentiment_balance_total", "Sentiment", "#2D7D9A"),
     ]
     bar_metrics = {"volume_usd", "social_volume_total", "whale_transaction_count_100k_usd_to_inf"}
     for key, title, color in chart_defs:
@@ -2271,7 +2271,7 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
         </div>
         <div class="profile-price-block">
             <span class="profile-price">{fmt_usd(price)}</span>
-            {mini_trend_svg(_data("price_usd")[-30:], width=120, height=32, color="#0F1419") if len(_data("price_usd")) >= 5 else ""}
+            {mini_trend_svg(_data("price_usd")[-30:], width=120, height=32, color="#0A2463") if len(_data("price_usd")) >= 5 else ""}
             <div class="profile-changes">{"".join(changes)}</div>
             {mvrv_html}
         </div>
