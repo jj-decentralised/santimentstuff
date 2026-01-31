@@ -40,12 +40,10 @@ LABEL_COLOR = "#666666"
 AXIS_COLOR = "#333333"
 BG_COLOR = "none"  # transparent — let the container handle background
 
-# WSJ typography stack — serif for data labels, clean and authoritative
-# Values include wrapping double-quotes for use in SVG attributes via f-string
-# Usage: f'font-family={FONT_LABEL}' → font-family="Georgia,Cambria,serif"
-FONT_LABEL = '"Georgia,Cambria,Times New Roman,serif"'
-FONT_DATA = '"Helvetica Neue,Arial,sans-serif"'
-FONT_TITLE = '"Helvetica Neue,Arial,sans-serif"'
+# System font stack — matches dashboard CSS, no web font downloads
+FONT_LABEL = '"-apple-system,BlinkMacSystemFont,Segoe UI,system-ui,sans-serif"'
+FONT_DATA = '"-apple-system,BlinkMacSystemFont,Segoe UI,system-ui,sans-serif"'
+FONT_TITLE = '"-apple-system,BlinkMacSystemFont,Segoe UI,system-ui,sans-serif"'
 
 # Heatmap color scale — more muted, WSJ editorial style
 HEATMAP_COLORS = {
@@ -241,6 +239,13 @@ def sparkline_svg(
     if len(values) < 2:
         return ""
 
+    # Downsample if too many points
+    if len(values) > 20:
+        step = len(values) / 20
+        values = [values[min(int(i * step), len(values) - 1)] for i in range(20)]
+        if values[-1] != data[-1].get("value"):
+            values[-1] = [d.get("value") for d in data if d.get("value") is not None][-1]
+
     min_v = min(values)
     max_v = max(values)
     v_range = max_v - min_v if max_v != min_v else 1
@@ -399,8 +404,8 @@ def line_chart_svg(
 
         color = s.get("color") or COLORS[si % len(COLORS)]
 
-        # Downsample dense data
-        max_points = 350
+        # Downsample dense data — keep SVG output small for fast rendering
+        max_points = 60
         if len(data) > max_points:
             step = len(data) / max_points
             sampled = []
@@ -556,9 +561,9 @@ def chart_panel(
     columns: int = 2,
 ) -> str:
     """Wrap multiple chart SVGs in a responsive grid."""
-    cols_class = f"chart-grid-{columns}"
-    items = "".join(f'<div class="chart-cell">{c}</div>' for c in charts)
-    return f'<div class="chart-grid {cols_class}">{items}</div>'
+    grid_cls = f"grid-{min(columns, 4)}"
+    items = "".join(f'<div class="chart-w">{c}</div>' for c in charts)
+    return f'<div class="{grid_cls}">{items}</div>'
 
 
 # ============================================================
@@ -573,13 +578,13 @@ def comparison_table(
     if not tokens:
         return '<p>No tokens selected for comparison.</p>'
 
-    header_cells = '<th class="col-name">Metric</th>'
+    header_cells = '<th class="col-nm">Metric</th>'
     for t in tokens:
         name = html_mod.escape(t.get("name", t.get("slug", "")))
         ticker = html_mod.escape(t.get("ticker", ""))
         header_cells += (
-            f'<th class="col-num"><a href="/token/{t.get("slug", "")}" class="token-link">'
-            f'<strong>{name}</strong> <span class="ticker">{ticker}</span></a></th>'
+            f'<th class="col-r"><a href="/token/{t.get("slug", "")}">'
+            f'<strong>{name}</strong> <span class="tk">{ticker}</span></a></th>'
         )
 
     lower_is_better = {"nvt"}
@@ -597,19 +602,19 @@ def comparison_table(
         else:
             best = None
 
-        cells = f'<td class="col-name">{html_mod.escape(label)}</td>'
+        cells = f'<td class="col-nm">{html_mod.escape(label)}</td>'
         for v in vals:
             if v is None:
-                cells += '<td class="col-num">&mdash;</td>'
+                cells += '<td class="col-r">&mdash;</td>'
             else:
                 is_best = (best is not None and v == best and len(numeric_vals) > 1)
-                cls = "col-num num-bold compare-best" if is_best else "col-num num-bold"
+                cls = "col-r bold" if is_best else "col-r"
                 cells += f'<td class="{cls}">{_fmt_val(v, key)}</td>'
         rows.append(f'<tr>{cells}</tr>')
 
     return f"""
-    <div class="table-wrap">
-        <table class="data-table compact">
+    <div class="tbl-w">
+        <table>
             <thead><tr>{header_cells}</tr></thead>
             <tbody>{''.join(rows)}</tbody>
         </table>
@@ -998,10 +1003,15 @@ def mini_trend_svg(
     height: int = 40,
     color: str = "#0A2463",
 ) -> str:
-    """Small line chart for stat cards — minimal, WSJ style."""
+    """Small line chart for stat cards — minimal."""
     values = [d.get("value") for d in data if d.get("value") is not None]
     if len(values) < 3:
         return ""
+
+    # Downsample if too many points
+    if len(values) > 30:
+        step = len(values) / 30
+        values = [values[min(int(i * step), len(values) - 1)] for i in range(30)]
 
     min_v = min(values)
     max_v = max(values)

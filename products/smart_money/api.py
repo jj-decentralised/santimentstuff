@@ -50,6 +50,8 @@ from core.ssr_renderer import (
     pct_class,
     render_glossary_page,
     render_sector_detail_page,
+    page_shell,
+    _esc,
 )
 
 logger = logging.getLogger(__name__)
@@ -1304,35 +1306,35 @@ def create_app() -> FastAPI:
         suggestion = ""
         if path.startswith("/token/"):
             slug_attempt = path.replace("/token/", "").strip("/")
-            suggestion = f'<p>Looking for a token? <a href="/screener?q={slug_attempt}" class="filter-btn">{slug_attempt}</a></p>'
+            suggestion = f'<p>Looking for a token? <a href="/screener?q={slug_attempt}" class="fbtn">{slug_attempt}</a></p>'
 
         popular = ""
         try:
             tokens = _get_all_tokens()[:8]
             if tokens:
                 chips = "".join(
-                    f'<a href="/token/{t["slug"]}" class="filter-btn">{t.get("name", t["slug"])[:16]}</a>'
+                    f'<a href="/token/{t["slug"]}" class="fbtn">{t.get("name", t["slug"])[:16]}</a>'
                     for t in tokens
                 )
-                popular = f'<div style="margin-top:12px"><p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">Popular tokens:</p><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">{chips}</div></div>'
+                popular = f'<div style="margin-top:12px"><p style="font-size:.78rem;color:var(--tx2);margin-bottom:6px">Popular tokens:</p><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">{chips}</div></div>'
         except Exception:
             pass
 
         body = f"""
-        <div class="empty-state" style="padding:60px 0">
-            <div class="empty-state-icon" style="font-size:3rem">&#9888;</div>
+        <div class="empty" style="padding:60px 0">
+            <div style="font-size:3rem">&#9888;</div>
             <h2>404 — Page Not Found</h2>
             <p>The page you're looking for doesn't exist or has been moved.</p>
             {suggestion}
-            <form action="/screener" method="get" style="margin:16px auto;max-width:300px;display:flex;gap:6px">
-                <input type="text" name="q" placeholder="Search tokens..." style="flex:1;padding:8px 12px;border:1px solid var(--border-color);border-radius:6px;font-size:0.85rem">
-                <button type="submit" class="filter-btn active">Search</button>
+            <form action="/screener" method="get" class="search-bar" style="margin:16px auto;max-width:300px">
+                <input type="text" name="q" placeholder="Search tokens...">
+                <button type="submit">Search</button>
             </form>
             <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-                <a href="/" class="filter-btn active">Briefing</a>
-                <a href="/explore" class="filter-btn">Explore</a>
-                <a href="/screener" class="filter-btn">Screener</a>
-                <a href="/sectors" class="filter-btn">Sectors</a>
+                <a href="/" class="fbtn on">Briefing</a>
+                <a href="/explore" class="fbtn">Explore</a>
+                <a href="/screener" class="fbtn">Screener</a>
+                <a href="/sectors" class="fbtn">Sectors</a>
             </div>
             {popular}
         </div>"""
@@ -1504,7 +1506,7 @@ def create_app() -> FastAPI:
             name = t.get("name", "").replace(",", "")
             mvrv = t.get("mvrv_usd") or 0
             from core.ssr_renderer import mvrv_zone as _mz2
-            z_label, _ = _mz2(mvrv) if mvrv else ("N/A", "#999")
+            z_label = _mz2(mvrv)[0] if mvrv else "N/A"
             lines.append(f"{name},{t.get('ticker','')},{t.get('slug','')},{t.get('sector','')},{t.get('price_usd',0):.4f},{mvrv:.4f},{z_label},{t.get('marketcap_usd',0) or 0:.0f}")
         csv_data = "\n".join(lines)
         return Response(
@@ -1868,39 +1870,37 @@ def create_app() -> FastAPI:
         ]
         rows = ""
         for method, path, desc, params, response in endpoints:
-            # Build a try-it link for simple GET endpoints
             try_path = path.replace("{slug}", "bitcoin").replace("{metric}", "price_usd")
             if "?" not in try_path and "csv" not in try_path:
-                try_link = f'<a href="{try_path}" class="api-try-link" target="_blank">Try it &rarr;</a>'
+                try_link = f'<a href="{try_path}" class="fbtn" target="_blank">Try &rarr;</a>'
             else:
                 try_link = ""
             rows += f"""<tr>
-                <td><span class="api-method">{method}</span></td>
-                <td class="col-name"><code>{_esc(path)}</code> {try_link}</td>
+                <td><span class="bold">{method}</span></td>
+                <td class="col-nm"><code>{_esc(path)}</code> {try_link}</td>
                 <td>{_esc(desc)}</td>
-                <td class="hide-mobile"><code>{_esc(params)}</code></td>
-                <td class="hide-mobile"><code>{_esc(response)[:60]}...</code></td>
+                <td class="hide-m"><code>{_esc(params)}</code></td>
+                <td class="hide-m"><code>{_esc(response)[:60]}...</code></td>
             </tr>"""
         body = f"""
-        {_breadcrumbs(("API",))}
-        <h1 class="page-title">API Documentation</h1>
-        <p class="page-subtitle">JSON endpoints for programmatic access to on-chain data</p>
+        <h1 class="pg-t">API Documentation</h1>
+        <p class="pg-sub">JSON endpoints for programmatic access to on-chain data</p>
         <div class="card" style="padding:16px">
-            <p style="font-size:0.8rem;margin-bottom:12px">Base URL: <code>https://santimentstuff-production-2305.up.railway.app</code></p>
-            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px">All endpoints return JSON unless otherwise noted. No authentication required.</p>
+            <p style="font-size:.8rem;margin-bottom:12px">Base URL: <code>https://santimentstuff-production-2305.up.railway.app</code></p>
+            <p style="font-size:.75rem;color:var(--tx2);margin-bottom:12px">All endpoints return JSON unless otherwise noted. No authentication required.</p>
         </div>
-        <div class="table-wrap">
-            <table class="data-table">
+        <div class="tbl-w">
+            <table>
                 <thead><tr>
                     <th>Method</th><th>Endpoint</th><th>Description</th>
-                    <th class="hide-mobile">Parameters</th><th class="hide-mobile">Response</th>
+                    <th class="hide-m">Parameters</th><th class="hide-m">Response</th>
                 </tr></thead>
                 <tbody>{rows}</tbody>
             </table>
         </div>
         <div class="card" style="padding:16px;margin-top:16px">
-            <div class="section-title">Example Usage</div>
-            <pre style="font-size:0.75rem;overflow-x:auto;padding:10px;background:var(--bg-alt);border-radius:4px"><code>curl https://santimentstuff-production-2305.up.railway.app/api/v1/market?page=1&amp;per_page=10
+            <div class="card-t">Example Usage</div>
+            <pre style="font-size:.75rem;overflow-x:auto;padding:10px;background:var(--bg2);border-radius:4px;margin-top:8px"><code>curl https://santimentstuff-production-2305.up.railway.app/api/v1/market?page=1&amp;per_page=10
 
 curl https://santimentstuff-production-2305.up.railway.app/api/v1/profile/bitcoin
 
@@ -1913,8 +1913,8 @@ curl https://santimentstuff-production-2305.up.railway.app/api/v1/sectors
 curl https://santimentstuff-production-2305.up.railway.app/api/v1/valuation/bitcoin</code></pre>
         </div>
         <div class="card" style="padding:16px;margin-top:16px">
-            <div class="section-title">Python Example</div>
-            <pre style="font-size:0.75rem;overflow-x:auto;padding:10px;background:var(--bg-alt);border-radius:4px"><code>import requests
+            <div class="card-t">Python Example</div>
+            <pre style="font-size:.75rem;overflow-x:auto;padding:10px;background:var(--bg2);border-radius:4px;margin-top:8px"><code>import requests
 
 BASE = "https://santimentstuff-production-2305.up.railway.app"
 
@@ -1933,8 +1933,8 @@ for d in eth_mvrv["data"][-5:]:
     print(f"{{d['datetime']}}: {{d['value']:.2f}}")</code></pre>
         </div>
         <div class="card" style="padding:16px;margin-top:16px">
-            <div class="section-title">Rate Limits</div>
-            <p style="font-size:0.78rem;color:var(--text-secondary)">No authentication or API keys required. Data refreshes daily. Be reasonable with request frequency. All data sourced from <a href="https://santiment.net" target="_blank" rel="noopener">Santiment API</a>.</p>
+            <div class="card-t">Rate Limits</div>
+            <p style="font-size:.78rem;color:var(--tx2)">No authentication or API keys required. Data refreshes daily. Be reasonable with request frequency. All data sourced from <a href="https://santiment.net" target="_blank" rel="noopener">Santiment API</a>.</p>
         </div>"""
         return page_shell("API Documentation", body)
 
