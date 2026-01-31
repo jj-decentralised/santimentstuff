@@ -41,9 +41,11 @@ AXIS_COLOR = "#333333"
 BG_COLOR = "none"  # transparent — let the container handle background
 
 # WSJ typography stack — serif for data labels, clean and authoritative
-FONT_LABEL = '"Georgia","Cambria","Times New Roman",serif'
-FONT_DATA = '"Helvetica Neue","Arial",sans-serif'
-FONT_TITLE = '"Helvetica Neue","Arial",sans-serif'
+# Values include wrapping double-quotes for use in SVG attributes via f-string
+# Usage: f'font-family={FONT_LABEL}' → font-family="Georgia,Cambria,serif"
+FONT_LABEL = '"Georgia,Cambria,Times New Roman,serif"'
+FONT_DATA = '"Helvetica Neue,Arial,sans-serif"'
+FONT_TITLE = '"Helvetica Neue,Arial,sans-serif"'
 
 # Heatmap color scale — more muted, WSJ editorial style
 HEATMAP_COLORS = {
