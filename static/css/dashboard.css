@@ -3878,3 +3878,99 @@ html.dark .screener-table tbody tr:hover { background: #161B22; }
   .spark-grid { grid-template-columns: repeat(3, 1fr); }
   .profile-name { font-size: 14pt; }
 }
+
+/* ================================================================
+   DERIVED METRICS — Analytics Dashboard panel
+   ================================================================ */
+.derived-panel {
+  margin-top: 16px;
+}
+.derived-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.derived-col {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.derived-heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 10px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-light);
+}
+/* Score bars */
+.derived-score {
+  display: grid;
+  grid-template-columns: 80px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.derived-score-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.derived-score-bar-track {
+  height: 6px;
+  background: var(--bg-alt);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.derived-score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.derived-score-val {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+  font-family: "Georgia", serif;
+  color: var(--text-primary);
+}
+/* Stat rows */
+.derived-stats-grid {
+  display: grid;
+  gap: 4px;
+}
+.derived-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.derived-stat:last-child { border-bottom: none; }
+.derived-stat-label {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+.derived-stat-val {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: "Georgia", serif;
+  color: var(--text-primary);
+}
+@media (max-width: 640px) {
+  .derived-grid { grid-template-columns: 1fr; }
+}
+/* Dark mode */
+html.dark .derived-col { background: #161B22; border-color: #30363D; }
+html.dark .derived-heading { border-bottom-color: #21262D; }
+html.dark .derived-stat { border-bottom-color: #21262D; }
+html.dark .derived-score-bar-track { background: #21262D; }
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .derived-col { background: #161B22; border-color: #30363D; }
+  :root:not(.light) .derived-heading { border-bottom-color: #21262D; }
+  :root:not(.light) .derived-stat { border-bottom-color: #21262D; }
+  :root:not(.light) .derived-score-bar-track { background: #21262D; }
+}

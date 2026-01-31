@@ -1745,6 +1745,112 @@ def _sparkline_grid(_data_fn, token_name: str) -> str:
     </div>"""
 
 
+def _derived_metrics_panel(derived: dict) -> str:
+    """Render the precalculated / derived analytics panel on token profiles."""
+    if not derived:
+        return ""
+
+    def _score_bar(label, value, color="#0A2463"):
+        if value is None:
+            return ""
+        pct = max(0, min(100, value))
+        # Color based on score level
+        if color == "auto":
+            if pct >= 70:
+                color = "#1B5E3B"
+            elif pct >= 40:
+                color = "#B8860B"
+            else:
+                color = "#B91C1C"
+        return f"""<div class="derived-score">
+            <div class="derived-score-label">{_esc(label)}</div>
+            <div class="derived-score-bar-track">
+                <div class="derived-score-bar-fill" style="width:{pct:.0f}%;background:{color}"></div>
+            </div>
+            <div class="derived-score-val">{pct:.0f}</div>
+        </div>"""
+
+    def _stat(label, value, fmt="", suffix="", tip=""):
+        if value is None:
+            return ""
+        if fmt == "pct":
+            v_str = f"{value:+.1f}%" if value >= 0 else f"{value:.1f}%"
+        elif fmt == "num2":
+            v_str = f"{value:.2f}"
+        elif fmt == "num1":
+            v_str = f"{value:.1f}"
+        elif fmt == "num0":
+            v_str = f"{value:.0f}"
+        else:
+            v_str = f"{value:,.2f}"
+        v_str += suffix
+        tip_html = f' title="{_esc(tip)}"' if tip else ""
+        return f'<div class="derived-stat"{tip_html}><span class="derived-stat-label">{_esc(label)}</span><span class="derived-stat-val">{v_str}</span></div>'
+
+    # Composite scores section
+    scores_html = ""
+    score_defs = [
+        ("Momentum", derived.get("momentum_score"), "auto", "Price trend + volume + activity momentum"),
+        ("Value", derived.get("value_score"), "auto", "MVRV + NVT valuation signal"),
+        ("Risk", derived.get("risk_score"), "auto", "Volatility + drawdown + beta risk"),
+        ("Health", derived.get("health_score"), "auto", "Network activity + development health"),
+    ]
+    for label, val, color, tip in score_defs:
+        if val is not None:
+            bar = _score_bar(label, val, color)
+            if bar:
+                scores_html += bar
+
+    # Technical stats
+    tech_stats = ""
+    tech_defs = [
+        ("RSI (14)", derived.get("rsi_14"), "num1", "", "Relative Strength Index: >70 overbought, <30 oversold"),
+        ("Volatility 30d", derived.get("volatility_30d"), "pct_raw", "", "Annualised 30-day volatility"),
+        ("Sharpe 90d", derived.get("sharpe_90d"), "num2", "", "Risk-adjusted return over 90 days"),
+        ("Max Drawdown 90d", derived.get("max_drawdown_90d"), "pct", "", "Deepest peak-to-trough in 90 days"),
+        ("vs 50d MA", derived.get("ma50_distance"), "pct", "", "Distance from 50-day moving average"),
+        ("vs 200d MA", derived.get("ma200_distance"), "pct", "", "Distance from 200-day moving average"),
+        ("Beta (vs BTC)", derived.get("beta_btc_90d"), "num2", "", "90-day beta relative to Bitcoin"),
+    ]
+    for label, val, fmt, suffix, tip in tech_defs:
+        if val is not None:
+            if fmt == "pct_raw":
+                # volatility is a decimal (e.g. 0.85 = 85%)
+                val_disp = val * 100
+                tech_stats += _stat(label, val_disp, "pct", suffix, tip)
+            else:
+                tech_stats += _stat(label, val, fmt, suffix, tip)
+
+    # On-chain derived
+    onchain_stats = ""
+    onchain_defs = [
+        ("MVRV Z-Score", derived.get("mvrv_zscore"), "num2", "", "Standardised MVRV vs 1yr distribution"),
+        ("NVT Signal", derived.get("nvt_signal"), "num1", "", "90-day smoothed NVT ratio"),
+        ("Dev Intensity", derived.get("dev_intensity"), "num2", "", "Dev activity normalised by market cap"),
+        ("Value per Address", derived.get("network_value_per_addr"), "", "", "Market cap per active address"),
+        ("Supply Shock", derived.get("supply_shock"), "num1", "x", "Supply outside exchanges / on exchanges"),
+    ]
+    for label, val, fmt, suffix, tip in onchain_defs:
+        if val is not None:
+            onchain_stats += _stat(label, val, fmt, suffix, tip)
+
+    if not scores_html and not tech_stats and not onchain_stats:
+        return ""
+
+    sections = []
+    if scores_html:
+        sections.append(f'<div class="derived-col"><h4 class="derived-heading">Composite Scores</h4>{scores_html}</div>')
+    if tech_stats:
+        sections.append(f'<div class="derived-col"><h4 class="derived-heading">Technical</h4><div class="derived-stats-grid">{tech_stats}</div></div>')
+    if onchain_stats:
+        sections.append(f'<div class="derived-col"><h4 class="derived-heading">On-Chain Derived</h4><div class="derived-stats-grid">{onchain_stats}</div></div>')
+
+    return f"""<div class="profile-section derived-panel">
+        <div class="profile-section-title">Analytics Dashboard</div>
+        <div class="derived-grid">{"".join(sections)}</div>
+    </div>"""
+
+
 def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: str = "all", token_info: dict = None, related_tokens: list = None, prev_token: dict = None, next_token: dict = None, mcap_rank: int = None, all_tokens: list = None) -> str:
     slug = slug or token.get("slug", "")
     name = _esc(token.get("name", slug))
@@ -2292,6 +2398,8 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "", timeframe: 
     {f'<div class="metrics-grid">{"".join(metric_cards)}</div>' if metric_cards else ''}
 
     {_sparkline_grid(_data, name)}
+
+    {_derived_metrics_panel(metrics.get("_derived", {}))}
 
     {_performance_table(price_data, _data("volume_usd"))}
 

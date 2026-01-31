@@ -29,6 +29,7 @@ from core.santiment_data_puller import (
     TIER2_METRICS,
     ALL_PROFILE_METRICS,
 )
+from core.derived_metrics import compute_token_derived
 from core.ssr_renderer import (
     render_briefing_page,
     render_explore_page,
@@ -1136,6 +1137,64 @@ def _build_profile_metrics(slug: str):
                 "max_365d": max(values[-365:]) if len(values) >= 30 else (max(values) if values else None),
                 "avg_30d": round(sum(values[-30:]) / len(values[-30:]), 4) if len(values) >= 30 else None,
             }
+
+    # ── Compute derived / precalculated metrics ──
+    def _vals(key):
+        m = metrics_data.get(key, {})
+        data = m.get("data", [])
+        return [d["value"] for d in data if d.get("value") is not None]
+
+    def _latest(key):
+        m = metrics_data.get(key, {})
+        return m.get("latest")
+
+    price_vals = _vals("price_usd")
+    # Get BTC prices for beta calculation
+    btc_prices = []
+    if _san_cache:
+        btc_data = _san_cache.get_timeseries("price_usd", "bitcoin")
+        btc_prices = [d["value"] for d in btc_data if d.get("value") is not None]
+
+    # Compute change metrics for composites
+    def _pct_change(vals, days):
+        if len(vals) < days + 1:
+            return None
+        old = vals[-(days + 1)]
+        if old and old != 0:
+            return round((vals[-1] - old) / old * 100, 2)
+        return None
+
+    price_change_7d = _pct_change(price_vals, 7)
+    price_change_30d = _pct_change(price_vals, 30)
+    vol_vals = _vals("volume_usd")
+    volume_change = _pct_change(vol_vals, 1) if vol_vals else None
+
+    mcap = _latest("marketcap_usd")
+    daa = _latest("daily_active_addresses")
+    vol_mcap = ((_latest("volume_usd") or 0) / mcap) if mcap and mcap > 0 else None
+
+    derived = compute_token_derived(
+        price_series=price_vals,
+        btc_price_series=btc_prices if btc_prices else None,
+        mvrv_series=_vals("mvrv_usd") or None,
+        nvt_series=_vals("nvt") or None,
+        inflow_series=_vals("exchange_inflow") or None,
+        outflow_series=_vals("exchange_outflow") or None,
+        mcap=mcap,
+        daa=daa,
+        dev_activity_val=_latest("dev_activity"),
+        supply_on=_latest("supply_on_exchanges"),
+        supply_outside=_latest("supply_outside_exchanges"),
+        price_change_7d=price_change_7d,
+        price_change_30d=price_change_30d,
+        volume_change=volume_change,
+        daa_change=_pct_change(_vals("daily_active_addresses"), 1),
+        dev_change=_pct_change(_vals("dev_activity"), 1),
+        growth_change=_pct_change(_vals("network_growth"), 1),
+        exchange_balance_change=_pct_change(_vals("exchange_balance"), 1),
+        vol_mcap_ratio=vol_mcap,
+    )
+    metrics_data["_derived"] = derived
     return metrics_data
 
 
