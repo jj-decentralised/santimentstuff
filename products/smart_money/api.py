@@ -589,8 +589,8 @@ SCATTER_VIEWS = [
     ("vol_mcap", "Speculation: Volume/MCap Ratio vs Active Addresses", "vol_mcap_ratio", "daily_active_addresses", "Volume / Market Cap", "Active Addresses", True, True),
 ]
 
-DEFAULT_PAGE_SIZE = 100
-MAX_PAGE_SIZE = 500
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 200
 _CACHE_TTL = 900  # seconds — recompute at most every 15 minutes
 
 # In-memory result cache: {key: (timestamp, value)}
@@ -611,8 +611,10 @@ def _cached(key: str, builder, ttl: int = _CACHE_TTL):
 
 # ── Bulk token data ──────────────────────────────────────────
 
-def _build_bulk_token_data(metrics_list: list[str]) -> list[dict]:
-    """One SQL query per metric instead of per token×metric."""
+def _build_bulk_token_data(metrics_list: list[str], max_tokens: int = 0) -> list[dict]:
+    """One SQL query per metric instead of per token×metric.
+    max_tokens: if > 0, only return the top N tokens by market cap (speed optimization).
+    """
     if not _san_cache:
         return []
     all_projects = _san_cache.get_all_projects()
@@ -646,15 +648,19 @@ def _build_bulk_token_data(metrics_list: list[str]) -> list[dict]:
                 slug_map[slug][f"{metric}_change"] = 0 if latest is not None else None
     tokens = [t for t in slug_map.values() if t.get("price_usd") is not None]
     tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
+    if max_tokens > 0:
+        tokens = tokens[:max_tokens]
     return tokens
 
 
 def _get_all_tokens() -> list[dict]:
-    return _cached("all_tokens", lambda: _build_bulk_token_data(KEY_METRICS))
+    """Top 500 tokens by market cap — covers 99.9% of market value."""
+    return _cached("all_tokens", lambda: _build_bulk_token_data(KEY_METRICS, max_tokens=500))
 
 
 def _get_summary_tokens() -> list[dict]:
-    return _cached("summary_tokens", lambda: _build_bulk_token_data(SUMMARY_METRICS))
+    """Lightweight summary: top 200 tokens, fewer metrics."""
+    return _cached("summary_tokens", lambda: _build_bulk_token_data(SUMMARY_METRICS, max_tokens=200))
 
 
 # Ticker strip data — top tokens for the price bar across all pages
@@ -1124,6 +1130,11 @@ def _build_all_tokens_for_valuation():
 
 
 def _build_profile_metrics(slug: str):
+    """Build full metrics for a token profile — cached per slug for 15 min."""
+    return _cached(f"profile_{slug}", lambda: _build_profile_metrics_uncached(slug))
+
+
+def _build_profile_metrics_uncached(slug: str):
     # Single batch query for all metrics instead of 60+ serial queries
     batch = _san_cache.get_timeseries_batch(ALL_PROFILE_METRICS, slug)
     metrics_data = {}

@@ -202,7 +202,9 @@ def page_shell(title: str, body: str, active_nav: str = "",
     )
 
     effective_theme = theme if theme != "auto" else _current_theme
-    html_class = f' class="{effective_theme}"' if effective_theme in ('dark', 'light') else ''
+    # Dark-first: only add class="light" when explicitly light
+    html_class = ' class="light"' if effective_theme == 'light' else ''
+    is_light = effective_theme == 'light'
     refresh = f'<meta http-equiv="refresh" content="{auto_refresh}">' if auto_refresh > 0 else ''
     canon = f'<link rel="canonical" href="{_esc(canonical)}">' if canonical else ''
 
@@ -213,8 +215,8 @@ def page_shell(title: str, body: str, active_nav: str = "",
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{_esc(title)} — Onchain Pulse</title>
 {refresh}
-<meta name="description" content="{_esc(og_description) if og_description else 'On-chain crypto analytics. MVRV, active addresses, exchange flows, dev activity.'}">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230F1419'/><text x='16' y='22' text-anchor='middle' fill='%2310B981' font-family='sans-serif' font-weight='900' font-size='18'>P</text></svg>">
+<meta name="description" content="{_esc(og_description) if og_description else 'On-chain crypto analytics dashboard. MVRV, active addresses, exchange flows, dev activity — powered by Santiment.'}">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230d1117'/><text x='16' y='22' text-anchor='middle' fill='%233fb950' font-family='sans-serif' font-weight='900' font-size='18'>P</text></svg>">
 <link rel="stylesheet" href="/static/css/dashboard.css">
 {canon}
 </head>
@@ -226,11 +228,11 @@ def page_shell(title: str, body: str, active_nav: str = "",
 <div class="hd-r">
 <form action="/explore" method="get" class="hd-search"><input type="text" name="q" placeholder="Search..." autocomplete="off"></form>
 {_freshness_badge()}
-{f'<a href="?theme=light" class="theme-btn">&#9788;</a>' if effective_theme == 'dark' else f'<a href="?theme=dark" class="theme-btn">&#9790;</a>'}
+{f'<a href="?theme=dark" class="theme-btn">&#9790;</a>' if is_light else f'<a href="?theme=light" class="theme-btn">&#9788;</a>'}
 </div>
 </div></header>
 <main class="main wrap" id="m">{body}</main>
-<footer class="ft">Data via <a href="https://santiment.net">Santiment</a> &middot; 100% SSR &middot; {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC</footer>
+<footer class="ft">Data via <a href="https://santiment.net">Santiment</a> &middot; 100% Server-Rendered &middot; {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC</footer>
 </body>
 </html>"""
 
@@ -779,12 +781,12 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "",
 
     # Secondary charts — only render if data exists
     chart_defs = [
-        ("mvrv_usd", "MVRV Ratio", "#C84630"),
-        ("daily_active_addresses", "Active Addresses", "#2D7D9A"),
-        ("volume_usd", "Volume", "#5B7065"),
-        ("dev_activity", "Dev Activity", "#7D5A3C"),
-        ("exchange_balance", "Exchange Balance", "#8E6C88"),
-        ("network_growth", "Network Growth", "#4A6FA5"),
+        ("mvrv_usd", "MVRV Ratio", "#f85149"),
+        ("daily_active_addresses", "Active Addresses", "#39d2c0"),
+        ("volume_usd", "Volume", "#d29922"),
+        ("dev_activity", "Dev Activity", "#bc8cff"),
+        ("exchange_balance", "Exchange Balance", "#f0883e"),
+        ("network_growth", "Network Growth", "#56d364"),
     ]
     for metric_key, title, color in chart_defs:
         data = _data(metric_key)

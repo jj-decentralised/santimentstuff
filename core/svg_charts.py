@@ -18,26 +18,26 @@ from typing import Optional
 
 
 # ============================================================
-# WSJ-INSPIRED COLOR PALETTE
+# BLOOMBERG-TERMINAL COLOR PALETTE — high contrast for dark BG
 # ============================================================
 
-# Primary series colors — muted, professional, WSJ-like
+# Primary series colors — vivid, high-contrast for dark backgrounds
 COLORS = [
-    "#0A2463",   # deep navy (primary)
-    "#C84630",   # WSJ red/brick
-    "#2D7D9A",   # teal-blue
-    "#7D5A3C",   # warm brown
-    "#5B7065",   # sage green
-    "#8E6C88",   # muted plum
-    "#B8860B",   # dark goldenrod
-    "#4A6FA5",   # steel blue
-    "#C17817",   # amber/ochre
-    "#3D5A80",   # slate blue
+    "#58a6ff",   # blue (primary)
+    "#f85149",   # red
+    "#3fb950",   # green
+    "#d29922",   # amber
+    "#bc8cff",   # purple
+    "#39d2c0",   # teal
+    "#f0883e",   # orange
+    "#79c0ff",   # light blue
+    "#56d364",   # bright green
+    "#db61a2",   # pink
 ]
 
-GRID_COLOR = "#E8E8E8"
-LABEL_COLOR = "#666666"
-AXIS_COLOR = "#333333"
+GRID_COLOR = "#30363d"
+LABEL_COLOR = "#8b949e"
+AXIS_COLOR = "#484f58"
 BG_COLOR = "none"  # transparent — let the container handle background
 
 # System font stack — matches dashboard CSS, no web font downloads
@@ -45,15 +45,15 @@ FONT_LABEL = '"-apple-system,BlinkMacSystemFont,Segoe UI,system-ui,sans-serif"'
 FONT_DATA = '"-apple-system,BlinkMacSystemFont,Segoe UI,system-ui,sans-serif"'
 FONT_TITLE = '"-apple-system,BlinkMacSystemFont,Segoe UI,system-ui,sans-serif"'
 
-# Heatmap color scale — more muted, WSJ editorial style
+# Heatmap color scale — high contrast for dark backgrounds
 HEATMAP_COLORS = {
-    "extreme_neg": "#B91C1C",
-    "neg": "#DC6B50",
-    "slight_neg": "#E8A998",
-    "neutral": "#E8E8E8",
-    "slight_pos": "#93C5A4",
-    "pos": "#3D8B5F",
-    "extreme_pos": "#1B5E3B",
+    "extreme_neg": "#f85149",
+    "neg": "#da3633",
+    "slight_neg": "#8b4946",
+    "neutral": "#30363d",
+    "slight_pos": "#3d6b4f",
+    "pos": "#2ea043",
+    "extreme_pos": "#3fb950",
 }
 
 
@@ -1040,14 +1040,14 @@ def mini_trend_svg(
 # ============================================================
 
 THESIS_COLORS = {
-    "smart_money": "#1B5E3B",
-    "builder_momentum": "#2D7D9A",
-    "deep_value": "#3D8B5F",
-    "distribution_warning": "#B91C1C",
-    "hodler": "#8E6C88",
-    "high_utility": "#4A6FA5",
-    "speculative": "#C17817",
-    "uncategorized": "#999999",
+    "smart_money": "#3fb950",
+    "builder_momentum": "#58a6ff",
+    "deep_value": "#56d364",
+    "distribution_warning": "#f85149",
+    "hodler": "#bc8cff",
+    "high_utility": "#39d2c0",
+    "speculative": "#d29922",
+    "uncategorized": "#484f58",
 }
 
 
