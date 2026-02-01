@@ -29,7 +29,10 @@ from core.santiment_data_puller import (
     TIER2_METRICS,
     ALL_PROFILE_METRICS,
 )
-from core.derived_metrics import compute_token_derived
+from core.derived_metrics import (
+    compute_token_derived, correlation_matrix, sector_momentum,
+    mean_reversion_zscore, sortino_ratio, calmar_ratio, metcalfe_ratio,
+)
 from core.ssr_renderer import (
     render_briefing_page,
     render_explore_page,
@@ -51,6 +54,7 @@ from core.ssr_renderer import (
     pct_class,
     render_glossary_page,
     render_sector_detail_page,
+    render_quant_page,
     page_shell,
     _esc,
 )
@@ -1983,6 +1987,89 @@ def create_app() -> FastAPI:
     async def get_glossary_page():
         """Metric glossary — explanations of all on-chain metrics."""
         return render_glossary_page()
+
+    @app.get("/quant", response_class=HTMLResponse)
+    async def get_quant_page():
+        """Quantitative analytics — correlation matrix, sector rotation, mean reversion scanner."""
+        if not _san_cache:
+            return HTMLResponse("<html><body><h1>Data not available yet</h1></body></html>")
+
+        all_tokens = _get_all_tokens()
+
+        # 1. Correlation matrix — top 15 tokens by market cap
+        top_slugs = [t["slug"] for t in sorted(all_tokens, key=lambda x: x.get("marketcap_usd") or 0, reverse=True)[:15]]
+        price_series_dict = {}
+        corr_labels = {}
+        for slug in top_slugs:
+            ts = _san_cache.get_timeseries("price_usd", slug)
+            prices = [d["value"] for d in ts if d.get("value") is not None]
+            if len(prices) >= 30:
+                price_series_dict[slug] = prices
+                proj = _san_cache.get_project(slug)
+                corr_labels[slug] = (proj.get("ticker") or slug[:5].upper()) if proj else slug[:5].upper()
+
+        corr_mat = correlation_matrix(price_series_dict, window=90) if len(price_series_dict) >= 2 else None
+
+        # 2. Sector rotation
+        sec_rot = sector_momentum(all_tokens)
+
+        # 3. Mean reversion scanner — find tokens with extreme z-scores
+        mean_rev_tokens = []
+        for t in all_tokens[:200]:  # Top 200 by mcap
+            slug = t.get("slug", "")
+            mvrv_ts = _san_cache.get_timeseries("mvrv_usd", slug)
+            nvt_ts = _san_cache.get_timeseries("nvt", slug)
+            mvrv_vals = [d["value"] for d in mvrv_ts if d.get("value") is not None]
+            nvt_vals = [d["value"] for d in nvt_ts if d.get("value") is not None]
+
+            mvrv_z = mean_reversion_zscore(mvrv_vals) if len(mvrv_vals) >= 30 else None
+            nvt_z = mean_reversion_zscore(nvt_vals) if len(nvt_vals) >= 30 else None
+
+            # Only include if at least one z-score is extreme
+            if (mvrv_z is not None and abs(mvrv_z) >= 1.5) or (nvt_z is not None and abs(nvt_z) >= 1.5):
+                signal = ""
+                if mvrv_z is not None and mvrv_z <= -1.5:
+                    signal = "Undervalued (MVRV stretched low)"
+                elif mvrv_z is not None and mvrv_z >= 2:
+                    signal = "Overvalued (MVRV stretched high)"
+                elif nvt_z is not None and nvt_z <= -1.5:
+                    signal = "High usage efficiency (NVT low)"
+                elif nvt_z is not None and nvt_z >= 2:
+                    signal = "Low usage efficiency (NVT high)"
+                mean_rev_tokens.append({
+                    **t, "mvrv_zscore_1y": mvrv_z, "nvt_zscore_1y": nvt_z, "signal": signal,
+                })
+        mean_rev_tokens.sort(key=lambda x: abs(x.get("mvrv_zscore_1y") or 0), reverse=True)
+
+        # 4. Risk-adjusted rankings
+        risk_adj = []
+        btc_ts = _san_cache.get_timeseries("price_usd", "bitcoin")
+        btc_prices = [d["value"] for d in btc_ts if d.get("value") is not None]
+        for t in all_tokens[:100]:
+            slug = t.get("slug", "")
+            ts = _san_cache.get_timeseries("price_usd", slug)
+            prices = [d["value"] for d in ts if d.get("value") is not None]
+            if len(prices) < 30:
+                continue
+            s90 = sortino_ratio(prices, 90) if len(prices) >= 90 else None
+            c90 = calmar_ratio(prices, 90) if len(prices) >= 30 else None
+            from core.derived_metrics import sharpe_ratio as _sharpe
+            sh90 = _sharpe(prices, 90) if len(prices) >= 90 else None
+            daa = t.get("daily_active_addresses") or 0
+            mcap = t.get("marketcap_usd") or 0
+            met = metcalfe_ratio(daa, mcap)
+            if s90 is not None:
+                risk_adj.append({
+                    **t, "sortino_90d": s90, "calmar_90d": c90,
+                    "sharpe_90d": sh90, "metcalfe_ratio": met,
+                })
+        risk_adj.sort(key=lambda x: x.get("sortino_90d") or -999, reverse=True)
+
+        return render_quant_page(
+            corr_matrix=corr_mat, corr_labels=corr_labels,
+            sector_rotation=sec_rot, mean_reversion=mean_rev_tokens[:30],
+            risk_adjusted=risk_adj,
+        )
 
     # ============================================================
     # JSON API ENDPOINTS (for programmatic access)

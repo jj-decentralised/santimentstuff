@@ -230,6 +230,169 @@ def supply_shock_ratio(supply_outside: float, supply_on: float) -> Optional[floa
 
 
 # ══════════════════════════════════════════════════════════════
+# ECONOMETRIC METRICS
+# ══════════════════════════════════════════════════════════════
+
+def sortino_ratio(prices: list[float], window: int = 90, risk_free: float = 0.0) -> Optional[float]:
+    """Annualised Sortino ratio — penalises only downside volatility."""
+    tail = prices[-window:] if len(prices) >= window else prices
+    lr = _log_returns(tail)
+    if len(lr) < 10:
+        return None
+    mean_r = statistics.mean(lr)
+    downside = [r for r in lr if r < 0]
+    if len(downside) < 3:
+        return None
+    down_std = statistics.stdev(downside)
+    if down_std == 0:
+        return None
+    return round((mean_r - risk_free / 365) / down_std * math.sqrt(365), 2)
+
+
+def calmar_ratio(prices: list[float], window: int = 90) -> Optional[float]:
+    """Calmar ratio — annualised return / max drawdown."""
+    tail = prices[-window:] if len(prices) >= window else prices
+    if len(tail) < 10 or tail[0] <= 0:
+        return None
+    total_return = (tail[-1] / tail[0] - 1)
+    ann_return = total_return * (365 / len(tail))
+    dd = max_drawdown(prices, window)
+    if dd is None or dd == 0:
+        return None
+    return round(ann_return * 100 / abs(dd), 2)
+
+
+def metcalfe_ratio(daa: float, mcap: float) -> Optional[float]:
+    """Metcalfe ratio: log10(DAA^2) / log10(MCap).
+    Values near 1.0 = fairly valued by Metcalfe's Law.
+    Above 1.0 = undervalued for network usage. Below 1.0 = overvalued."""
+    if not daa or daa < 10 or not mcap or mcap < 1e6:
+        return None
+    log_metcalfe = math.log10(daa ** 2)
+    log_mcap = math.log10(mcap)
+    if log_mcap == 0:
+        return None
+    return round(log_metcalfe / log_mcap, 3)
+
+
+def onchain_velocity(tx_volume: float, mcap: float) -> Optional[float]:
+    """On-chain velocity: transaction_volume / market_cap.
+    Low = HODLing. High = active circulation / speculation."""
+    if not tx_volume or not mcap or mcap <= 0:
+        return None
+    return round(tx_volume / mcap, 4)
+
+
+def mean_reversion_zscore(values: list[float], window: int = 365) -> Optional[float]:
+    """Generic z-score of latest value vs its trailing distribution.
+    Used for scanning stretched metrics (MVRV, NVT, velocity)."""
+    if len(values) < 30:
+        return None
+    tail = values[-window:] if len(values) >= window else values
+    if len(tail) < 20:
+        return None
+    mean_v = statistics.mean(tail)
+    std_v = statistics.stdev(tail)
+    if std_v == 0:
+        return None
+    return round((values[-1] - mean_v) / std_v, 2)
+
+
+def rolling_correlation(series_a: list[float], series_b: list[float],
+                        window: int = 90) -> Optional[float]:
+    """Pearson correlation of daily returns over a rolling window."""
+    n = min(window, len(series_a), len(series_b))
+    if n < 20:
+        return None
+    ra = _returns(series_a[-n:])
+    rb = _returns(series_b[-n:])
+    n2 = min(len(ra), len(rb))
+    if n2 < 10:
+        return None
+    ra = ra[-n2:]
+    rb = rb[-n2:]
+    mean_a = statistics.mean(ra)
+    mean_b = statistics.mean(rb)
+    cov = sum((ra[i] - mean_a) * (rb[i] - mean_b) for i in range(n2)) / n2
+    std_a = statistics.stdev(ra)
+    std_b = statistics.stdev(rb)
+    if std_a == 0 or std_b == 0:
+        return None
+    return round(cov / (std_a * std_b), 3)
+
+
+def correlation_matrix(price_series_dict: dict[str, list[float]],
+                       window: int = 90) -> dict[str, dict[str, float]]:
+    """Build NxN correlation matrix from {slug: price_series} dict.
+    Returns {slug_a: {slug_b: correlation, ...}, ...}."""
+    slugs = list(price_series_dict.keys())
+    matrix = {}
+    for a in slugs:
+        matrix[a] = {}
+        for b in slugs:
+            if a == b:
+                matrix[a][b] = 1.0
+            elif b in matrix and a in matrix[b]:
+                matrix[a][b] = matrix[b][a]  # Symmetric
+            else:
+                corr = rolling_correlation(price_series_dict[a], price_series_dict[b], window)
+                matrix[a][b] = corr if corr is not None else 0.0
+    return matrix
+
+
+def sector_momentum(tokens: list[dict], periods: list[int] = None) -> list[dict]:
+    """Compute sector relative performance across multiple periods.
+    tokens: list of token dicts with 'sector', 'price_usd_change', 'price_usd_change_7d', etc.
+    Returns: [{sector, count, avg_24h, avg_7d, avg_30d, momentum_rank}, ...]"""
+    if periods is None:
+        periods = [1, 7, 30]
+    sector_data = {}
+    for t in tokens:
+        sec = t.get("sector", "Other")
+        if sec not in sector_data:
+            sector_data[sec] = {"count": 0, "changes_24h": [], "changes_7d": [], "changes_30d": []}
+        sector_data[sec]["count"] += 1
+        ch24 = t.get("price_usd_change")
+        ch7 = t.get("price_usd_change_7d")
+        ch30 = t.get("price_usd_change_30d")
+        if ch24 is not None:
+            sector_data[sec]["changes_24h"].append(ch24)
+        if ch7 is not None:
+            sector_data[sec]["changes_7d"].append(ch7)
+        if ch30 is not None:
+            sector_data[sec]["changes_30d"].append(ch30)
+
+    results = []
+    for sec, d in sector_data.items():
+        avg_24h = statistics.mean(d["changes_24h"]) if d["changes_24h"] else None
+        avg_7d = statistics.mean(d["changes_7d"]) if d["changes_7d"] else None
+        avg_30d = statistics.mean(d["changes_30d"]) if d["changes_30d"] else None
+        # Composite momentum: blend all available periods
+        blended = 0
+        count = 0
+        if avg_24h is not None:
+            blended += avg_24h * 0.2
+            count += 0.2
+        if avg_7d is not None:
+            blended += avg_7d * 0.3
+            count += 0.3
+        if avg_30d is not None:
+            blended += avg_30d * 0.5
+            count += 0.5
+        results.append({
+            "sector": sec, "count": d["count"],
+            "avg_24h": round(avg_24h, 2) if avg_24h is not None else None,
+            "avg_7d": round(avg_7d, 2) if avg_7d is not None else None,
+            "avg_30d": round(avg_30d, 2) if avg_30d is not None else None,
+            "blended_momentum": round(blended / count, 2) if count > 0 else None,
+        })
+    results.sort(key=lambda x: x.get("blended_momentum") or -999, reverse=True)
+    for i, r in enumerate(results):
+        r["momentum_rank"] = i + 1
+    return results
+
+
+# ══════════════════════════════════════════════════════════════
 # COMPOSITE SCORES (0–100)
 # ══════════════════════════════════════════════════════════════
 
@@ -451,6 +614,17 @@ def compute_token_derived(
     result["network_value_per_addr"] = network_value_per_address(mcap or 0, daa or 0)
     result["dev_intensity"] = dev_intensity(dev_activity_val or 0, mcap or 0)
     result["supply_shock"] = supply_shock_ratio(supply_outside or 0, supply_on or 0)
+
+    # Econometric metrics
+    result["sortino_90d"] = sortino_ratio(price_series, 90) if len(price_series) >= 90 else None
+    result["calmar_90d"] = calmar_ratio(price_series, 90) if len(price_series) >= 30 else None
+    result["metcalfe_ratio"] = metcalfe_ratio(daa or 0, mcap or 0)
+    result["velocity"] = onchain_velocity(
+        price_series[-1] * (vol_mcap_ratio or 0) * mcap if price_series and mcap and vol_mcap_ratio else 0,
+        mcap or 0
+    ) if mcap else None
+    result["mvrv_zscore_1y"] = mean_reversion_zscore(mvrv_series) if mvrv_series and len(mvrv_series) >= 30 else None
+    result["nvt_zscore_1y"] = mean_reversion_zscore(nvt_series) if nvt_series and len(nvt_series) >= 30 else None
 
     # Composite scores
     result["momentum_score"] = momentum_score(

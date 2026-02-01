@@ -10,7 +10,8 @@ from typing import Optional
 from .svg_charts import (
     sparkline_svg, line_chart_svg, comparison_table,
     market_heatmap_svg, dominance_bar_svg,
-    scatter_plot_svg, THESIS_COLORS,
+    scatter_plot_svg, THESIS_COLORS, correlation_heatmap_svg,
+    COLORS,
 )
 
 
@@ -188,6 +189,7 @@ def page_shell(title: str, body: str, active_nav: str = "",
         ("market", "/market", "Market"),
         ("insights", "/insights", "Insights"),
         ("sectors", "/sectors", "Sectors"),
+        ("quant", "/quant", "Quant"),
         ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
         ("watchlist", "/watchlist?tokens=bitcoin,ethereum,solana,cardano,avalanche", "Watchlist"),
     ]
@@ -292,7 +294,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
 <div class="stat stat-hero"><div class="stat-l">24h Volume</div><div class="stat-v">{fmt_usd(b.get("total_vol"))}</div></div>
 <div class="stat"><div class="stat-l">Breadth</div><div class="stat-v"><span class="up">{up}</span> / <span class="dn">{down}</span></div>
 <div class="breadth-bar"><div class="breadth-fill" style="width:{breadth_pct:.0f}%"></div></div></div>
-<div class="stat"><div class="stat-l">Avg MVRV</div><div class="stat-v">{f"{avg_mvrv:.2f}" if avg_mvrv else "&mdash;"} <span class="zone {zone_css}">{zone_label}</span></div></div>
+<div class="stat"><div class="stat-l">Avg MVRV</div><div class="stat-v">{f"{avg_mvrv:.2f}" if avg_mvrv is not None else "&mdash;"} <span class="zone {zone_css}">{zone_label}</span></div></div>
 <div class="stat"><div class="stat-l">Sentiment</div><div class="stat-v"><span class="score {score_cls}">{composite}</span> {score_label}</div></div>
 </div>""")
 
@@ -333,11 +335,12 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
 
     # Market composite scores
     momentum_sc = min(100, max(0, int((breadth_pct - 30) / 40 * 100))) if total_bd > 0 else 50
-    value_sc = min(100, max(0, int((3.5 - (avg_mvrv or 1.5)) / 3.0 * 100))) if avg_mvrv is not None else 50
+    value_sc = min(100, max(0, int((3.5 - avg_mvrv) / 3.0 * 100))) if avg_mvrv is not None else 50
     risk_sc = min(100, max(0, int(vol_conc))) if vol_conc > 0 else 50
     health_daa = b.get("total_daa") or 0
     health_dev = b.get("total_dev") or 0
-    health_sc = min(100, max(0, 50 + (1 if health_daa > 100000 else -10) + (1 if health_dev > 1000 else -10) + int(breadth_pct - 50)))
+    # Health: base 50, +15 for strong DAA, +15 for strong dev, breadth contribution
+    health_sc = min(100, max(0, 50 + (15 if health_daa > 100000 else (-10 if health_daa < 10000 else 0)) + (15 if health_dev > 1000 else (-10 if health_dev < 100 else 0)) + int((breadth_pct - 50) * 0.4)))
 
     def _score_color(v, inverted=False):
         if inverted:
@@ -579,13 +582,15 @@ def _market_overview_table(tokens, start, sort_by, order, view, sector, tier, pa
 
 def _market_valuation_table(tokens, sector, zone_filter, view):
     rows = ""
+    rank = 0
     for i, t in enumerate(tokens[:200]):
         mvrv = t.get("mvrv_usd")
         if mvrv is None:
             continue
+        rank += 1
         slug = t.get("slug", "")
         zl, zc, _ = mvrv_zone(mvrv)
-        rows += f'<tr><td class="col-rk">{i+1}</td><td class="col-nm"><a href="/token/{slug}"><strong>{_esc(t.get("name", slug)[:20])}</strong><span class="tk">{_esc(t.get("ticker",""))}</span></a></td><td class="col-r bold">{fmt_usd(t.get("price_usd"))}</td><td class="col-r bold">{mvrv:.2f}</td><td><span class="zone {zc}">{zl}</span></td><td class="hide-m" style="min-width:80px"><div class="mini-bar"><div class="mini-bar-fill" style="width:{min(100, mvrv/4*100):.0f}%"></div></div></td></tr>'
+        rows += f'<tr><td class="col-rk">{rank}</td><td class="col-nm"><a href="/token/{slug}"><strong>{_esc(t.get("name", slug)[:20])}</strong><span class="tk">{_esc(t.get("ticker",""))}</span></a></td><td class="col-r bold">{fmt_usd(t.get("price_usd"))}</td><td class="col-r bold">{mvrv:.2f}</td><td><span class="zone {zc}">{zl}</span></td><td class="hide-m" style="min-width:80px"><div class="mini-bar"><div class="mini-bar-fill" style="width:{min(100, mvrv/4*100):.0f}%"></div></div></td></tr>'
 
     return f'''<div class="tbl-w"><table>
 <thead><tr><th class="col-rk">#</th><th>Name</th><th class="col-r">Price</th><th class="col-r">MVRV</th><th>Zone</th><th class="hide-m">Bar</th></tr></thead>
@@ -944,9 +949,18 @@ def _derived_metrics_panel(derived: dict) -> str:
         elif key == "mvrv_zscore":
             if val >= 2: return ' style="color:var(--red)"'
             if val <= -1: return ' style="color:var(--green)"'
-        elif key == "sharpe_ratio":
+        elif key in ("sharpe_ratio", "sortino_90d", "calmar_90d"):
             if val >= 1: return ' style="color:var(--green)"'
             if val <= 0: return ' style="color:var(--red)"'
+        elif key == "metcalfe_ratio":
+            if val >= 50: return ' style="color:var(--green)"'  # undervalued for usage
+            if val <= 5: return ' style="color:var(--red)"'     # overvalued for usage
+        elif key in ("mvrv_zscore_1y", "nvt_zscore_1y"):
+            if val >= 2: return ' style="color:var(--red)"'     # stretched high
+            if val <= -1: return ' style="color:var(--green)"'  # stretched low (buy)
+        elif key == "velocity":
+            if val >= 0.3: return ' style="color:var(--amber)"'  # speculation
+            if val <= 0.02: return ' style="color:var(--blue)"'  # HODLing
         return ""
 
     items = []
@@ -954,8 +968,12 @@ def _derived_metrics_panel(derived: dict) -> str:
         ("momentum_score", "Momentum", "/100"), ("value_score", "Value", "/100"),
         ("risk_score", "Risk", "/100"), ("health_score", "Health", "/100"),
         ("rsi", "RSI (14d)", ""), ("mvrv_zscore", "MVRV Z-Score", ""),
-        ("sharpe_ratio", "Sharpe Ratio", ""), ("volatility", "Volatility", "%"),
-        ("max_drawdown", "Max Drawdown", "%"), ("beta_vs_btc", "Beta vs BTC", ""),
+        ("sharpe_ratio", "Sharpe (90d)", ""), ("sortino_90d", "Sortino (90d)", ""),
+        ("calmar_90d", "Calmar (90d)", ""),
+        ("volatility", "Volatility", "%"), ("max_drawdown", "Max Drawdown", "%"),
+        ("beta_vs_btc", "Beta vs BTC", ""),
+        ("metcalfe_ratio", "Metcalfe Ratio", ""), ("velocity", "Velocity", ""),
+        ("mvrv_zscore_1y", "MVRV Z (1Y)", ""), ("nvt_zscore_1y", "NVT Z (1Y)", ""),
         ("nvt_signal", "NVT Signal", ""), ("net_exchange_flow_7d", "Net Exch Flow 7d", ""),
     ]
     for key, label, suffix in metric_labels:
@@ -1427,3 +1445,123 @@ def render_glossary_page() -> str:
 {sections}"""
 
     return page_shell("Glossary", body)
+
+
+def render_quant_page(
+    corr_matrix: dict = None,
+    corr_labels: dict = None,
+    sector_rotation: list = None,
+    mean_reversion: list = None,
+    risk_adjusted: list = None,
+) -> str:
+    """Quantitative analytics page — correlation matrix, sector rotation, mean reversion scanner."""
+    p = []
+    p.append('<h1 class="pg-t">Quantitative Analytics</h1>')
+    p.append('<p class="pg-sub">Cross-asset correlations, sector rotation, mean reversion signals</p>')
+
+    # ── Correlation Matrix ──
+    if corr_matrix and len(corr_matrix) >= 2:
+        heatmap = correlation_heatmap_svg(corr_matrix, labels=corr_labels)
+        p.append(f'''<div class="card">
+<div class="card-hd"><span class="card-t">90-Day Return Correlation Matrix</span></div>
+<div class="chart-w">{heatmap}</div>
+<div style="font-size:.72rem;color:var(--tx2);margin-top:6px">
+Red = high correlation (contagion risk). Green = low/negative correlation (diversification).
+Pairs above 0.7 move together — no diversification benefit. Pairs below -0.1 provide genuine hedging.
+</div></div>''')
+
+    # ── Sector Rotation ──
+    if sector_rotation:
+        sec_rows = ""
+        for s in sector_rotation:
+            avg24 = s.get("avg_24h")
+            avg7 = s.get("avg_7d")
+            avg30 = s.get("avg_30d")
+            blended = s.get("blended_momentum")
+            sec_rows += f'<tr><td class="col-rk">{s["momentum_rank"]}</td>'
+            sec_rows += f'<td class="col-nm"><strong>{_esc(s["sector"])}</strong> <span class="tk">{s["count"]} tokens</span></td>'
+            sec_rows += f'<td class="col-r {pct_class(avg24)}">{fmt_pct(avg24)}</td>'
+            sec_rows += f'<td class="col-r {pct_class(avg7)}">{fmt_pct(avg7)}</td>'
+            sec_rows += f'<td class="col-r {pct_class(avg30)}">{fmt_pct(avg30)}</td>'
+            sec_rows += f'<td class="col-r bold {pct_class(blended)}">{fmt_pct(blended)}</td></tr>'
+
+        p.append(f'''<div class="card">
+<div class="card-hd"><span class="card-t">Sector Rotation</span></div>
+<div style="font-size:.72rem;color:var(--tx2);margin-bottom:6px">
+Ranked by blended momentum (50% 30d + 30% 7d + 20% 24h). Leading sectors attract capital first. Lagging sectors in bull markets often catch up.
+</div>
+<div class="tbl-w"><table>
+<thead><tr><th class="col-rk">#</th><th>Sector</th><th class="col-r">24h</th><th class="col-r">7d</th><th class="col-r">30d</th><th class="col-r">Score</th></tr></thead>
+<tbody>{sec_rows}</tbody>
+</table></div></div>''')
+
+    # ── Mean Reversion Scanner ──
+    if mean_reversion:
+        mr_rows = ""
+        for t in mean_reversion:
+            slug = t.get("slug", "")
+            mvrv_z = t.get("mvrv_zscore_1y")
+            nvt_z = t.get("nvt_zscore_1y")
+            signal = t.get("signal", "")
+            signal_cls = "up" if "undervalued" in signal.lower() else "dn" if "overvalued" in signal.lower() else ""
+
+            def _z_style(z):
+                if z is None: return "", "&mdash;"
+                cls = "up" if z <= -1 else "dn" if z >= 2 else ""
+                return cls, f"{z:+.2f}"
+
+            mz_cls, mz_str = _z_style(mvrv_z)
+            nz_cls, nz_str = _z_style(nvt_z)
+
+            mr_rows += f'<tr><td class="col-nm"><a href="/token/{slug}"><strong>{_esc(t.get("name", slug)[:20])}</strong><span class="tk">{_esc(t.get("ticker", ""))}</span></a></td>'
+            mr_rows += f'<td class="col-r {mz_cls}">{mz_str}</td>'
+            mr_rows += f'<td class="col-r {nz_cls}">{nz_str}</td>'
+            mr_rows += f'<td class="col-r bold">{fmt_usd(t.get("price_usd"))}</td>'
+            mr_rows += f'<td class="{signal_cls}">{_esc(signal)}</td></tr>'
+
+        p.append(f'''<div class="card">
+<div class="card-hd"><span class="card-t">Mean Reversion Scanner</span></div>
+<div style="font-size:.72rem;color:var(--tx2);margin-bottom:6px">
+Tokens with MVRV or NVT z-scores beyond \u00b12\u03c3 from their 1-year mean. Historically, extreme z-scores revert to the mean within 30\u201390 days.
+</div>
+<div class="tbl-w"><table>
+<thead><tr><th>Token</th><th class="col-r">MVRV Z</th><th class="col-r">NVT Z</th><th class="col-r">Price</th><th>Signal</th></tr></thead>
+<tbody>{mr_rows if mr_rows else '<tr><td colspan="5" class="empty">No extreme z-scores detected.</td></tr>'}</tbody>
+</table></div></div>''')
+
+    # ── Risk-Adjusted Rankings ──
+    if risk_adjusted:
+        ra_rows = ""
+        for i, t in enumerate(risk_adjusted[:30]):
+            slug = t.get("slug", "")
+            sortino = t.get("sortino_90d")
+            calmar = t.get("calmar_90d")
+            sharpe = t.get("sharpe_90d")
+            metcalfe = t.get("metcalfe_ratio")
+
+            def _rat_fmt(v):
+                if v is None: return "&mdash;"
+                cls = "up" if v >= 1 else "dn" if v <= 0 else ""
+                return f'<span class="{cls}">{v:.2f}</span>'
+
+            ra_rows += f'<tr><td class="col-rk">{i+1}</td>'
+            ra_rows += f'<td class="col-nm"><a href="/token/{slug}"><strong>{_esc(t.get("name", slug)[:20])}</strong><span class="tk">{_esc(t.get("ticker", ""))}</span></a></td>'
+            ra_rows += f'<td class="col-r">{_rat_fmt(sortino)}</td>'
+            ra_rows += f'<td class="col-r">{_rat_fmt(calmar)}</td>'
+            ra_rows += f'<td class="col-r">{_rat_fmt(sharpe)}</td>'
+            ra_rows += f'<td class="col-r">{f"{metcalfe:.1f}" if metcalfe else "&mdash;"}</td>'
+            ra_rows += f'<td class="col-r bold">{fmt_usd(t.get("price_usd"))}</td></tr>'
+
+        p.append(f'''<div class="card">
+<div class="card-hd"><span class="card-t">Risk-Adjusted Rankings</span></div>
+<div style="font-size:.72rem;color:var(--tx2);margin-bottom:6px">
+Ranked by Sortino ratio (90d). Sortino penalises only downside volatility — a Sortino above 1.0 means returns compensate for downside risk.
+Calmar = return/max drawdown. Metcalfe = DAA\u00b2/MCap (higher = undervalued for usage).
+</div>
+<div class="tbl-w"><table>
+<thead><tr><th class="col-rk">#</th><th>Token</th><th class="col-r">Sortino</th><th class="col-r">Calmar</th><th class="col-r">Sharpe</th><th class="col-r">Metcalfe</th><th class="col-r">Price</th></tr></thead>
+<tbody>{ra_rows}</tbody>
+</table></div></div>''')
+
+    body = "\n".join(p)
+    return page_shell("Quant", body, active_page="quant")

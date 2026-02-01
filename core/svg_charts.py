@@ -244,10 +244,10 @@ def sparkline_svg(
 
     # Downsample if too many points
     if len(values) > 20:
+        orig_last = values[-1]
         step = len(values) / 20
         values = [values[min(int(i * step), len(values) - 1)] for i in range(20)]
-        if values[-1] != data[-1].get("value"):
-            values[-1] = [d.get("value") for d in data if d.get("value") is not None][-1]
+        values[-1] = orig_last  # Always preserve the actual last value
 
     min_v = min(values)
     max_v = max(values)
@@ -410,13 +410,13 @@ def line_chart_svg(
         # Downsample dense data — keep SVG output small for fast rendering
         max_points = 60
         if len(data) > max_points:
+            orig_last = data[-1]
             step = len(data) / max_points
             sampled = []
             for j in range(max_points):
                 idx = int(j * step)
                 sampled.append(data[min(idx, len(data) - 1)])
-            if sampled[-1] is not data[-1]:
-                sampled[-1] = data[-1]
+            sampled[-1] = orig_last  # Always preserve the actual last value
             data = sampled
 
         n = len(data)
@@ -675,15 +675,17 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
         row_mcap = sum(t.get("marketcap_usd") or 0 for t in row_tokens) or 1
         x = 0
 
+        n_row = len(row_tokens)
+        min_w = width / max(n_row, 1) * 0.3  # Proportional min, never overflows
         for t in row_tokens:
             mcap = t.get("marketcap_usd") or 0
-            w = max(30, (mcap / row_mcap) * width)
-            pct = t.get("price_usd_change") or 0
+            w = max(min_w, (mcap / row_mcap) * width)
+            pct = t.get("price_usd_change")
             bg = _heatmap_color(pct)
             fg = _heatmap_text_color(pct)
             slug = t.get("slug", "")
             ticker = html_mod.escape(t.get("ticker", "")[:6])
-            pct_str = f"{pct:+.1f}%" if pct else "0%"
+            pct_str = f"{pct:+.1f}%" if pct is not None and pct != 0 else "\u2014" if pct is None else "0%"
 
             elements.append(
                 f'<a href="/token/{slug}">'
@@ -706,7 +708,7 @@ def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
                     f'opacity="0.9" font-family={FONT_LABEL}>{pct_str}</text>'
                 )
             elements.append('</a>')
-            x += w
+            x = min(x + w, width)  # Clamp to prevent overflow
 
         idx = row_end
 
@@ -983,3 +985,99 @@ def scatter_plot_svg(
     return "\n".join(elements)
 
 
+# ============================================================
+# CORRELATION HEATMAP — NxN matrix with color coding
+# ============================================================
+
+def correlation_heatmap_svg(
+    matrix: dict[str, dict[str, float]],
+    labels: dict[str, str] = None,
+    width: int = 600,
+) -> str:
+    """Render an NxN correlation matrix as a color-coded SVG heatmap.
+    matrix: {slug_a: {slug_b: correlation, ...}, ...}
+    labels: {slug: display_label}
+    """
+    slugs = list(matrix.keys())
+    n = len(slugs)
+    if n < 2:
+        return '<div class="chart-empty">Need at least 2 assets for correlation matrix</div>'
+
+    labels = labels or {}
+    cell_size = min(40, max(18, (width - 80) // n))
+    label_pad = 60
+    total_w = label_pad + cell_size * n + 20
+    height = label_pad + cell_size * n + 20
+
+    elements = [
+        f'<svg width="100%" viewBox="0 0 {total_w} {height}" '
+        f'preserveAspectRatio="xMidYMid meet" class="chart-svg">'
+    ]
+
+    def _corr_color(v):
+        if v >= 0.7:
+            return "#c92a2a"
+        if v >= 0.4:
+            return "#ffc9c9"
+        if v >= -0.1:
+            return "#e9ecef"
+        if v >= -0.4:
+            return "#b2f2bb"
+        return "#2b8a3e"
+
+    def _corr_text(v):
+        if v >= 0.7 or v <= -0.4:
+            return "#ffffff"
+        return "#495057"
+
+    # Column labels (rotated)
+    for j, slug in enumerate(slugs):
+        lbl = html_mod.escape(labels.get(slug, slug[:5].upper()))
+        x = label_pad + j * cell_size + cell_size / 2
+        elements.append(
+            f'<text x="{x:.1f}" y="{label_pad - 6}" text-anchor="end" '
+            f'font-size="8" fill="{LABEL_COLOR}" font-family={FONT_DATA} '
+            f'transform="rotate(-45,{x:.1f},{label_pad - 6})">{lbl}</text>'
+        )
+
+    for i, slug_a in enumerate(slugs):
+        lbl = html_mod.escape(labels.get(slug_a, slug_a[:5].upper()))
+        y = label_pad + i * cell_size + cell_size / 2
+        elements.append(
+            f'<text x="{label_pad - 4}" y="{y + 3:.1f}" text-anchor="end" '
+            f'font-size="8" fill="{LABEL_COLOR}" font-family={FONT_DATA}>{lbl}</text>'
+        )
+
+        for j, slug_b in enumerate(slugs):
+            corr = matrix.get(slug_a, {}).get(slug_b, 0)
+            cx = label_pad + j * cell_size
+            cy = label_pad + i * cell_size
+            bg = _corr_color(corr)
+            fg = _corr_text(corr)
+
+            elements.append(
+                f'<rect x="{cx:.1f}" y="{cy:.1f}" width="{cell_size}" height="{cell_size}" '
+                f'fill="{bg}" rx="1"/>'
+            )
+            if cell_size >= 22:
+                elements.append(
+                    f'<text x="{cx + cell_size/2:.1f}" y="{cy + cell_size/2 + 3:.1f}" '
+                    f'text-anchor="middle" font-size="7" font-weight="600" fill="{fg}" '
+                    f'font-family={FONT_DATA}>{corr:.2f}</text>'
+                )
+
+    # Legend
+    leg_y = height - 6
+    leg_items = [("#2b8a3e", "\u22640.4"), ("#b2f2bb", "\u22640.1"), ("#e9ecef", "~0"),
+                 ("#ffc9c9", "\u22650.4"), ("#c92a2a", "\u22650.7")]
+    leg_x = label_pad
+    for color, lbl in leg_items:
+        elements.append(f'<rect x="{leg_x}" y="{leg_y - 6}" width="10" height="10" rx="1" fill="{color}"/>')
+        elements.append(
+            f'<text x="{leg_x + 13}" y="{leg_y + 2}" font-size="7" fill="{LABEL_COLOR}" '
+            f'font-family={FONT_DATA}>{lbl}</text>'
+        )
+        leg_x += 42
+
+    elements.append('</svg>')
+    return "\n".join(elements)
