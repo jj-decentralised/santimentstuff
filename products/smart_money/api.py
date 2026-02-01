@@ -150,17 +150,21 @@ async def _santiment_background_pull():
         }
         logger.info(f"Santiment Phase 2 complete. {universe_stats.get('total_points', 0)} points. Cache: {_san_cache.get_pull_stats()}")
 
-        # Refresh latest_values summary table + re-warm caches
+        # Warm-swap: pre-build new cache then atomically swap
         try:
-            logger.info("Refreshing latest_values + re-warming caches after Phase 2...")
+            logger.info("Refreshing latest_values + warm-swapping caches after Phase 2...")
             _san_cache.refresh_all_latest_values(KEY_METRICS)
+            import time as _time
+            new_cache = {}
+            new_all = _build_bulk_token_data(KEY_METRICS, max_tokens=500)
+            new_cache["all_tokens"] = (_time.time(), new_all)
+            new_cache["summary_tokens"] = (_time.time(), _build_bulk_token_data(SUMMARY_METRICS, max_tokens=200))
             _result_cache.clear()
-            _get_all_tokens()
-            _get_summary_tokens()
+            _result_cache.update(new_cache)
             _build_economy_briefing()
-            logger.info("Phase 2 cache re-warm complete")
+            logger.info("Phase 2 warm-swap complete")
         except Exception as warm_err:
-            logger.warning(f"Phase 2 cache re-warm failed (non-fatal): {warm_err}")
+            logger.warning(f"Phase 2 warm-swap failed (non-fatal): {warm_err}")
 
     except Exception as e:
         import traceback
@@ -202,7 +206,15 @@ async def _santiment_background_pull():
             _san_pull_status["status"] = "refreshing"
             await _san_puller.daily_refresh()
             _san_cache.refresh_all_latest_values(KEY_METRICS)
+            # Warm-swap: pre-build then atomically replace
+            import time as _time
+            new_cache = {}
+            new_all = _build_bulk_token_data(KEY_METRICS, max_tokens=500)
+            new_cache["all_tokens"] = (_time.time(), new_all)
+            new_cache["summary_tokens"] = (_time.time(), _build_bulk_token_data(SUMMARY_METRICS, max_tokens=200))
             _result_cache.clear()
+            _result_cache.update(new_cache)
+            _build_economy_briefing()
             _san_pull_status = {
                 "status": "ready",
                 "last_pull": datetime.now(timezone.utc).isoformat(),
@@ -1133,14 +1145,15 @@ def _build_all_tokens_for_valuation():
     return [t for t in tokens if t.get("mvrv_usd") is not None and t.get("price_usd") is not None]
 
 
-def _build_profile_metrics(slug: str):
+def _build_profile_metrics(slug: str, limit_days: int = 365):
     """Build full metrics for a token profile — cached per slug for 15 min."""
-    return _cached(f"profile_{slug}", lambda: _build_profile_metrics_uncached(slug))
+    cache_key = f"profile_{slug}_{limit_days}"
+    return _cached(cache_key, lambda: _build_profile_metrics_uncached(slug, limit_days))
 
 
-def _build_profile_metrics_uncached(slug: str):
-    # Single batch query for all metrics instead of 60+ serial queries
-    batch = _san_cache.get_timeseries_batch(ALL_PROFILE_METRICS, slug)
+def _build_profile_metrics_uncached(slug: str, limit_days: int = 365):
+    # Single batch query for all metrics — limit_days reduces 142K→21K rows
+    batch = _san_cache.get_timeseries_batch(ALL_PROFILE_METRICS, slug, limit_days=limit_days)
     metrics_data = {}
     for metric, data in batch.items():
         if data:
@@ -1912,11 +1925,13 @@ def create_app() -> FastAPI:
         if not project:
             project = {"name": slug.replace("-", " ").title(), "ticker": slug.upper()[:5]}
 
-        metrics = _build_profile_metrics(slug)
+        # Fetch slightly more than displayed so derived metrics have lookback data
+        tf_limit = {"7d": 60, "30d": 90, "90d": 180, "1y": 400, "all": 0}.get(tf, 0)
+        metrics = _build_profile_metrics(slug, limit_days=tf_limit)
         if not metrics:
             return HTMLResponse(f"<html><body><h1>No data for {slug}</h1><p>Data may still be loading.</p><a href='/'>Back</a></body></html>")
 
-        # Trim timeseries to requested timeframe
+        # Trim timeseries to requested timeframe for display
         tf_days = {"7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": 0}.get(tf, 0)
         if tf_days > 0:
             for key, mdata in metrics.items():

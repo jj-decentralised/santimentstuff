@@ -8,10 +8,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from .svg_charts import (
-    sparkline_svg, line_chart_svg, chart_panel, comparison_table,
-    market_heatmap_svg, dominance_bar_svg, donut_chart_svg,
-    sentiment_gauge_svg, mini_trend_svg,
-    scatter_plot_svg, bar_chart_svg, radar_chart_svg, THESIS_COLORS,
+    sparkline_svg, line_chart_svg, comparison_table,
+    market_heatmap_svg, dominance_bar_svg,
+    scatter_plot_svg, THESIS_COLORS,
 )
 
 
@@ -145,14 +144,14 @@ THESIS_LABELS = {
 }
 
 THESIS_DESCRIPTIONS = {
-    "smart_money": "Exchange balance declining while price is flat — accumulation signal",
-    "builder_momentum": "Strong dev activity growth with network expansion",
-    "deep_value": "MVRV below 0.7 with active network — historically strong buying zone",
-    "distribution_warning": "Exchange balance rising + elevated MVRV — distribution risk",
-    "hodler": "Low velocity with moderate MVRV — long-term holder base",
-    "high_utility": "High DAA relative to market cap — genuine network usage",
-    "speculative": "High volume/mcap with low active addresses — speculation dominated",
-    "uncategorized": "No clear on-chain signal pattern",
+    "smart_money": "Exchange accumulation detected. Historically bullish. Consider building position over 5\u20137 days.",
+    "builder_momentum": "Active builder momentum. Favor for 3\u20136 month holds \u2014 dev activity leads price.",
+    "deep_value": "Deep value opportunity. High conviction DCA zone. Average in over 2\u20134 weeks.",
+    "distribution_warning": "Distribution risk. Take profits or tighten stop-losses. Reduce exposure.",
+    "hodler": "Strong holder base with low velocity. Suitable for long-term positions.",
+    "high_utility": "Genuine network usage outpacing speculation. Favor for medium-term holds.",
+    "speculative": "Speculation-driven. Short-term momentum only \u2014 use tight stops.",
+    "uncategorized": "No clear on-chain signal. Wait for thesis to develop before entering.",
 }
 
 
@@ -197,22 +196,18 @@ def page_shell(title: str, body: str, active_nav: str = "",
         for key, href, label in nav_items
     )
 
-    effective_theme = theme if theme != "auto" else _current_theme
-    # Dark-first: only add class="light" when explicitly light
-    html_class = ' class="light"' if effective_theme == 'light' else ''
-    is_light = effective_theme == 'light'
     refresh = f'<meta http-equiv="refresh" content="{auto_refresh}">' if auto_refresh > 0 else ''
     canon = f'<link rel="canonical" href="{_esc(canonical)}">' if canonical else ''
 
     return f"""<!DOCTYPE html>
-<html lang="en"{html_class}>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{_esc(title)} — Onchain Pulse</title>
 {refresh}
 <meta name="description" content="{_esc(og_description) if og_description else 'On-chain crypto analytics dashboard. MVRV, active addresses, exchange flows, dev activity — powered by Santiment.'}">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230d1117'/><text x='16' y='22' text-anchor='middle' fill='%233fb950' font-family='sans-serif' font-weight='900' font-size='18'>P</text></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23212529'/><text x='16' y='22' text-anchor='middle' fill='%23ffffff' font-family='sans-serif' font-weight='900' font-size='18'>P</text></svg>">
 <link rel="stylesheet" href="/static/css/dashboard.css">
 {canon}
 </head>
@@ -224,7 +219,6 @@ def page_shell(title: str, body: str, active_nav: str = "",
 <div class="hd-r">
 <form action="/market" method="get" class="hd-search"><input type="text" name="q" placeholder="Search..." autocomplete="off"></form>
 {_freshness_badge()}
-{f'<a href="?theme=dark" class="theme-btn">&#9790;</a>' if is_light else f'<a href="?theme=light" class="theme-btn">&#9788;</a>'}
 </div>
 </div></header>
 <main class="main wrap" id="m">{body}</main>
@@ -302,21 +296,76 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
 <div class="stat"><div class="stat-l">Sentiment</div><div class="stat-v"><span class="score {score_cls}">{composite}</span> {score_label}</div></div>
 </div>""")
 
-    # Narrative
+    # Prescriptive narrative
     narr = []
-    if breadth_pct >= 60:
-        narr.append(f"Broad strength — {breadth_pct:.0f}% of tokens up")
-    elif breadth_pct <= 40:
-        narr.append(f"Broad weakness — only {breadth_pct:.0f}% of tokens up")
+    if breadth_pct >= 65:
+        narr.append(f"Broad strength ({breadth_pct:.0f}% up) \u2014 momentum strategies favored. Consider increasing positions on tokens with positive exchange outflow")
+    elif breadth_pct >= 55:
+        narr.append(f"Moderate breadth ({breadth_pct:.0f}% up) \u2014 selective buying. Focus on tokens with improving fundamentals")
+    elif breadth_pct <= 35:
+        narr.append(f"Broad weakness ({breadth_pct:.0f}% up) \u2014 capital preservation. Accumulate Deep Value selectively")
+    elif breadth_pct <= 45:
+        narr.append(f"Cautious breadth ({breadth_pct:.0f}% up) \u2014 reduce risk. Favor tokens with strong holder bases")
     if vol_conc > 70:
-        narr.append(f"Volume concentrated in top 10 ({vol_conc:.0f}%)")
+        narr.append(f"Volume concentrated in top 10 ({vol_conc:.0f}%) \u2014 capital is selective. Focus on large-caps with improving on-chain fundamentals")
     if avg_mvrv is not None:
-        if avg_mvrv < 1.0:
-            narr.append("Aggregate MVRV below 1.0 — undervaluation signal")
+        if avg_mvrv < 0.8:
+            narr.append(f"MVRV at {avg_mvrv:.2f} (deep undervaluation). High conviction accumulation zone. DCA into quality assets")
+        elif avg_mvrv < 1.0:
+            narr.append(f"MVRV at {avg_mvrv:.2f} (undervalued). Favor value plays. Rotate from speculative to fundamentally strong tokens")
+        elif avg_mvrv > 3.0:
+            narr.append(f"MVRV at {avg_mvrv:.2f} (euphoria). Take profits aggressively. Rotate into stables or hedge positions")
         elif avg_mvrv > 2.5:
-            narr.append("Elevated MVRV — potential overheating")
+            narr.append(f"MVRV at {avg_mvrv:.2f} (overheating). Tighten stop-losses. Rotate from Euphoria-zone to Deep Value tokens")
+
+    # Regime guidance
+    if regime == "Bullish":
+        narr.append("Regime: Bullish \u2014 favor momentum plays and Smart Money thesis tokens")
+    elif regime == "Bearish":
+        narr.append("Regime: Bearish \u2014 capital preservation. Accumulate Deep Value selectively")
+    elif regime == "Cautiously Bullish":
+        narr.append("Regime: Cautiously bullish \u2014 selective exposure. Favor tokens with improving on-chain activity")
+    elif regime == "Cautiously Bearish":
+        narr.append("Regime: Cautiously bearish \u2014 reduce position sizes. Focus on quality with low MVRV")
+
     if narr:
         p.append(f'<div class="narrative">{". ".join(narr)}.</div>')
+
+    # Market composite scores
+    momentum_sc = min(100, max(0, int((breadth_pct - 30) / 40 * 100))) if total_bd > 0 else 50
+    value_sc = min(100, max(0, int((3.5 - (avg_mvrv or 1.5)) / 3.0 * 100))) if avg_mvrv is not None else 50
+    risk_sc = min(100, max(0, int(vol_conc))) if vol_conc > 0 else 50
+    health_daa = b.get("total_daa") or 0
+    health_dev = b.get("total_dev") or 0
+    health_sc = min(100, max(0, 50 + (1 if health_daa > 100000 else -10) + (1 if health_dev > 1000 else -10) + int(breadth_pct - 50)))
+
+    def _score_color(v, inverted=False):
+        if inverted:
+            if v >= 65: return "var(--red)"
+            if v <= 35: return "var(--green)"
+        else:
+            if v >= 65: return "var(--green)"
+            if v <= 35: return "var(--red)"
+        return "var(--amber)"
+
+    def _score_guide(name, v):
+        if name == "Momentum":
+            return "Strong \u2014 favor trend-following" if v >= 65 else "Weak \u2014 wait for confirmation" if v <= 35 else "Neutral \u2014 selective entries"
+        if name == "Value":
+            return "Undervalued \u2014 accumulation opportunities" if v >= 65 else "Overvalued \u2014 tighten stops" if v <= 35 else "Fair \u2014 focus on quality"
+        if name == "Risk":
+            return "Elevated \u2014 reduce size, tighten stops" if v >= 65 else "Low \u2014 confidence in sizing" if v <= 35 else "Moderate \u2014 standard sizing"
+        if name == "Health":
+            return "Strong fundamentals \u2014 conviction buy setups" if v >= 65 else "Weak fundamentals \u2014 be cautious" if v <= 35 else "Mixed \u2014 selective"
+        return ""
+
+    scores_html = ""
+    for sname, sval, inv in [("Momentum", momentum_sc, False), ("Value", value_sc, False), ("Risk", risk_sc, True), ("Health", health_sc, False)]:
+        sc = _score_color(sval, inv)
+        guide = _score_guide(sname, sval)
+        scores_html += f'<div class="stat"><div class="stat-l">{sname}</div><div class="stat-v" style="color:{sc};font-size:1.2rem">{sval}</div><div style="font-size:.68rem;color:var(--tx2)">{guide}</div></div>'
+
+    p.append(f'<div class="card"><div class="card-hd"><span class="card-t">Market Scores</span></div><div class="stats">{scores_html}</div></div>')
 
     # ── Charts row (2 columns) ──
     trends = b.get("trends", {})
@@ -330,7 +379,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         btc_data = [d for d in btc_price if d.get("value") is not None]
         if btc_data:
             btc_series = [{"data": btc_data, "label": "BTC/USD"}]
-            btc_svg = line_chart_svg(btc_series, title="", width=480, height=200, show_area=True)
+            btc_svg = line_chart_svg(btc_series, title="", width=600, height=200, show_area=True)
             charts_left = f'<div class="card"><div class="card-hd"><span class="card-t">BTC Price (90d)</span></div><div class="chart-w">{btc_svg}</div></div>'
 
     # Market heatmap (right)
@@ -339,7 +388,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         charts_right = f'<div class="card"><div class="card-hd"><span class="card-t">Market Heatmap</span></div><div class="chart-w">{market_heatmap_svg(heatmap_tokens, max_tokens=40)}</div></div>'
 
     if charts_left or charts_right:
-        p.append(f'<div class="chart-grid">{charts_left}{charts_right}</div>')
+        p.append(f'<div class="grid-2">{charts_left}{charts_right}</div>')
 
     # ── Dominance bar + MVRV zones (2 columns) ──
     dom_html = ""
@@ -347,7 +396,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
 
     # Dominance bar
     if all_tokens and len(all_tokens) >= 5:
-        dom_html = f'<div class="card"><div class="card-hd"><span class="card-t">Market Dominance</span></div><div class="chart-w">{dominance_bar_svg(all_tokens[:20], width=480, height=80)}</div></div>'
+        dom_html = f'<div class="card"><div class="card-hd"><span class="card-t">Market Dominance</span></div><div class="chart-w">{dominance_bar_svg(all_tokens[:20], width=600, height=80)}</div></div>'
 
     # MVRV zone distribution
     zones = b.get("mvrv_zones", {})
@@ -365,7 +414,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         zone_html = f'<div class="card"><div class="card-hd"><span class="card-t">MVRV Zones</span></div><div class="hist">{zone_bars}</div></div>'
 
     if dom_html or zone_html:
-        p.append(f'<div class="chart-grid">{dom_html}{zone_html}</div>')
+        p.append(f'<div class="grid-2">{dom_html}{zone_html}</div>')
 
     # ── Signals + Movers (2 columns) ──
     signals_html = ""
@@ -393,7 +442,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         movers_html = f'<div class="card"><div class="card-hd"><span class="card-t">Movers</span></div><div class="movers"><div><div class="stat-l" style="margin-bottom:4px">Gainers</div>{_mover_rows(gainers)}</div><div><div class="stat-l" style="margin-bottom:4px">Losers</div>{_mover_rows(losers)}</div></div></div>'
 
     if signals_html or movers_html:
-        p.append(f'<div class="chart-grid">{signals_html}{movers_html}</div>')
+        p.append(f'<div class="grid-2">{signals_html}{movers_html}</div>')
 
     # ── Sector performance table ──
     sector_data = b.get("sector_data", {})
@@ -703,7 +752,7 @@ def render_insights_page(insights: dict, view_id: str = "mvrv_nvt",
     if current_view:
         _, chart_title, x_metric, y_metric, x_label, y_label, log_x, log_y = current_view
         chart_svg = scatter_plot_svg(
-            insights["points"], width=700, height=380,
+            insights["points"], width=600, height=380,
             title=chart_title, x_key="x", y_key="y",
             x_label=x_label, y_label=y_label,
             color_key="thesis", size_key="marketcap_usd",
@@ -718,7 +767,17 @@ def render_insights_page(insights: dict, view_id: str = "mvrv_nvt",
             color = THESIS_COLORS.get(key, "#9CA3AF")
             label = THESIS_LABELS.get(key, key)
             legend += f'<span style="margin-right:10px"><span class="sig-dot" style="background:{color}"></span>{_esc(label)} ({cnt})</span>'
-        p.append(f'<div class="card"><div class="card-hd"><span class="card-t">{_esc(chart_title)}</span></div><div class="chart-w">{chart_svg}</div><div style="font-size:.72rem;color:var(--tx2);margin-top:4px">{legend}</div></div>')
+        # Interpretation guide per view
+        INSIGHT_GUIDES = {
+            "mvrv_nvt": "Bottom-left = undervalued + high usage (best risk/reward). Top-right = overvalued + low usage (avoid). Green dots = Smart Money accumulation.",
+            "daa_mcap": "Above diagonal = overvalued for usage level. Below = value opportunity if usage trending up.",
+            "exch_price": "Bottom-right quadrant (price up, exchange down) = smart money buying. Build positions over 5\u20137 days.",
+            "dev_growth": "Top-right = strong builders with growing network. Favor for 3\u20136 month holds.",
+            "vol_mcap": "High vol/mcap + low DAA = speculation. Low vol/mcap + high DAA = genuine utility.",
+        }
+        guide = INSIGHT_GUIDES.get(view_id, "")
+        guide_html = f'<div class="narrative" style="font-size:.75rem;margin-top:6px">{_esc(guide)}</div>' if guide else ""
+        p.append(f'<div class="card"><div class="card-hd"><span class="card-t">{_esc(chart_title)}</span></div><div class="chart-w">{chart_svg}</div><div style="font-size:.72rem;color:var(--tx2);margin-top:4px">{legend}</div>{guide_html}</div>')
 
     # Thesis categories
     thesis_tokens = insights.get("thesis_tokens", {})
@@ -870,27 +929,66 @@ def render_screener_page(tokens: list, tier: str = "all",
 def _derived_metrics_panel(derived: dict) -> str:
     if not derived:
         return ""
+
+    def _score_style(key, val):
+        """Color-code composite scores: green=good, red=bad."""
+        if key in ("momentum_score", "value_score", "health_score"):
+            if val >= 65: return ' style="color:var(--green)"'
+            if val <= 35: return ' style="color:var(--red)"'
+        elif key == "risk_score":
+            if val >= 65: return ' style="color:var(--red)"'
+            if val <= 35: return ' style="color:var(--green)"'
+        elif key == "rsi":
+            if val >= 70: return ' style="color:var(--red)"'
+            if val <= 30: return ' style="color:var(--green)"'
+        elif key == "mvrv_zscore":
+            if val >= 2: return ' style="color:var(--red)"'
+            if val <= -1: return ' style="color:var(--green)"'
+        elif key == "sharpe_ratio":
+            if val >= 1: return ' style="color:var(--green)"'
+            if val <= 0: return ' style="color:var(--red)"'
+        return ""
+
     items = []
     metric_labels = [
-        ("volatility", "Volatility", "%"), ("sharpe_ratio", "Sharpe Ratio", ""),
-        ("max_drawdown", "Max Drawdown", "%"), ("rsi", "RSI (14d)", ""),
-        ("beta_vs_btc", "Beta vs BTC", ""), ("mvrv_zscore", "MVRV Z-Score", ""),
-        ("nvt_signal", "NVT Signal", ""), ("net_exchange_flow_7d", "Net Exch Flow 7d", ""),
         ("momentum_score", "Momentum", "/100"), ("value_score", "Value", "/100"),
         ("risk_score", "Risk", "/100"), ("health_score", "Health", "/100"),
+        ("rsi", "RSI (14d)", ""), ("mvrv_zscore", "MVRV Z-Score", ""),
+        ("sharpe_ratio", "Sharpe Ratio", ""), ("volatility", "Volatility", "%"),
+        ("max_drawdown", "Max Drawdown", "%"), ("beta_vs_btc", "Beta vs BTC", ""),
+        ("nvt_signal", "NVT Signal", ""), ("net_exchange_flow_7d", "Net Exch Flow 7d", ""),
     ]
     for key, label, suffix in metric_labels:
         val = derived.get(key)
         if val is None:
             continue
+        style = _score_style(key, val) if isinstance(val, (int, float)) else ""
         if isinstance(val, float):
             display = f"{val:.2f}{suffix}"
         else:
             display = f"{val}{suffix}"
-        items.append(f'<div class="derived-item"><div class="derived-label">{label}</div><div class="derived-val">{display}</div></div>')
+        items.append(f'<div class="derived-item"><div class="derived-label">{label}</div><div class="derived-val"{style}>{display}</div></div>')
     if not items:
         return ""
-    return f'<div class="card"><div class="card-hd"><span class="card-t">Derived Metrics</span></div><div class="derived">{"".join(items)}</div></div>'
+
+    # Build one-line thesis summary from composite scores
+    summary_parts = []
+    mom = derived.get("momentum_score")
+    val = derived.get("value_score")
+    risk = derived.get("risk_score")
+    health = derived.get("health_score")
+    if mom is not None:
+        summary_parts.append("strong momentum" if mom >= 65 else "weak momentum" if mom <= 35 else "neutral momentum")
+    if val is not None:
+        summary_parts.append("undervalued" if val >= 65 else "overvalued" if val <= 35 else "fair value")
+    if risk is not None:
+        summary_parts.append("high risk" if risk >= 65 else "low risk" if risk <= 35 else "moderate risk")
+    if health is not None:
+        summary_parts.append("strong fundamentals" if health >= 65 else "weak fundamentals" if health <= 35 else "mixed fundamentals")
+    summary = ", ".join(summary_parts).capitalize() + "." if summary_parts else ""
+    summary_html = f'<div style="font-size:.75rem;color:var(--tx2);margin-top:6px;border-top:1px solid var(--border);padding-top:6px">{summary}</div>' if summary else ""
+
+    return f'<div class="card"><div class="card-hd"><span class="card-t">Derived Metrics</span></div><div class="derived">{"".join(items)}</div>{summary_html}</div>'
 
 
 def render_token_profile(token: dict, metrics: dict, slug: str = "",
@@ -973,29 +1071,32 @@ def render_token_profile(token: dict, metrics: dict, slug: str = "",
         from .svg_charts import COLORS
         chart = line_chart_svg(
             [{"label": f"{name} Price", "data": price_data, "color": COLORS[0]}],
-            width=700, height=250, title="Price", metric_key="price_usd",
+            width=600, height=250, title="Price", metric_key="price_usd",
             show_area=True, show_min_max=True,
         )
         p.append(f'<div class="card"><div class="chart-w">{chart}</div></div>')
 
-    # Secondary charts — only render if data exists
+    # Secondary charts — 2-column grid
     chart_defs = [
-        ("mvrv_usd", "MVRV Ratio", "#f85149"),
-        ("daily_active_addresses", "Active Addresses", "#39d2c0"),
-        ("volume_usd", "Volume", "#d29922"),
-        ("dev_activity", "Dev Activity", "#bc8cff"),
-        ("exchange_balance", "Exchange Balance", "#f0883e"),
-        ("network_growth", "Network Growth", "#56d364"),
+        ("mvrv_usd", "MVRV Ratio", "#c92a2a"),
+        ("daily_active_addresses", "Active Addresses", "#0c8599"),
+        ("volume_usd", "Volume", "#e67700"),
+        ("dev_activity", "Dev Activity", "#7048e8"),
+        ("exchange_balance", "Exchange Balance", "#d9480f"),
+        ("network_growth", "Network Growth", "#2b8a3e"),
     ]
+    secondary_charts = []
     for metric_key, title, color in chart_defs:
         data = _data(metric_key)
         if data and len(data) >= 5:
             chart = line_chart_svg(
                 [{"label": title, "data": data, "color": color}],
-                width=700, height=180, title=title, metric_key=metric_key,
+                width=600, height=180, title=title, metric_key=metric_key,
                 show_area=False, show_min_max=False,
             )
-            p.append(f'<div class="card"><div class="chart-w">{chart}</div></div>')
+            secondary_charts.append(f'<div class="card"><div class="chart-w">{chart}</div></div>')
+    if secondary_charts:
+        p.append(f'<div class="grid-2">{"".join(secondary_charts)}</div>')
 
     # Derived metrics
     derived = metrics.get("_derived", {})
@@ -1061,7 +1162,7 @@ def render_compare_page(tokens: list) -> str:
             if data:
                 series.append({"label": t.get("name", t.get("slug", "")), "data": data, "color": COLORS[i % len(COLORS)]})
         if series:
-            svg = line_chart_svg(series, width=700, height=220, title=title, metric_key=metric_key,
+            svg = line_chart_svg(series, width=600, height=220, title=title, metric_key=metric_key,
                                  show_area=show_area and len(series) == 1, show_min_max=False)
             charts += f'<div class="card"><div class="chart-w">{svg}</div></div>'
 
