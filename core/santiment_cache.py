@@ -43,11 +43,47 @@ class SantimentCache:
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
 
     def _connect(self):
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA cache_size=10000")
-        self._conn.row_factory = sqlite3.Row
+        """Connect to SQLite with corruption recovery.
+        If the DB file is corrupted (disk I/O error), rename it aside and start fresh.
+        """
+        try:
+            self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA cache_size=10000")
+            self._conn.row_factory = sqlite3.Row
+        except sqlite3.OperationalError as e:
+            if "disk I/O error" in str(e) or "database disk image is malformed" in str(e):
+                logger.error(f"SQLite DB corrupted ({e}). Removing and starting fresh.")
+                try:
+                    if self._conn:
+                        self._conn.close()
+                except Exception:
+                    pass
+                # Remove corrupt DB and WAL/SHM files
+                for suffix in ("", "-wal", "-shm"):
+                    p = self._db_path + suffix
+                    if os.path.exists(p):
+                        try:
+                            backup = p + ".corrupt"
+                            os.rename(p, backup)
+                            logger.info(f"Renamed {p} -> {backup}")
+                        except Exception as rename_err:
+                            logger.warning(f"Could not rename {p}: {rename_err}")
+                            try:
+                                os.remove(p)
+                            except Exception:
+                                pass
+                # Retry with fresh DB
+                self._ensure_dir()
+                self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute("PRAGMA synchronous=NORMAL")
+                self._conn.execute("PRAGMA cache_size=10000")
+                self._conn.row_factory = sqlite3.Row
+                logger.info("Fresh SQLite DB created successfully.")
+            else:
+                raise
 
     def _create_tables(self):
         self._conn.executescript("""

@@ -240,11 +240,18 @@ async def lifespan(app: FastAPI):
     if san_api_key:
         logger.info("Santiment API key found, initializing...")
         mem_cache = CacheManager()
-        _san_cache = SantimentCache()
-        _san_client = SantimentClient(api_key=san_api_key, cache=mem_cache)
-        await _san_client.__aenter__()
-        _san_puller = SantimentDataPuller(_san_client, _san_cache)
-        san_task = asyncio.create_task(_santiment_background_pull())
+        try:
+            _san_cache = SantimentCache()
+        except Exception as cache_err:
+            logger.error(f"SantimentCache init failed: {cache_err}. App will start without cached data.")
+            _san_cache = None
+        if _san_cache:
+            _san_client = SantimentClient(api_key=san_api_key, cache=mem_cache)
+            await _san_client.__aenter__()
+            _san_puller = SantimentDataPuller(_san_client, _san_cache)
+            san_task = asyncio.create_task(_santiment_background_pull())
+        else:
+            logger.warning("Running without SantimentCache — data features degraded")
     else:
         logger.warning("SANTIMENT_API_KEY not set, Santiment features disabled")
 
