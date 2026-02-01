@@ -641,6 +641,12 @@ def _cached(key: str, builder, ttl: int = _CACHE_TTL):
 def _build_bulk_token_data(metrics_list: list[str], max_tokens: int = 0) -> list[dict]:
     """One SQL query per metric instead of per token×metric.
     max_tokens: if > 0, only return the top N tokens by market cap (speed optimization).
+
+    Market cap handling:
+      - Project metadata mcap (from allProjects query) is used as the authoritative
+        source for sorting/ranking.  Santiment's timeseries marketcap_usd is unreliable
+        for many tokens (meme coins, chain-specific variants inherit parent mcap, etc.).
+      - Timeseries marketcap_usd is still used for computing 24h % change.
     """
     if not _san_cache:
         return []
@@ -653,6 +659,8 @@ def _build_bulk_token_data(metrics_list: list[str], max_tokens: int = 0) -> list
         name = project.get("name", slug)
         infra = project.get("infrastructure", "")
         sector, category = _classify_sector_category(slug, infra, name)
+        # Use project metadata marketcap as authoritative source
+        proj_mcap = project.get("marketcap_usd")
         slug_map[slug] = {
             "slug": slug,
             "name": name,
@@ -660,6 +668,8 @@ def _build_bulk_token_data(metrics_list: list[str], max_tokens: int = 0) -> list
             "infrastructure": infra,
             "sector": sector,
             "category": category,
+            "marketcap_usd": proj_mcap,
+            "_proj_mcap": proj_mcap,  # Keep reference for validation
         }
     for metric in metrics_list:
         bulk = _san_cache.get_latest_values(metric)
@@ -668,11 +678,28 @@ def _build_bulk_token_data(metrics_list: list[str], max_tokens: int = 0) -> list
                 continue
             latest = vals.get("latest")
             prev = vals.get("prev")
-            slug_map[slug][metric] = latest
-            if latest is not None and prev is not None and prev != 0:
-                slug_map[slug][f"{metric}_change"] = round((latest - prev) / prev * 100, 2)
+            if metric == "marketcap_usd":
+                # For mcap: prefer project metadata, use timeseries only for % change
+                proj_mcap = slug_map[slug].get("_proj_mcap")
+                if proj_mcap and proj_mcap > 0:
+                    slug_map[slug]["marketcap_usd"] = proj_mcap
+                elif latest is not None:
+                    # No project mcap — fall back to timeseries but cap at $5T
+                    slug_map[slug]["marketcap_usd"] = min(latest, 5e12)
+                # Compute % change from timeseries (prev→latest)
+                if latest is not None and prev is not None and prev != 0:
+                    slug_map[slug]["marketcap_usd_change"] = round((latest - prev) / prev * 100, 2)
+                else:
+                    slug_map[slug]["marketcap_usd_change"] = 0 if latest is not None else None
             else:
-                slug_map[slug][f"{metric}_change"] = 0 if latest is not None else None
+                slug_map[slug][metric] = latest
+                if latest is not None and prev is not None and prev != 0:
+                    slug_map[slug][f"{metric}_change"] = round((latest - prev) / prev * 100, 2)
+                else:
+                    slug_map[slug][f"{metric}_change"] = 0 if latest is not None else None
+    # Clean up internal field
+    for entry in slug_map.values():
+        entry.pop("_proj_mcap", None)
     tokens = [t for t in slug_map.values() if t.get("price_usd") is not None]
     tokens.sort(key=lambda x: x.get("marketcap_usd") or 0, reverse=True)
     if max_tokens > 0:
@@ -1210,7 +1237,12 @@ def _build_profile_metrics_uncached(slug: str, limit_days: int = 365):
     vol_vals = _vals("volume_usd")
     volume_change = _pct_change(vol_vals, 1) if vol_vals else None
 
+    # Prefer project metadata mcap (more reliable than timeseries for many tokens)
     mcap = _latest("marketcap_usd")
+    if _san_cache:
+        proj = _san_cache.get_project(slug)
+        if proj and proj.get("marketcap_usd"):
+            mcap = proj["marketcap_usd"]
     daa = _latest("daily_active_addresses")
     vol_mcap = ((_latest("volume_usd") or 0) / mcap) if mcap and mcap > 0 else None
 
