@@ -185,16 +185,12 @@ def page_shell(title: str, body: str, active_nav: str = "",
                theme: str = "auto", og_description: str = "",
                canonical: str = "") -> str:
     nav_items = [
-        ("briefing", "/", "Briefing"),
-        ("explore", "/explore", "Explore"),
-        ("sectors", "/sectors", "Sectors"),
-        ("screener", "/screener", "Screener"),
+        ("dashboard", "/", "Dashboard"),
+        ("market", "/market", "Market"),
         ("insights", "/insights", "Insights"),
-        ("valuation", "/valuation", "Valuation"),
-        ("developers", "/developers", "Dev"),
+        ("sectors", "/sectors", "Sectors"),
         ("compare", "/compare?tokens=bitcoin,ethereum,solana", "Compare"),
         ("watchlist", "/watchlist?tokens=bitcoin,ethereum,solana,cardano,avalanche", "Watchlist"),
-        ("sync", "/sync", "Sync"),
     ]
     nav_html = "".join(
         f'<a href="{href}" class="{"active" if key == active_nav else ""}">{label}</a>'
@@ -226,13 +222,13 @@ def page_shell(title: str, body: str, active_nav: str = "",
 <a href="/" class="logo">Onchain<span>Pulse</span></a>
 <nav class="hd-nav">{nav_html}</nav>
 <div class="hd-r">
-<form action="/explore" method="get" class="hd-search"><input type="text" name="q" placeholder="Search..." autocomplete="off"></form>
+<form action="/market" method="get" class="hd-search"><input type="text" name="q" placeholder="Search..." autocomplete="off"></form>
 {_freshness_badge()}
 {f'<a href="?theme=dark" class="theme-btn">&#9790;</a>' if is_light else f'<a href="?theme=light" class="theme-btn">&#9788;</a>'}
 </div>
 </div></header>
 <main class="main wrap" id="m">{body}</main>
-<footer class="ft">Data via <a href="https://santiment.net">Santiment</a> &middot; 100% Server-Rendered &middot; {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC</footer>
+<footer class="ft">Data via <a href="https://santiment.net">Santiment</a> &middot; <a href="/sync">Sync</a> &middot; <a href="/glossary">Glossary</a> &middot; <a href="/api">API</a> &middot; {datetime.utcnow().strftime("%Y-%m-%d %H:%M")} UTC</footer>
 </body>
 </html>"""
 
@@ -243,7 +239,7 @@ def page_shell(title: str, body: str, active_nav: str = "",
 
 def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, universe_size: int, sectors: dict = None) -> str:
     if not briefing:
-        return page_shell("Briefing", '<div class="empty"><h2>Building your briefing...</h2><p>Data is being pulled from Santiment. <a href="/sync">View sync progress</a></p></div>', active_nav="briefing")
+        return page_shell("Dashboard", '<div class="empty"><h2>Building your dashboard...</h2><p>Data is being pulled from Santiment. <a href="/sync">View sync progress</a></p></div>', active_nav="dashboard")
 
     b = briefing
     p = []
@@ -291,14 +287,16 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     zone_label, zone_css, zone_desc = mvrv_zone(avg_mvrv)
 
     now_str = datetime.utcnow().strftime("%b %d, %Y")
+
+    # ── Hero stats row ──
     p.append(f"""
-<h1 class="pg-t">Daily Economy Briefing</h1>
+<h1 class="pg-t">Dashboard</h1>
 <p class="pg-sub">{now_str} &middot; {b.get("total_tokens", 0)} tokens &middot; <span class="{regime_cls} bold">{regime}</span></p>
 
 <div class="stats">
-<div class="stat"><div class="stat-l">Market Cap</div><div class="stat-v">{fmt_usd(b.get("total_mcap"))}</div></div>
-<div class="stat"><div class="stat-l">24h Volume</div><div class="stat-v">{fmt_usd(b.get("total_vol"))}</div></div>
-<div class="stat"><div class="stat-l">Breadth</div><div class="stat-v"><span class="up">{up}</span>/<span class="dn">{down}</span></div>
+<div class="stat stat-hero"><div class="stat-l">Total Market Cap</div><div class="stat-v">{fmt_usd(b.get("total_mcap"))}</div></div>
+<div class="stat stat-hero"><div class="stat-l">24h Volume</div><div class="stat-v">{fmt_usd(b.get("total_vol"))}</div></div>
+<div class="stat"><div class="stat-l">Breadth</div><div class="stat-v"><span class="up">{up}</span> / <span class="dn">{down}</span></div>
 <div class="breadth-bar"><div class="breadth-fill" style="width:{breadth_pct:.0f}%"></div></div></div>
 <div class="stat"><div class="stat-l">Avg MVRV</div><div class="stat-v">{f"{avg_mvrv:.2f}" if avg_mvrv else "&mdash;"} <span class="zone {zone_css}">{zone_label}</span></div></div>
 <div class="stat"><div class="stat-l">Sentiment</div><div class="stat-v"><span class="score {score_cls}">{composite}</span> {score_label}</div></div>
@@ -307,9 +305,9 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     # Narrative
     narr = []
     if breadth_pct >= 60:
-        narr.append(f"Broad strength — {breadth_pct:.0f}% up")
+        narr.append(f"Broad strength — {breadth_pct:.0f}% of tokens up")
     elif breadth_pct <= 40:
-        narr.append(f"Broad weakness — {breadth_pct:.0f}% up")
+        narr.append(f"Broad weakness — only {breadth_pct:.0f}% of tokens up")
     if vol_conc > 70:
         narr.append(f"Volume concentrated in top 10 ({vol_conc:.0f}%)")
     if avg_mvrv is not None:
@@ -320,12 +318,43 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
     if narr:
         p.append(f'<div class="narrative">{". ".join(narr)}.</div>')
 
+    # ── Charts row (2 columns) ──
+    trends = b.get("trends", {})
+    all_tokens = b.get("all_tokens", [])
+    charts_left = ""
+    charts_right = ""
+
+    # BTC price chart (left)
+    btc_price = trends.get("btc_price", [])
+    if btc_price and len(btc_price) >= 5:
+        btc_data = [d for d in btc_price if d.get("value") is not None]
+        if btc_data:
+            btc_series = [{"data": btc_data, "label": "BTC/USD"}]
+            btc_svg = line_chart_svg(btc_series, title="", width=480, height=200, show_area=True)
+            charts_left = f'<div class="card"><div class="card-hd"><span class="card-t">BTC Price (90d)</span></div><div class="chart-w">{btc_svg}</div></div>'
+
+    # Market heatmap (right)
+    if all_tokens and len(all_tokens) >= 10:
+        heatmap_tokens = all_tokens[:40]
+        charts_right = f'<div class="card"><div class="card-hd"><span class="card-t">Market Heatmap</span></div><div class="chart-w">{market_heatmap_svg(heatmap_tokens, max_tokens=40)}</div></div>'
+
+    if charts_left or charts_right:
+        p.append(f'<div class="chart-grid">{charts_left}{charts_right}</div>')
+
+    # ── Dominance bar + MVRV zones (2 columns) ──
+    dom_html = ""
+    zone_html = ""
+
+    # Dominance bar
+    if all_tokens and len(all_tokens) >= 5:
+        dom_html = f'<div class="card"><div class="card-hd"><span class="card-t">Market Dominance</span></div><div class="chart-w">{dominance_bar_svg(all_tokens[:20], width=480, height=80)}</div></div>'
+
     # MVRV zone distribution
     zones = b.get("mvrv_zones", {})
     zone_total = b.get("mvrv_total", 0) or 1
-    zone_defs = [("Deep Value", "deep_value", "#16a34a"), ("Undervalued", "undervalued", "#059669"),
-                 ("Fair", "fair", "#d97706"), ("Elevated", "elevated", "#ea580c"),
-                 ("Overvalued", "overvalued", "#dc2626"), ("Euphoria", "euphoria", "#991b1b")]
+    zone_defs = [("Deep Value", "deep_value", "#48bb78"), ("Undervalued", "undervalued", "#38a169"),
+                 ("Fair", "fair", "#ecc94b"), ("Elevated", "elevated", "#ed8936"),
+                 ("Overvalued", "overvalued", "#fc8181"), ("Euphoria", "euphoria", "#e53e3e")]
     zone_bars = ""
     for label, key, color in zone_defs:
         cnt = zones.get(key, 0)
@@ -333,9 +362,40 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
         if cnt > 0:
             zone_bars += f'<div class="hist-col"><div class="hist-bar" style="height:{max(2, pct*0.8):.0f}px;background:{color}"></div><div class="hist-ct">{cnt}</div><div class="hist-lb">{label}</div></div>'
     if zone_bars:
-        p.append(f'<div class="card"><div class="card-hd"><span class="card-t">MVRV Zones</span></div><div class="hist">{zone_bars}</div></div>')
+        zone_html = f'<div class="card"><div class="card-hd"><span class="card-t">MVRV Zones</span></div><div class="hist">{zone_bars}</div></div>'
 
-    # Sector performance
+    if dom_html or zone_html:
+        p.append(f'<div class="chart-grid">{dom_html}{zone_html}</div>')
+
+    # ── Signals + Movers (2 columns) ──
+    signals_html = ""
+    movers_html = ""
+
+    # On-chain signals
+    signals = b.get("signals", [])
+    if signals:
+        sig_rows = ""
+        for s in signals[:8]:
+            ch = s.get("change", 0)
+            cls = "up" if "spike" in s.get("signal", "") or "accumulation" in s.get("signal", "") or "surge" in s.get("signal", "") else "dn"
+            sig_rows += f'<tr><td><a href="/token/{s.get("slug","")}">{_esc(s.get("name","")[:16])}</a></td><td>{_esc(s.get("metric",""))}</td><td class="{cls}">{fmt_pct(ch)}</td></tr>'
+        signals_html = f'<div class="card"><div class="card-hd"><span class="card-t">On-Chain Signals</span></div><div class="tbl-w"><table><thead><tr><th>Token</th><th>Metric</th><th class="col-r">Change</th></tr></thead><tbody>{sig_rows}</tbody></table></div></div>'
+
+    # Gainers / Losers
+    gainers = b.get("gainers", [])[:6]
+    losers = b.get("losers", [])[:6]
+    if gainers or losers:
+        def _mover_rows(tokens):
+            return "".join(
+                f'<a href="/token/{t.get("slug","")}" class="mover-chip"><span>{_esc(t.get("ticker",""))}</span><span class="{pct_class(t.get("price_usd_change"))}">{fmt_pct(t.get("price_usd_change"))}</span></a>'
+                for t in tokens
+            )
+        movers_html = f'<div class="card"><div class="card-hd"><span class="card-t">Movers</span></div><div class="movers"><div><div class="stat-l" style="margin-bottom:4px">Gainers</div>{_mover_rows(gainers)}</div><div><div class="stat-l" style="margin-bottom:4px">Losers</div>{_mover_rows(losers)}</div></div></div>'
+
+    if signals_html or movers_html:
+        p.append(f'<div class="chart-grid">{signals_html}{movers_html}</div>')
+
+    # ── Sector performance table ──
     sector_data = b.get("sector_data", {})
     if sector_data:
         sec_rows = ""
@@ -346,28 +406,7 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
             sec_rows += f'<tr><td><a href="/sector/{sec_key}" class="sec-tag">{_esc(sec_label)}</a></td><td class="col-r">{data.get("count",0)}</td><td class="col-r">{fmt_usd(data.get("mcap"))}</td><td class="col-r {pct_class(avg_ch)}">{fmt_pct(avg_ch)}</td></tr>'
         p.append(f'<div class="card"><div class="card-hd"><span class="card-t">Sectors</span><a href="/sectors" class="export-btn">View all</a></div><div class="tbl-w"><table><thead><tr><th>Sector</th><th class="col-r">Tokens</th><th class="col-r">MCap</th><th class="col-r">Avg 24h</th></tr></thead><tbody>{sec_rows}</tbody></table></div></div>')
 
-    # On-chain signals
-    signals = b.get("signals", [])
-    if signals:
-        sig_rows = ""
-        for s in signals[:10]:
-            ch = s.get("change", 0)
-            cls = "up" if "spike" in s.get("signal", "") or "accumulation" in s.get("signal", "") or "surge" in s.get("signal", "") else "dn"
-            sig_rows += f'<tr><td><a href="/token/{s.get("slug","")}">{_esc(s.get("name",""))}</a></td><td>{_esc(s.get("metric",""))}</td><td class="{cls}">{fmt_pct(ch)}</td></tr>'
-        p.append(f'<div class="card"><div class="card-hd"><span class="card-t">On-Chain Signals</span></div><div class="tbl-w"><table><thead><tr><th>Token</th><th>Metric</th><th class="col-r">Change</th></tr></thead><tbody>{sig_rows}</tbody></table></div></div>')
-
-    # Gainers / Losers
-    gainers = b.get("gainers", [])[:8]
-    losers = b.get("losers", [])[:8]
-    if gainers or losers:
-        def _mover_rows(tokens):
-            return "".join(
-                f'<a href="/token/{t.get("slug","")}" class="mover-chip"><span>{_esc(t.get("ticker",""))}</span><span class="{pct_class(t.get("price_usd_change"))}">{fmt_pct(t.get("price_usd_change"))}</span></a>'
-                for t in tokens
-            )
-        p.append(f'<div class="card"><div class="card-hd"><span class="card-t">Movers</span></div><div class="movers"><div><div class="stat-l" style="margin-bottom:4px">Gainers</div>{_mover_rows(gainers)}</div><div><div class="stat-l" style="margin-bottom:4px">Losers</div>{_mover_rows(losers)}</div></div></div>')
-
-    # Network health
+    # ── Network health ──
     p.append(f"""
 <div class="card"><div class="card-hd"><span class="card-t">Network Health</span></div>
 <div class="stats">
@@ -377,16 +416,16 @@ def render_briefing_page(briefing: dict, pull_status: str, cache_stats: dict, un
 <div class="stat"><div class="stat-l">Distributing</div><div class="stat-v dn">{b.get("distributing", 0)}</div></div>
 </div></div>""")
 
-    # Quick nav
+    # ── Quick nav ──
     p.append("""
 <div class="stats">
-<a href="/explore" class="stat"><div class="stat-l">Explore</div><div class="stat-v" style="font-size:.78rem">Full token table</div></a>
-<a href="/screener" class="stat"><div class="stat-l">Screener</div><div class="stat-v" style="font-size:.78rem">Filter &amp; sort</div></a>
-<a href="/valuation" class="stat"><div class="stat-l">Valuation</div><div class="stat-v" style="font-size:.78rem">MVRV zones</div></a>
+<a href="/market" class="stat"><div class="stat-l">Market</div><div class="stat-v" style="font-size:.78rem">Full token table</div></a>
+<a href="/market?view=screener" class="stat"><div class="stat-l">Screener</div><div class="stat-v" style="font-size:.78rem">Filter &amp; sort</div></a>
+<a href="/market?view=valuation" class="stat"><div class="stat-l">Valuation</div><div class="stat-v" style="font-size:.78rem">MVRV zones</div></a>
 <a href="/insights" class="stat"><div class="stat-l">Insights</div><div class="stat-v" style="font-size:.78rem">Scatter plots</div></a>
 </div>""")
 
-    return page_shell("Briefing", "\n".join(p), active_nav="briefing")
+    return page_shell("Dashboard", "\n".join(p), active_nav="dashboard")
 
 
 # ================================================================
@@ -458,6 +497,166 @@ def render_explore_page(tokens: list, page: int = 1, per_page: int = 100,
 <a href="/explore/csv?sector={sector}{search_qs}" class="export-btn">Export CSV</a>"""
 
     return page_shell("Explore", body, active_nav="explore")
+
+
+# ================================================================
+# MARKET PAGE — Unified market view
+# ================================================================
+
+def _market_overview_table(tokens, start, sort_by, order, view, sector, tier, page):
+    sec_qs = f"&sector={sector}" if sector != "all" else ""
+    tier_qs = f"&tier={tier}" if tier != "all" else ""
+
+    def sort_link(col, label):
+        new_order = "asc" if sort_by == col and order == "desc" else "desc"
+        arrow = " &darr;" if sort_by == col and order == "desc" else " &uarr;" if sort_by == col else ""
+        return f'<a href="/market?view={view}&sort={col}&order={new_order}{sec_qs}{tier_qs}&page={page}" class="sort-link">{label}{arrow}</a>'
+
+    rows = ""
+    for i, t in enumerate(tokens):
+        slug = t.get("slug", "")
+        pct = t.get("price_usd_change")
+        mvrv = t.get("mvrv_usd")
+        zone_html = f'<span class="zone {mvrv_zone(mvrv)[1]}">{mvrv_zone(mvrv)[0]}</span>' if mvrv else "&mdash;"
+        spark = t.get("sparkline_7d", [])
+        spark_html = sparkline_svg(spark, width=60, height=18) if spark and len(spark) >= 2 else ""
+        rows += f'<tr><td class="col-rk">{start + i + 1}</td><td class="col-nm"><a href="/token/{slug}"><strong>{_esc(t.get("name", slug)[:20])}</strong><span class="tk">{_esc(t.get("ticker", ""))}</span></a></td><td class="col-r bold">{fmt_usd(t.get("price_usd"))}</td><td class="col-r {pct_class(pct)}">{fmt_pct(pct)}</td><td class="hide-m">{spark_html}</td><td class="col-r hide-m">{fmt_usd(t.get("marketcap_usd"))}</td><td class="col-r hide-m">{fmt_usd(t.get("volume_usd"))}</td><td class="col-r hide-m">{f"{mvrv:.2f}" if mvrv else "&mdash;"}</td><td class="hide-m">{zone_html}</td></tr>'
+
+    return f'''<div class="tbl-w"><table>
+<thead><tr><th class="col-rk">#</th><th>Name</th><th class="col-r">{sort_link("price_usd", "Price")}</th><th class="col-r">{sort_link("price_usd_change", "24h")}</th><th class="hide-m">7d</th><th class="col-r hide-m">{sort_link("marketcap_usd", "MCap")}</th><th class="col-r hide-m">{sort_link("volume_usd", "Vol")}</th><th class="col-r hide-m">{sort_link("mvrv_usd", "MVRV")}</th><th class="hide-m">Zone</th></tr></thead>
+<tbody>{rows if rows else '<tr><td colspan="9" class="empty">No tokens found.</td></tr>'}</tbody>
+</table></div>'''
+
+
+def _market_valuation_table(tokens, sector, zone_filter, view):
+    rows = ""
+    for i, t in enumerate(tokens[:200]):
+        mvrv = t.get("mvrv_usd")
+        if mvrv is None:
+            continue
+        slug = t.get("slug", "")
+        zl, zc, _ = mvrv_zone(mvrv)
+        rows += f'<tr><td class="col-rk">{i+1}</td><td class="col-nm"><a href="/token/{slug}"><strong>{_esc(t.get("name", slug)[:20])}</strong><span class="tk">{_esc(t.get("ticker",""))}</span></a></td><td class="col-r bold">{fmt_usd(t.get("price_usd"))}</td><td class="col-r bold">{mvrv:.2f}</td><td><span class="zone {zc}">{zl}</span></td><td class="hide-m" style="min-width:80px"><div class="mini-bar"><div class="mini-bar-fill" style="width:{min(100, mvrv/4*100):.0f}%"></div></div></td></tr>'
+
+    return f'''<div class="tbl-w"><table>
+<thead><tr><th class="col-rk">#</th><th>Name</th><th class="col-r">Price</th><th class="col-r">MVRV</th><th>Zone</th><th class="hide-m">Bar</th></tr></thead>
+<tbody>{rows if rows else '<tr><td colspan="6" class="empty">No MVRV data.</td></tr>'}</tbody>
+</table></div>'''
+
+
+def _market_developers_table(tokens):
+    max_dev = max((t.get("dev_activity") or 0 for t in tokens), default=1) or 1
+    rows = ""
+    for i, t in enumerate(tokens[:100]):
+        dev = t.get("dev_activity") or 0
+        dev_ch = t.get("dev_activity_change")
+        slug = t.get("slug", "")
+        rows += f'<tr><td class="col-rk">{i+1}</td><td class="col-nm"><a href="/token/{slug}"><strong>{_esc(t.get("name",slug)[:20])}</strong><span class="tk">{_esc(t.get("ticker",""))}</span></a></td><td class="col-r bold">{dev:,.0f}</td><td class="col-r {pct_class(dev_ch)} hide-m">{fmt_pct(dev_ch)}</td><td class="hide-m" style="min-width:80px"><div class="mini-bar"><div class="mini-bar-fill" style="width:{min(100, dev/max_dev*100):.0f}%"></div></div></td><td class="col-r hide-m">{fmt_usd(t.get("price_usd"))}</td><td class="col-r hide-m">{fmt_usd(t.get("marketcap_usd"))}</td></tr>'
+
+    return f'''<div class="tbl-w"><table>
+<thead><tr><th class="col-rk">#</th><th>Name</th><th class="col-r">Dev</th><th class="col-r hide-m">Change</th><th class="hide-m">Bar</th><th class="col-r hide-m">Price</th><th class="col-r hide-m">MCap</th></tr></thead>
+<tbody>{rows if rows else '<tr><td colspan="7">No data.</td></tr>'}</tbody>
+</table></div>'''
+
+
+def render_market_page(tokens: list, page: int = 1, per_page: int = 50,
+                       total: int = 0, sector: str = "all",
+                       sectors: dict = None, search: str = "",
+                       sort_by: str = "marketcap_usd", order: str = "desc",
+                       view: str = "overview",
+                       tier: str = "all",
+                       zone_filter: str = "all") -> str:
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    start = (page - 1) * per_page
+
+    # View tabs
+    views = [("overview", "Overview"), ("screener", "Screener"), ("valuation", "Valuation"), ("developers", "Developers")]
+    sec_qs = f"&sector={sector}" if sector != "all" else ""
+    view_tabs = "".join(
+        f'<a href="/market?view={v}{sec_qs}" class="fbtn{" on" if v == view else ""}">{label}</a>'
+        for v, label in views
+    )
+
+    # Sector filter
+    sec_btns = f'<a href="/market?view={view}" class="fbtn{" on" if sector == "all" else ""}">All</a>'
+    for key in ["l1", "l2", "defi", "meme", "ai", "gaming", "exchange", "stablecoin"]:
+        label = (sectors or {}).get(key, key.title())
+        sec_btns += f'<a href="/market?view={view}&sector={key}" class="fbtn{" on" if key == sector else ""}">{_esc(label)}</a>'
+
+    # Search bar
+    search_html = f'''<form class="search-bar" action="/market" method="get">
+<input type="text" name="q" value="{_esc(search)}" placeholder="Search tokens..." autocomplete="off">
+<button type="submit">Search</button>
+<input type="hidden" name="view" value="{_esc(view)}">
+</form>'''
+
+    # Build view-specific content
+    if view == "valuation":
+        table_html = _market_valuation_table(tokens, sector, zone_filter, view)
+    elif view == "developers":
+        table_html = _market_developers_table(tokens)
+    else:
+        table_html = _market_overview_table(tokens, start, sort_by, order, view, sector, tier, page)
+
+    # Tier filter (screener only)
+    tier_html = ""
+    if view == "screener":
+        tiers = [("all", "All"), ("mega", ">$100B"), ("large", "$10B+"), ("mid", "$1B+"), ("small", "$100M+"), ("micro", "<$100M")]
+        tier_btns = "".join(f'<a href="/market?view=screener&tier={key}{sec_qs}" class="fbtn{" on" if key == tier else ""}">{label}</a>' for key, label in tiers)
+        tier_html = f'<div class="fbar"><span class="fbar-l">Tier:</span>{tier_btns}</div>'
+        # Quick filters
+        tier_html += '''<div class="fbar"><span class="fbar-l">Quick:</span>
+<a href="/market?view=screener&sort=mvrv_usd&order=asc" class="fbtn">Undervalued</a>
+<a href="/market?view=screener&sort=price_usd_change&order=desc" class="fbtn">Gainers</a>
+<a href="/market?view=screener&sort=price_usd_change&order=asc" class="fbtn">Losers</a>
+<a href="/market?view=screener&sort=dev_activity&order=desc" class="fbtn">Active Dev</a>
+</div>'''
+
+    # Zone filter (valuation only)
+    zone_html = ""
+    if view == "valuation":
+        zone_defs = [("Deep Value", "deep_value"), ("Undervalued", "undervalued"), ("Fair Value", "fair"),
+                     ("Elevated", "elevated"), ("Overvalued", "overvalued"), ("Euphoria", "euphoria")]
+        zone_btns = f'<a href="/market?view=valuation{sec_qs}" class="fbtn{" on" if zone_filter == "all" else ""}">All</a>'
+        zone_counts = {}
+        for t in tokens:
+            mvrv = t.get("mvrv_usd")
+            if mvrv is not None:
+                z = mvrv_zone(mvrv)
+                zone_counts[z[0]] = zone_counts.get(z[0], 0) + 1
+        for label, key in zone_defs:
+            zone_btns += f'<a href="/market?view=valuation&zone={key}{sec_qs}" class="fbtn{" on" if zone_filter == key else ""}">{label} ({zone_counts.get(label, 0)})</a>'
+        zone_html = f'<div class="fbar"><span class="fbar-l">Zone:</span>{zone_btns}</div>'
+
+    # Pagination
+    pager = ""
+    if view in ("overview", "screener") and total_pages > 1:
+        sort_qs = f"&sort={sort_by}&order={order}"
+        tier_qs = f"&tier={tier}" if tier != "all" else ""
+        pages = []
+        if page > 1:
+            pages.append(f'<a href="/market?view={view}&page={page-1}{sec_qs}{sort_qs}{tier_qs}">&laquo;</a>')
+        for pg in range(max(1, page - 3), min(total_pages + 1, page + 4)):
+            if pg == page:
+                pages.append(f'<span class="cur">{pg}</span>')
+            else:
+                pages.append(f'<a href="/market?view={view}&page={pg}{sec_qs}{sort_qs}{tier_qs}">{pg}</a>')
+        if page < total_pages:
+            pages.append(f'<a href="/market?view={view}&page={page+1}{sec_qs}{sort_qs}{tier_qs}">&raquo;</a>')
+        pager = f'<div class="pager">{"".join(pages)}</div>'
+
+    body = f'''
+<div class="pg-t-row"><div><h1 class="pg-t">Market</h1><p class="pg-sub">{total} tokens{f' matching "{_esc(search)}"' if search else ''}</p></div>
+<a href="/market/csv?view={view}&sector={_esc(sector)}&sort={_esc(sort_by)}&order={_esc(order)}" class="export-btn">Export CSV</a></div>
+{search_html}
+<div class="fbar"><span class="fbar-l">View:</span>{view_tabs}</div>
+<div class="fbar"><span class="fbar-l">Sector:</span>{sec_btns}</div>
+{tier_html}
+{zone_html}
+{table_html}
+{pager}'''
+
+    return page_shell("Market", body, active_nav="market")
 
 
 # ================================================================

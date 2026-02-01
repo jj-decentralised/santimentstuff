@@ -127,10 +127,24 @@ class SantimentCache:
                 PRIMARY KEY (metric, slug)
             );
 
+            -- Materialized latest values — avoids full table scans
+            CREATE TABLE IF NOT EXISTS latest_values (
+                metric TEXT NOT NULL,
+                slug TEXT NOT NULL,
+                interval TEXT DEFAULT '1d',
+                latest_dt TEXT,
+                latest_value REAL,
+                prev_dt TEXT,
+                prev_value REAL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (metric, slug, interval)
+            );
+
             -- Index for fast lookups
             CREATE INDEX IF NOT EXISTS idx_ts_slug ON timeseries(slug, metric);
             CREATE INDEX IF NOT EXISTS idx_ts_metric ON timeseries(metric, slug);
             CREATE INDEX IF NOT EXISTS idx_ts_dt ON timeseries(dt);
+            CREATE INDEX IF NOT EXISTS idx_ts_covering ON timeseries(metric, interval, slug, dt DESC);
             CREATE INDEX IF NOT EXISTS idx_ohlcv_slug ON ohlcv(slug, dt);
             CREATE INDEX IF NOT EXISTS idx_pull_log_metric ON pull_log(metric, slug);
         """)
@@ -193,18 +207,76 @@ class SantimentCache:
         rows = self._conn.execute(query, params).fetchall()
         return [{"datetime": row["dt"], "value": row["value"]} for row in rows]
 
+    def refresh_latest_values(self, metric: str, interval: str = "1d") -> int:
+        """
+        Refresh the latest_values summary table for a given metric.
+        Uses a window function to find the last 2 values per slug,
+        then stores them in the small summary table.
+        Call this after data pulls — NOT on every request.
+        """
+        now = time.time()
+        self._conn.execute(
+            """INSERT OR REPLACE INTO latest_values
+               (metric, slug, interval, latest_dt, latest_value, prev_dt, prev_value, updated_at)
+               SELECT metric, slug, interval,
+                   MAX(CASE WHEN rn = 1 THEN dt END),
+                   MAX(CASE WHEN rn = 1 THEN value END),
+                   MAX(CASE WHEN rn = 2 THEN dt END),
+                   MAX(CASE WHEN rn = 2 THEN value END),
+                   ?
+               FROM (
+                   SELECT metric, slug, interval, dt, value,
+                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY dt DESC) as rn
+                   FROM timeseries
+                   WHERE metric = ? AND interval = ?
+               ) WHERE rn <= 2
+               GROUP BY metric, slug, interval""",
+            (now, metric, interval),
+        )
+        self._conn.commit()
+        count = self._conn.execute(
+            "SELECT COUNT(*) FROM latest_values WHERE metric = ? AND interval = ?",
+            (metric, interval),
+        ).fetchone()[0]
+        return count
+
+    def refresh_all_latest_values(self, metrics: list[str], interval: str = "1d") -> int:
+        """Refresh latest_values for all given metrics. Call after data pulls."""
+        total = 0
+        for metric in metrics:
+            total += self.refresh_latest_values(metric, interval)
+        return total
+
     def get_latest_values(self, metric: str, interval: str = "1d") -> dict:
         """
         Bulk fetch the latest 2 values for ALL slugs for a given metric.
-        Returns {slug: {"latest": val, "prev": val}} — one query instead of N.
+        Reads from the pre-computed latest_values summary table (fast).
+        Falls back to full table scan if summary table is empty.
         """
+        rows = self._conn.execute(
+            """SELECT slug, latest_value, latest_dt, prev_value
+               FROM latest_values
+               WHERE metric = ? AND interval = ?""",
+            (metric, interval),
+        ).fetchall()
+
+        if rows:
+            result = {}
+            for row in rows:
+                result[row["slug"]] = {
+                    "latest": row["latest_value"],
+                    "latest_dt": row["latest_dt"],
+                    "prev": row["prev_value"],
+                }
+            return result
+
+        # Fallback: full scan (only runs if latest_values not yet populated)
         rows = self._conn.execute(
             """SELECT slug, dt, value FROM timeseries
                WHERE metric = ? AND interval = ?
                ORDER BY slug, dt DESC""",
             (metric, interval),
         ).fetchall()
-
         result = {}
         prev_slug = None
         count = 0
@@ -219,7 +291,6 @@ class SantimentCache:
                 result[s]["latest_dt"] = row["dt"]
             elif count == 2:
                 result[s]["prev"] = row["value"]
-            # skip rows beyond 2 per slug
         return result
 
     def get_aggregate_timeseries(
@@ -247,18 +318,24 @@ class SantimentCache:
         metrics: list[str],
         slug: str,
         interval: str = "1d",
+        limit_days: int = 0,
     ) -> dict[str, list[dict]]:
         """Fetch timeseries for multiple metrics for one slug in a single query.
+        limit_days: if > 0, only fetch the last N days of data.
         Returns {metric: [{"datetime": ..., "value": ...}, ...]}."""
         if not metrics:
             return {}
         placeholders = ",".join("?" for _ in metrics)
-        rows = self._conn.execute(
-            f"""SELECT metric, dt, value FROM timeseries
-                WHERE slug = ? AND interval = ? AND metric IN ({placeholders})
-                ORDER BY metric, dt ASC""",
-            [slug, interval] + metrics,
-        ).fetchall()
+        query = f"""SELECT metric, dt, value FROM timeseries
+                WHERE slug = ? AND interval = ? AND metric IN ({placeholders})"""
+        params = [slug, interval] + metrics
+        if limit_days > 0:
+            from datetime import datetime, timedelta
+            cutoff = (datetime.utcnow() - timedelta(days=limit_days)).strftime("%Y-%m-%d")
+            query += " AND dt >= ?"
+            params.append(cutoff)
+        query += " ORDER BY metric, dt ASC"
+        rows = self._conn.execute(query, params).fetchall()
         result: dict[str, list[dict]] = {m: [] for m in metrics}
         for row in rows:
             result[row["metric"]].append({"datetime": row["dt"], "value": row["value"]})

@@ -42,6 +42,7 @@ from core.ssr_renderer import (
     render_watchlist_page,
     render_sectors_page,
     render_developers_page,
+    render_market_page,
     set_ticker_data_fn,
     set_freshness_fn,
     set_theme,
@@ -149,9 +150,10 @@ async def _santiment_background_pull():
         }
         logger.info(f"Santiment Phase 2 complete. {universe_stats.get('total_points', 0)} points. Cache: {_san_cache.get_pull_stats()}")
 
-        # Re-warm caches with full universe data
+        # Refresh latest_values summary table + re-warm caches
         try:
-            logger.info("Re-warming caches after Phase 2...")
+            logger.info("Refreshing latest_values + re-warming caches after Phase 2...")
+            _san_cache.refresh_all_latest_values(KEY_METRICS)
             _result_cache.clear()
             _get_all_tokens()
             _get_summary_tokens()
@@ -199,6 +201,8 @@ async def _santiment_background_pull():
             logger.info("Santiment: Running periodic refresh...")
             _san_pull_status["status"] = "refreshing"
             await _san_puller.daily_refresh()
+            _san_cache.refresh_all_latest_values(KEY_METRICS)
+            _result_cache.clear()
             _san_pull_status = {
                 "status": "ready",
                 "last_pull": datetime.now(timezone.utc).isoformat(),
@@ -591,7 +595,7 @@ SCATTER_VIEWS = [
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
-_CACHE_TTL = 900  # seconds — recompute at most every 15 minutes
+_CACHE_TTL = 14400  # seconds — 4 hours, aligned with data refresh cycle
 
 # In-memory result cache: {key: (timestamp, value)}
 _result_cache: dict = {}
@@ -1363,6 +1367,107 @@ def create_app() -> FastAPI:
         cache_stats = _san_cache.get_pull_stats() if _san_cache else {}
         universe_size = _san_pull_status.get("universe_size", 0)
         return render_briefing_page(briefing, status, cache_stats, universe_size, sectors=SECTORS)
+
+    @app.get("/market", response_class=HTMLResponse)
+    async def get_market_page(
+        page: int = Query(default=1, ge=1),
+        per_page: int = Query(default=DEFAULT_PAGE_SIZE, ge=10, le=MAX_PAGE_SIZE),
+        sector: str = Query(default="all"),
+        q: str = Query(default=""),
+        sort: str = Query(default="marketcap_usd"),
+        order: str = Query(default="desc"),
+        view: str = Query(default="overview"),
+        tier: str = Query(default="all"),
+        zone: str = Query(default="all"),
+    ):
+        """Unified market page — overview, screener, valuation, developers."""
+        if view == "valuation":
+            enriched = _build_all_tokens_for_valuation()
+            if sector != "all":
+                enriched = [t for t in enriched if t.get("sector") == sector]
+            if zone != "all":
+                from core.ssr_renderer import mvrv_zone as _mz
+                zone_label_map = {"deep_value": "Deep Value", "undervalued": "Undervalued", "fair": "Fair Value",
+                                 "elevated": "Elevated", "overvalued": "Overvalued", "euphoria": "Euphoria"}
+                target_label = zone_label_map.get(zone, "")
+                if target_label:
+                    enriched = [t for t in enriched if t.get("mvrv_usd") is not None and _mz(t["mvrv_usd"])[0] == target_label]
+            return render_market_page(enriched, total=len(enriched), sector=sector, sectors=SECTORS,
+                                      view="valuation", zone_filter=zone)
+        elif view == "developers":
+            tokens = _get_all_tokens()
+            dev_tokens = [t for t in tokens if t.get("dev_activity") is not None and (t.get("dev_activity") or 0) > 0]
+            if sector != "all":
+                dev_tokens = [t for t in dev_tokens if t.get("sector") == sector]
+            dev_tokens.sort(key=lambda t: t.get("dev_activity") or 0, reverse=True)
+            return render_market_page(dev_tokens[:100], total=len(dev_tokens), sector=sector, sectors=SECTORS,
+                                      view="developers")
+        elif view == "screener":
+            tier_ranges = {
+                "mega": (100e9, float("inf")), "large": (10e9, 100e9),
+                "mid": (1e9, 10e9), "small": (100e6, 1e9),
+                "micro": (0, 100e6), "all": (0, float("inf")),
+            }
+            min_mcap, max_mcap = tier_ranges.get(tier, (0, float("inf")))
+            tokens = _build_screener_tokens(min_mcap, max_mcap, -999, 999, sort, order, sector, "all", search=q)
+            visible_slugs = [t["slug"] for t in tokens[:200]]
+            if visible_slugs and _san_cache:
+                sparkline_data = _san_cache.get_timeseries_multi_slugs("price_usd", visible_slugs, limit_per_slug=7)
+                for t in tokens[:200]:
+                    t["sparkline_7d"] = sparkline_data.get(t["slug"], [])
+            return render_market_page(tokens, total=len(tokens), sector=sector, sectors=SECTORS,
+                                      search=q, sort_by=sort, order=order, view="screener", tier=tier)
+        else:
+            # Overview (default) — paginated token list
+            tokens, total = _build_token_list(page, per_page, sector=sector, search=q, sort_by=sort, order=order)
+            return render_market_page(tokens, page=page, per_page=per_page, total=total,
+                                      sector=sector, sectors=SECTORS, search=q,
+                                      sort_by=sort, order=order, view="overview")
+
+    @app.get("/market/csv")
+    async def get_market_csv(
+        view: str = Query(default="overview"),
+        sector: str = Query(default="all"),
+        sort: str = Query(default="marketcap_usd"),
+        order: str = Query(default="desc"),
+        q: str = Query(default=""),
+        tier: str = Query(default="all"),
+    ):
+        """Export market data as CSV."""
+        import csv, io
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        if view == "developers":
+            tokens = _get_all_tokens()
+            dev_tokens = [t for t in tokens if (t.get("dev_activity") or 0) > 0]
+            if sector != "all":
+                dev_tokens = [t for t in dev_tokens if t.get("sector") == sector]
+            dev_tokens.sort(key=lambda t: t.get("dev_activity") or 0, reverse=True)
+            writer.writerow(["Rank", "Name", "Ticker", "Slug", "Sector", "Dev Activity", "Price USD", "Market Cap"])
+            for i, t in enumerate(dev_tokens[:200], 1):
+                writer.writerow([i, t.get("name", ""), t.get("ticker", ""), t.get("slug", ""),
+                                t.get("sector", ""), t.get("dev_activity", 0),
+                                t.get("price_usd", ""), t.get("marketcap_usd", "")])
+        elif view == "valuation":
+            enriched = _build_all_tokens_for_valuation()
+            if sector != "all":
+                enriched = [t for t in enriched if t.get("sector") == sector]
+            writer.writerow(["Name", "Ticker", "Slug", "Sector", "Price USD", "MVRV", "Market Cap"])
+            for t in enriched[:500]:
+                writer.writerow([t.get("name", ""), t.get("ticker", ""), t.get("slug", ""),
+                                t.get("sector", ""), t.get("price_usd", ""),
+                                f"{t.get('mvrv_usd', 0) or 0:.4f}", t.get("marketcap_usd", "")])
+        else:
+            tokens, _ = _build_token_list(1, 500, sector=sector, search=q, sort_by=sort, order=order)
+            writer.writerow(["Rank", "Name", "Ticker", "Slug", "Sector", "Price (USD)", "Change 24h %", "Market Cap", "Volume 24h", "MVRV"])
+            for i, t in enumerate(tokens):
+                writer.writerow([i + 1, t.get("name", ""), t.get("ticker", ""), t.get("slug", ""),
+                                t.get("sector", ""), t.get("price_usd", ""),
+                                f"{t.get('price_usd_change', ''):.2f}" if t.get("price_usd_change") is not None else "",
+                                t.get("marketcap_usd", ""), t.get("volume_usd", ""),
+                                f"{t.get('mvrv_usd', ''):.2f}" if t.get("mvrv_usd") is not None else ""])
+        return Response(content=buf.getvalue(), media_type="text/csv",
+                       headers={"Content-Disposition": f"attachment; filename=market_{view}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"})
 
     @app.get("/explore", response_class=HTMLResponse)
     async def get_explore_page(

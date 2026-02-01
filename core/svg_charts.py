@@ -38,6 +38,9 @@ COLORS = [
 GRID_COLOR = "#30363d"
 LABEL_COLOR = "#8b949e"
 AXIS_COLOR = "#484f58"
+TITLE_COLOR = "#e6edf3"
+VALUE_COLOR = "#c9d1d9"
+MUTED_COLOR = "#6e7681"
 BG_COLOR = "none"  # transparent — let the container handle background
 
 # System font stack — matches dashboard CSS, no web font downloads
@@ -362,7 +365,7 @@ def line_chart_svg(
     if title:
         elements.append(
             f'<text x="{pad_left}" y="18" font-size="14" font-weight="700" '
-            f'fill="#222222" font-family={FONT_TITLE} letter-spacing="-0.3">{html_mod.escape(title)}</text>'
+            f'fill="{TITLE_COLOR}" font-family={FONT_TITLE} letter-spacing="-0.3">{html_mod.escape(title)}</text>'
         )
 
     # Y-axis: thin dotted gridlines + right-side labels (WSJ style)
@@ -532,7 +535,7 @@ def line_chart_svg(
                 f'stroke="{color}" stroke-width="2"/>'
             )
             elements.append(
-                f'<text x="{leg_x + 18}" y="{leg_y}" font-size="9" font-weight="500" fill="#555" '
+                f'<text x="{leg_x + 18}" y="{leg_y}" font-size="9" font-weight="500" fill="{LABEL_COLOR}" '
                 f'font-family={FONT_DATA}>{html_mod.escape(label)}</text>'
             )
             leg_x += len(label) * 5.8 + 32
@@ -540,7 +543,7 @@ def line_chart_svg(
     # Source line — small, bottom-left (WSJ convention)
     elements.append(
         f'<text x="{pad_left}" y="{height - 2}" text-anchor="start" '
-        f'font-size="8" fill="#AAAAAA" font-family={FONT_LABEL} '
+        f'font-size="8" fill="{AXIS_COLOR}" font-family={FONT_LABEL} '
         f'font-style="italic">Source: Santiment</text>'
     )
 
@@ -645,10 +648,10 @@ def _heatmap_color(pct_change: float) -> str:
 
 def _heatmap_text_color(pct_change: float) -> str:
     if pct_change is None:
-        return "#555555"
+        return LABEL_COLOR
     if abs(pct_change) >= 5:
         return "#FFFFFF"
-    return "#333333"
+    return VALUE_COLOR
 
 
 def market_heatmap_svg(tokens: list[dict], max_tokens: int = 50) -> str:
@@ -763,7 +766,7 @@ def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) ->
             "label": "Others",
             "value": others_mcap,
             "pct": (others_mcap / total) * 100,
-            "color": "#CCCCCC",
+            "color": AXIS_COLOR,
         })
 
     for seg in segments:
@@ -791,7 +794,7 @@ def dominance_bar_svg(tokens: list[dict], width: int = 700, height: int = 56) ->
         label = f'{seg["label"]} {seg["pct"]:.1f}%'
         elements.append(
             f'<text x="{leg_x + 14}" y="{label_y + 3}" font-size="9" font-weight="500" '
-            f'fill="#555" font-family={FONT_DATA}>{label}</text>'
+            f'fill="{LABEL_COLOR}" font-family={FONT_DATA}>{label}</text>'
         )
         leg_x += len(label) * 5.5 + 22
 
@@ -833,7 +836,7 @@ def donut_chart_svg(
             "label": "Others",
             "value": others,
             "pct": (others / total) * 100,
-            "color": "#CCCCCC",
+            "color": AXIS_COLOR,
         })
 
     cx, cy = width / 2, height / 2 - 10
@@ -885,7 +888,7 @@ def donut_chart_svg(
         if s["pct"] >= 4:
             elements.append(
                 f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchor}" '
-                f'font-size="9" font-weight="600" fill="#444" '
+                f'font-size="9" font-weight="600" fill="{LABEL_COLOR}" '
                 f'font-family={FONT_DATA}>'
                 f'{html_mod.escape(s["label"])} {s["pct"]:.0f}%</text>'
             )
@@ -895,12 +898,12 @@ def donut_chart_svg(
     # Center text
     elements.append(
         f'<text x="{cx}" y="{cy - 2}" text-anchor="middle" '
-        f'font-size="11" font-weight="700" fill="#222" '
+        f'font-size="11" font-weight="700" fill="{TITLE_COLOR}" '
         f'font-family={FONT_DATA}>Market</text>'
     )
     elements.append(
         f'<text x="{cx}" y="{cy + 12}" text-anchor="middle" '
-        f'font-size="9" font-weight="400" fill="#777" '
+        f'font-size="9" font-weight="400" fill="{MUTED_COLOR}" '
         f'font-family={FONT_LABEL}>Dominance</text>'
     )
 
@@ -962,31 +965,31 @@ def sentiment_gauge_svg(
     ny = cy - (r - 8) * math.sin(needle_angle)
     elements.append(
         f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{nx:.1f}" y2="{ny:.1f}" '
-        f'stroke="#222222" stroke-width="2" stroke-linecap="round"/>'
+        f'stroke="{TITLE_COLOR}" stroke-width="2" stroke-linecap="round"/>'
     )
-    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="#222222"/>')
-    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="2.5" fill="white"/>')
+    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="{TITLE_COLOR}"/>')
+    elements.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="2.5" fill="#0d1117"/>')
 
     # Value
     elements.append(
         f'<text x="{cx:.1f}" y="{cy - r/2 - 2:.1f}" text-anchor="middle" '
-        f'font-size="22" font-weight="800" fill="#222222" '
+        f'font-size="22" font-weight="800" fill="{TITLE_COLOR}" '
         f'font-family={FONT_DATA}>{value:.2f}</text>'
     )
     elements.append(
         f'<text x="{cx:.1f}" y="{cy + 16:.1f}" text-anchor="middle" '
-        f'font-size="9" font-weight="500" fill="#888" '
+        f'font-size="9" font-weight="500" fill="{MUTED_COLOR}" '
         f'font-family={FONT_LABEL}>{html_mod.escape(label)}</text>'
     )
 
     # Min/Max labels
     elements.append(
         f'<text x="{cx - r - 4:.1f}" y="{cy + 4:.1f}" text-anchor="end" '
-        f'font-size="8" fill="#999" font-family={FONT_LABEL}>Undervalued</text>'
+        f'font-size="8" fill="{MUTED_COLOR}" font-family={FONT_LABEL}>Undervalued</text>'
     )
     elements.append(
         f'<text x="{cx + r + 4:.1f}" y="{cy + 4:.1f}" text-anchor="start" '
-        f'font-size="8" fill="#999" font-family={FONT_LABEL}>Overvalued</text>'
+        f'font-size="8" fill="{MUTED_COLOR}" font-family={FONT_LABEL}>Overvalued</text>'
     )
 
     elements.append('</svg>')
@@ -1131,7 +1134,7 @@ def scatter_plot_svg(
     if title:
         elements.append(
             f'<text x="{pad_left}" y="18" font-size="14" font-weight="700" '
-            f'fill="#222" font-family={FONT_TITLE}>{html_mod.escape(title)}</text>'
+            f'fill="{TITLE_COLOR}" font-family={FONT_TITLE}>{html_mod.escape(title)}</text>'
         )
 
     # Dotted gridlines
@@ -1160,13 +1163,13 @@ def scatter_plot_svg(
     if x_label:
         elements.append(
             f'<text x="{pad_left + chart_w / 2}" y="{height - 4}" text-anchor="middle" '
-            f'font-size="10" font-weight="600" fill="#555" '
+            f'font-size="10" font-weight="600" fill="{LABEL_COLOR}" '
             f'font-family={FONT_DATA}>{html_mod.escape(x_label)}</text>'
         )
     if y_label:
         elements.append(
             f'<text x="10" y="{pad_top + chart_h / 2}" text-anchor="middle" '
-            f'font-size="10" font-weight="600" fill="#555" '
+            f'font-size="10" font-weight="600" fill="{LABEL_COLOR}" '
             f'font-family={FONT_DATA} '
             f'transform="rotate(-90, 10, {pad_top + chart_h / 2})">{html_mod.escape(y_label)}</text>'
         )
@@ -1189,9 +1192,9 @@ def scatter_plot_svg(
         dot_cy = scale_y(yv)
 
         if color_key and p.get(color_key):
-            color = THESIS_COLORS.get(p[color_key], "#999999")
+            color = THESIS_COLORS.get(p[color_key], MUTED_COLOR)
         else:
-            color = "#0A2463"
+            color = "#58a6ff"
 
         if size_key and max_size > 0 and size_vals:
             sv = size_vals[idx_p] if idx_p < len(size_vals) else 0
@@ -1215,14 +1218,14 @@ def scatter_plot_svg(
         if r > 8 and ticker:
             elements.append(
                 f'<text x="{dot_cx:.1f}" y="{dot_cy - r - 3:.1f}" text-anchor="middle" '
-                f'font-size="8" font-weight="600" fill="#444" '
+                f'font-size="8" font-weight="600" fill="{LABEL_COLOR}" '
                 f'font-family={FONT_DATA}>{ticker}</text>'
             )
 
     # Source line
     elements.append(
         f'<text x="{pad_left}" y="{height - 2}" text-anchor="start" '
-        f'font-size="8" fill="#AAA" font-family={FONT_LABEL} '
+        f'font-size="8" fill="{AXIS_COLOR}" font-family={FONT_LABEL} '
         f'font-style="italic">Source: Santiment</text>'
     )
 
@@ -1273,7 +1276,7 @@ def bar_chart_svg(
     if title:
         elements.append(
             f'<text x="{pad_left}" y="18" font-size="12" font-weight="700" '
-            f'fill="#222" font-family={FONT_TITLE}>{html_mod.escape(title)}</text>'
+            f'fill="{TITLE_COLOR}" font-family={FONT_TITLE}>{html_mod.escape(title)}</text>'
         )
 
     # Dotted gridlines with right-side labels
@@ -1384,7 +1387,7 @@ def radar_chart_svg(
             anchor = "start"
         elements.append(
             f'<text x="{lx:.1f}" y="{ly + 3:.1f}" text-anchor="{anchor}" '
-            f'font-size="9" font-weight="500" fill="#555" '
+            f'font-size="9" font-weight="500" fill="{LABEL_COLOR}" '
             f'font-family={FONT_DATA}>{html_mod.escape(label)}</text>'
         )
 
@@ -1424,7 +1427,7 @@ def radar_chart_svg(
         )
         elements.append(
             f'<text x="{leg_x + 16}" y="{leg_y + 3.5}" font-size="9" font-weight="500" '
-            f'fill="#444" font-family={FONT_DATA}>{html_mod.escape(label)}</text>'
+            f'fill="{LABEL_COLOR}" font-family={FONT_DATA}>{html_mod.escape(label)}</text>'
         )
         leg_x += len(label) * 5.5 + 28
 
